@@ -30,6 +30,7 @@ app.use('/season-stats', seasonStatsRouter)
 async function startServer() {
   try {
     await mongoose.connect(process.env.MONGODB_URI)
+    console.log("ENV NO RENDER:", process.env.MONGODB_URI);
     app.listen(port, () => {
       console.log(`API running on http://localhost:${port}`)
     })
