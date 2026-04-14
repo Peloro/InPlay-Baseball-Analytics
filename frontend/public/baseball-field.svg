@@ -1,0 +1,27 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="grass" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 350) rotate(90) scale(360 620)">
+      <stop stop-color="#52B86F"/>
+      <stop offset="1" stop-color="#2B8E4E"/>
+    </radialGradient>
+    <radialGradient id="dirt" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 580) rotate(90) scale(260 280)">
+      <stop stop-color="#C48E5A"/>
+      <stop offset="1" stop-color="#9C6036"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="700" fill="url(#grass)"/>
+  <path d="M600 670L230 300L600 80L970 300L600 670Z" fill="url(#dirt)"/>
+  <path d="M600 622L292 314L600 130L908 314L600 622Z" fill="#38A55D"/>
+
+  <line x1="600" y1="670" x2="230" y2="300" stroke="#F4F3EE" stroke-width="6"/>
+  <line x1="600" y1="670" x2="970" y2="300" stroke="#F4F3EE" stroke-width="6"/>
+
+  <circle cx="600" cy="530" r="38" fill="#B37444" stroke="#F4F3EE" stroke-width="4"/>
+  <circle cx="600" cy="350" r="22" fill="#B37444" stroke="#F4F3EE" stroke-width="4"/>
+
+  <rect x="585" y="652" width="30" height="30" transform="rotate(45 585 652)" fill="#F4F3EE"/>
+  <rect x="311" y="302" width="26" height="26" transform="rotate(45 311 302)" fill="#F4F3EE"/>
+  <rect x="587" y="111" width="26" height="26" transform="rotate(45 587 111)" fill="#F4F3EE"/>
+  <rect x="862" y="302" width="26" height="26" transform="rotate(45 862 302)" fill="#F4F3EE"/>
+</svg>

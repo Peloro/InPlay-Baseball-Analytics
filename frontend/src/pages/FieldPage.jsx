@@ -1,0 +1,2418 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import PlayerStatsModal from '../components/PlayerStatsModal'
+import CountDots from '../components/CountDots'
+import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
+import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
+import { VALID_POSITIONS } from '../data/positions'
+
+const LONG_PRESS_MS = 450
+const DEFENSIVE_POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
+
+function makeOpponentMarkers() {
+  return DEFENSIVE_POSITIONS.map((position) => {
+    const point = getDefaultFieldPosition(position)
+    return {
+      id: `opponent-${position}`,
+      label: position,
+      x: point.x,
+      y: point.y,
+    }
+  })
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function getPlayerId(player) {
+  return player?._id || player?.id
+}
+
+function isInsideRect(clientX, clientY, rect) {
+  if (!rect) return false
+  return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+}
+
+function getMainPosition(player) {
+  return player.activePosition || player.positions?.[0] || 'DH'
+}
+
+function getRoleType(player) {
+  return Array.isArray(player?.positions) && player.positions.includes('P') ? 'pitcher' : 'hitter'
+}
+
+function safeNumber(value) {
+  const parsed = Number(value || 0)
+  if (!Number.isFinite(parsed) || parsed < 0) return 0
+  return parsed
+}
+
+function formatIpFromOuts(outsPitched) {
+  const outs = safeNumber(outsPitched)
+  const innings = Math.floor(outs / 3)
+  const remainder = outs % 3
+  return `${innings}.${remainder}`
+}
+
+function formatEraFromOuts(outsPitched, earnedRuns) {
+  const outs = safeNumber(outsPitched)
+  const runs = safeNumber(earnedRuns)
+  if (!outs) return '--'
+  return ((runs * 21) / outs).toFixed(2)
+}
+
+function reorderList(list, from, to) {
+  const safe = [...list]
+  const [item] = safe.splice(from, 1)
+  safe.splice(to, 0, item)
+  return safe
+}
+
+function applyRunnerAdvance(runners, basesToAdvance) {
+  const order = ['first', 'second', 'third']
+  const nextRunners = { first: false, second: false, third: false }
+  let runs = 0
+
+  for (let index = order.length - 1; index >= 0; index -= 1) {
+    const base = order[index]
+    if (!runners?.[base]) continue
+
+    const targetIndex = index + basesToAdvance
+    if (targetIndex >= order.length) {
+      runs += 1
+    } else {
+      nextRunners[order[targetIndex]] = true
+    }
+  }
+
+  return { nextRunners, runs }
+}
+
+function applyHitToBases(runners, hitType) {
+  if (hitType === 'homerun') {
+    let runs = 1
+    if (runners?.first) runs += 1
+    if (runners?.second) runs += 1
+    if (runners?.third) runs += 1
+    return {
+      nextRunners: { first: false, second: false, third: false },
+      runs,
+      bases: 4,
+    }
+  }
+
+  const bases = hitType === 'triple' ? 3 : hitType === 'double' ? 2 : 1
+  const advanced = applyRunnerAdvance(runners, bases)
+  const nextRunners = { ...advanced.nextRunners }
+  if (bases === 1) nextRunners.first = true
+  if (bases === 2) nextRunners.second = true
+  if (bases === 3) nextRunners.third = true
+
+  return {
+    nextRunners,
+    runs: advanced.runs,
+    bases,
+  }
+}
+
+function forceAdvanceToFirst(runners) {
+  const next = { ...(runners || { first: false, second: false, third: false }) }
+  let runs = 0
+
+  if (!next.first) {
+    next.first = true
+    return { nextRunners: next, runs }
+  }
+
+  if (next.second && next.third) {
+    runs += 1
+  }
+
+  next.third = next.second ? true : next.third
+  next.second = true
+  next.first = true
+
+  return { nextRunners: next, runs }
+}
+
+function getNextBatterIndexFromState(state) {
+  const order = state.battingOrder || []
+  if (!state.isAttacking || !order.length) return state.currentBatterIndex || 0
+  const currentIndex = Math.min(state.currentBatterIndex || 0, order.length - 1)
+  return (currentIndex + 1) % order.length
+}
+
+function FieldPage({
+  players,
+  setPlayers,
+  activeTool,
+  clearDrawVersion,
+  gameState,
+  onUpdateGameState,
+  onUpdatePlayer,
+  onPitchAction,
+  onDefensiveOut,
+  onDefensiveEarnedRun,
+  activeGame,
+  onEndGame,
+}) {
+  const layoutRef = useRef(null)
+  const fieldStageRef = useRef(null)
+  const fieldImageRef = useRef(null)
+  const benchRef = useRef(null)
+  const drawingRef = useRef(null)
+  const dragRef = useRef(null)
+  const isDrawingRef = useRef(false)
+  const longPressTimerRef = useRef(null)
+  const dragStartRef = useRef(null)
+  const suppressModalUntilRef = useRef(0)
+
+  const [selectedId, setSelectedId] = useState(null)
+  const [tooltipId, setTooltipId] = useState(null)
+  const [fieldRect, setFieldRect] = useState({ left: 0, top: 0, width: 0, height: 0 })
+  const [strokes, setStrokes] = useState([])
+  const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
+  const [dragPreview, setDragPreview] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)
+  const [benchSearch, setBenchSearch] = useState('')
+  const [focusedPlayerId, setFocusedPlayerId] = useState(null)
+  const [focusedSeasonEntry, setFocusedSeasonEntry] = useState(null)
+  const [focusedGameEntry, setFocusedGameEntry] = useState(null)
+  const [draggingPlayerId, setDraggingPlayerId] = useState(null)
+  const [recentlyDroppedId, setRecentlyDroppedId] = useState(null)
+  const [dragSource, setDragSource] = useState(null)
+  const [dropMessage, setDropMessage] = useState('')
+  const [runnerDrag, setRunnerDrag] = useState(null)
+  const [editingPlayerId, setEditingPlayerId] = useState(null)
+  const [editForm, setEditForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
+  const [showPreGameSetup, setShowPreGameSetup] = useState(false)
+  const [setupAttacking, setSetupAttacking] = useState(true)
+  const [setupStarters, setSetupStarters] = useState([])
+  const [setupBattingOrder, setSetupBattingOrder] = useState([])
+  const [setupDraggingId, setSetupDraggingId] = useState(null)
+  const [opponentDefense, setOpponentDefense] = useState(makeOpponentMarkers)
+  const [pitcherLiveStat, setPitcherLiveStat] = useState(null)
+  const [pendingDefenseError, setPendingDefenseError] = useState(false)
+  const [selectedErrorDefenderId, setSelectedErrorDefenderId] = useState('')
+  const [pendingDoublePlaySelect, setPendingDoublePlaySelect] = useState(false)
+  const [selectedDoublePlayRunnerBase, setSelectedDoublePlayRunnerBase] = useState('')
+  const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
+  const [undoStack, setUndoStack] = useState([])
+  const [invalidFeedback, setInvalidFeedback] = useState('')
+
+  const playersById = useMemo(() => {
+    const map = {}
+    for (const player of players) {
+      map[getPlayerId(player)] = player
+    }
+    return map
+  }, [players])
+
+  const onFieldIds = useMemo(() => new Set(gameState.onFieldPlayerIds || []), [gameState.onFieldPlayerIds])
+
+  const fieldPlayers = useMemo(
+    () => players.filter((player) => onFieldIds.has(getPlayerId(player))),
+    [players, onFieldIds],
+  )
+
+  const benchPlayers = useMemo(() => {
+    const term = benchSearch.trim().toLowerCase()
+    return players
+      .filter((player) => !onFieldIds.has(getPlayerId(player)))
+      .filter((player) => {
+        if (!term) return true
+        return (
+          player.name.toLowerCase().includes(term)
+          || String(player.number).includes(term)
+          || getMainPosition(player).toLowerCase().includes(term)
+        )
+      })
+      .sort((a, b) => {
+        const byPos = getMainPosition(a).localeCompare(getMainPosition(b))
+        if (byPos !== 0) return byPos
+        return a.number - b.number
+      })
+  }, [players, onFieldIds, benchSearch])
+
+  const setupStarterIds = useMemo(() => setupStarters.map((item) => item.playerId), [setupStarters])
+
+  const setupAvailablePlayers = useMemo(
+    () => players.filter((player) => !setupStarterIds.includes(getPlayerId(player))),
+    [players, setupStarterIds],
+  )
+
+  const playerCanPlayPosition = useCallback((playerId, position) => {
+    const player = playersById[playerId]
+    if (!player) return false
+    const allowed = Array.isArray(player.positions) ? player.positions : []
+    return allowed.includes(position)
+  }, [playersById])
+
+  useEffect(() => {
+    if (!gameState.currentGameId) {
+      const timer = window.setTimeout(() => setShowPreGameSetup(false), 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    if (gameState.preGameConfigured) {
+      const timer = window.setTimeout(() => setShowPreGameSetup(false), 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    const starters = DEFENSIVE_POSITIONS.map((position) => {
+      return { position, playerId: '' }
+    })
+
+    const timer = window.setTimeout(() => {
+      setSetupAttacking(true)
+      setSetupStarters(starters)
+      setSetupBattingOrder([])
+      setShowPreGameSetup(true)
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [gameState.currentGameId, gameState.preGameConfigured, players])
+
+  useEffect(() => {
+    if (!gameState.currentGameId || !gameState.currentPitcherId || gameState.isAttacking) {
+      const timer = window.setTimeout(() => setPitcherLiveStat(null), 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    const load = async () => {
+      try {
+        const response = await gameStatsApi.listByGame(gameState.currentGameId, gameState.currentPitcherId)
+        setPitcherLiveStat(response.data?.[0] || null)
+      } catch {
+        setPitcherLiveStat(null)
+      }
+    }
+
+    load()
+  }, [
+    gameState.currentGameId,
+    gameState.currentPitcherId,
+    gameState.isAttacking,
+    gameState.pitchCount,
+    gameState.outs,
+    gameState.homeScore,
+    gameState.awayScore,
+  ])
+
+
+  useEffect(() => {
+    if (gameState.isAttacking) return
+
+    const lineup = Array.isArray(gameState.lineup) ? gameState.lineup : []
+    const lineupById = {}
+    for (const item of lineup) {
+      if (item?.playerId && item?.position) lineupById[item.playerId] = item.position
+    }
+
+    setPlayers((current) =>
+      current.map((player) => {
+        const id = getPlayerId(player)
+        if (!(gameState.onFieldPlayerIds || []).includes(id)) return player
+        const position = lineupById[id] || getMainPosition(player)
+        const point = getDefaultFieldPosition(position)
+        return { ...player, activePosition: position, x: point.x, y: point.y }
+      }),
+    )
+  }, [gameState.isAttacking, gameState.onFieldPlayerIds, gameState.lineup, setPlayers])
+
+  useEffect(() => {
+    if (!gameState.currentGameId || !gameState.preGameConfigured || showPreGameSetup) return
+
+    const lineup = Array.isArray(gameState.lineup) ? gameState.lineup : []
+    const battingOrder = Array.isArray(gameState.battingOrder) ? gameState.battingOrder : []
+    const bench = Array.isArray(gameState.bench) ? gameState.bench : []
+
+    gamesApi.update(gameState.currentGameId, {
+      isAttacking: gameState.isAttacking,
+      lineup,
+      battingOrder,
+      bench,
+    }).catch(() => {})
+  }, [
+    gameState.currentGameId,
+    gameState.preGameConfigured,
+    gameState.isAttacking,
+    gameState.lineup,
+    gameState.battingOrder,
+    gameState.bench,
+    showPreGameSetup,
+  ])
+
+  const confirmPreGameSetup = async () => {
+    const starters = setupStarters.filter((item) => item.playerId)
+    const starterIds = starters.map((item) => item.playerId)
+
+    if (starters.length !== 9) return
+    if (new Set(starterIds).size !== 9) return
+    if (new Set(starters.map((item) => item.position)).size !== 9) return
+    if (!starters.every((item) => playerCanPlayPosition(item.playerId, item.position))) return
+    if (setupBattingOrder.length !== 9) return
+    if (new Set(setupBattingOrder).size !== 9) return
+    if (!setupBattingOrder.every((id) => starterIds.includes(id))) return
+
+    const lineupById = {}
+    for (const item of starters) lineupById[item.playerId] = item.position
+    const bench = players.map((player) => getPlayerId(player)).filter((id) => !starterIds.includes(id))
+
+    setPlayers((current) =>
+      current.map((player) => {
+        const id = getPlayerId(player)
+        const position = lineupById[id]
+        if (!position) return player
+        const point = getDefaultFieldPosition(position)
+        return { ...player, activePosition: position, x: point.x, y: point.y }
+      }),
+    )
+
+    onUpdateGameState((current) => ({
+      ...current,
+      isAttacking: setupAttacking,
+      lineup: starters,
+      bench,
+      battingOrder: setupBattingOrder,
+      currentBatterIndex: 0,
+      participantPlayerIds: [...starterIds, ...bench],
+      onFieldPlayerIds: starterIds,
+      preGameConfigured: true,
+      outs: 0,
+      balls: 0,
+      strikes: 0,
+      runners: { first: false, second: false, third: false },
+      inning: current.inning || 1,
+      inningHalf: current.inningHalf || 'top',
+    }), 'Configuracao inicial confirmada')
+
+    try {
+      await gamesApi.update(gameState.currentGameId, {
+        isAttacking: setupAttacking,
+        battingOrder: setupBattingOrder,
+        lineup: starters,
+        bench,
+      })
+    } catch {
+      // Mantem setup local mesmo sem backend.
+    }
+
+    setShowPreGameSetup(false)
+  }
+
+  const assignStarter = (position, playerId) => {
+    if (playerId && !playerCanPlayPosition(playerId, position)) return
+
+    setSetupStarters((current) => {
+      const next = current.map((item) => (item.position === position ? { ...item, playerId } : item))
+      const ids = next.map((item) => item.playerId).filter(Boolean)
+      setSetupBattingOrder((order) => {
+        const filtered = order.filter((id) => ids.includes(id))
+        for (const id of ids) {
+          if (!filtered.includes(id)) filtered.push(id)
+        }
+        return filtered.slice(0, 9)
+      })
+      return next
+    })
+  }
+
+  const onBattingDragStart = (id) => setSetupDraggingId(id)
+
+  const onBattingDrop = (targetId) => {
+    if (!setupDraggingId || setupDraggingId === targetId) return
+    setSetupBattingOrder((current) => {
+      const from = current.indexOf(setupDraggingId)
+      const to = current.indexOf(targetId)
+      if (from < 0 || to < 0) return current
+      return reorderList(current, from, to)
+    })
+    setSetupDraggingId(null)
+  }
+
+  const toFieldPoint = useCallback((clientX, clientY) => {
+    if (!fieldStageRef.current || !fieldRect.width || !fieldRect.height) return null
+
+    const stageRect = fieldStageRef.current.getBoundingClientRect()
+    const localX = clientX - stageRect.left
+    const localY = clientY - stageRect.top
+
+    const fieldX = ((localX - fieldRect.left) / fieldRect.width) * 100
+    const fieldY = ((localY - fieldRect.top) / fieldRect.height) * 100
+
+    if (fieldX < 0 || fieldX > 100 || fieldY < 0 || fieldY > 100) return null
+    return { x: clamp(fieldX, 0, 100), y: clamp(fieldY, 0, 100) }
+  }, [fieldRect])
+
+  const toScreenPoint = useCallback((x, y) => ({
+    left: fieldRect.left + (x / 100) * fieldRect.width,
+    top: fieldRect.top + (y / 100) * fieldRect.height,
+  }), [fieldRect])
+
+  useLayoutEffect(() => {
+    const updateFieldRect = () => {
+      if (!fieldStageRef.current || !fieldImageRef.current) return
+
+      const stageRect = fieldStageRef.current.getBoundingClientRect()
+      const imageRect = fieldImageRef.current.getBoundingClientRect()
+
+      setFieldRect({
+        left: imageRect.left - stageRect.left,
+        top: imageRect.top - stageRect.top,
+        width: imageRect.width,
+        height: imageRect.height,
+      })
+    }
+
+    updateFieldRect()
+    window.addEventListener('resize', updateFieldRect)
+    return () => window.removeEventListener('resize', updateFieldRect)
+  }, [])
+
+  useEffect(() => {
+    if (!drawingRef.current) return
+
+    const canvas = drawingRef.current
+    const width = Math.max(1, Math.floor(fieldRect.width))
+    const height = Math.max(1, Math.floor(fieldRect.height))
+    const ratio = window.devicePixelRatio || 1
+
+    canvas.width = width * ratio
+    canvas.height = height * ratio
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+
+    const context = canvas.getContext('2d')
+    context.setTransform(ratio, 0, 0, ratio, 0, 0)
+    context.clearRect(0, 0, width, height)
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    context.strokeStyle = '#E43D28'
+    context.lineWidth = 3
+
+    for (const stroke of strokes) {
+      if (!stroke.length) continue
+      context.beginPath()
+      context.moveTo((stroke[0].x / 100) * width, (stroke[0].y / 100) * height)
+      for (let index = 1; index < stroke.length; index += 1) {
+        context.lineTo((stroke[index].x / 100) * width, (stroke[index].y / 100) * height)
+      }
+      context.stroke()
+    }
+  }, [strokes, fieldRect])
+
+  useEffect(() => {
+    if (!clearDrawVersion) return
+    const frame = window.requestAnimationFrame(() => setStrokes([]))
+    return () => window.cancelAnimationFrame(frame)
+  }, [clearDrawVersion])
+
+  useEffect(() => {
+    const onField = gameState.onFieldPlayerIds || []
+    if (!onField.length) return
+
+    // Keep the most recently added player in a duplicated position.
+    const seen = new Set()
+    const keepReversed = []
+
+    for (let index = onField.length - 1; index >= 0; index -= 1) {
+      const id = onField[index]
+      const player = playersById[id]
+      if (!player) continue
+      const position = getMainPosition(player)
+      if (seen.has(position)) continue
+      seen.add(position)
+      keepReversed.push(id)
+    }
+
+    const keep = keepReversed.reverse()
+    if (keep.length !== onField.length) {
+      onUpdateGameState((current) => {
+        const unique = Array.from(new Set(keep))
+        const battingOrder = (current.battingOrder || []).filter((id) => unique.includes(id))
+        const lineup = (current.lineup || []).filter((item) => unique.includes(item.playerId))
+        const bench = players.map((item) => getPlayerId(item)).filter((id) => !unique.includes(id))
+        return {
+          ...current,
+          onFieldPlayerIds: unique,
+          battingOrder,
+          lineup,
+          bench,
+          participantPlayerIds: [...unique, ...bench],
+        }
+      }, 'Conflito de posicao resolvido: jogador anterior enviado ao banco')
+    }
+  }, [gameState.onFieldPlayerIds, onUpdateGameState, players, playersById])
+
+  const advanceRunner = useCallback((base) => {
+    const order = ['first', 'second', 'third']
+    const index = order.indexOf(base)
+    if (index === -1) return
+
+    onUpdateGameState((current) => {
+      if (!current.runners?.[base]) return current
+
+      const nextRunners = { ...current.runners, [base]: false }
+      const nextBase = order[index + 1]
+      const runs = nextBase ? 0 : 1
+
+      if (nextBase) {
+        nextRunners[nextBase] = true
+      }
+
+      return {
+        ...current,
+        runners: nextRunners,
+        homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
+        awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
+      }
+    }, `Corredor avancou de ${base}`)
+
+    if (!gameState.isAttacking && base === 'third' && gameState.runners?.third) {
+      onDefensiveEarnedRun?.(1)
+    }
+  }, [gameState.isAttacking, gameState.runners, onDefensiveEarnedRun, onUpdateGameState])
+
+  const removeRunner = useCallback((base) => {
+    onUpdateGameState((current) => {
+      if (!current.runners?.[base]) return current
+
+      const nextOuts = clamp((current.outs || 0) + 1, 0, 3)
+      const sideSwitch = nextOuts >= 3
+      const nextHalf = sideSwitch
+        ? current.inningHalf === 'top'
+          ? 'bottom'
+          : 'top'
+        : current.inningHalf || 'top'
+      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+
+      return {
+        ...current,
+        runners: sideSwitch
+          ? { first: false, second: false, third: false }
+          : { ...current.runners, [base]: false },
+        outs: sideSwitch ? 0 : nextOuts,
+        balls: sideSwitch ? 0 : current.balls,
+        strikes: sideSwitch ? 0 : current.strikes,
+        isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
+        inningHalf: nextHalf,
+        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+      }
+    }, `Corredor removido em ${base}`)
+    if (!gameState.isAttacking && gameState.runners?.[base]) {
+      onDefensiveOut?.(1)
+    }
+  }, [gameState.isAttacking, gameState.runners, onDefensiveOut, onUpdateGameState])
+
+  const upsertCurrentBatterStats = useCallback(async (playerId, patch = {}) => {
+    if (!gameState.currentGameId || !playerId) return
+
+    const found = await gameStatsApi.listByGame(gameState.currentGameId, playerId)
+    const current = found.data?.[0]
+
+    const payload = {
+      type: getRoleType(playersById[playerId]),
+      hitting: {
+        atBats: safeNumber(patch.hitting?.atBats ?? current?.hitting?.atBats),
+        hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
+        strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
+        outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
+      },
+      pitching: {
+        inningsPitched: safeNumber(current?.pitching?.inningsPitched),
+        earnedRuns: safeNumber(current?.pitching?.earnedRuns),
+        strikeouts: safeNumber(current?.pitching?.strikeouts),
+        walks: safeNumber(current?.pitching?.walks),
+        strikes: safeNumber(current?.pitching?.strikes),
+        balls: safeNumber(current?.pitching?.balls),
+        pitchCount: safeNumber(current?.pitching?.pitchCount),
+      },
+      defense: {
+        errors: safeNumber(current?.defense?.errors),
+        doublePlays: safeNumber(current?.defense?.doublePlays),
+        flyOuts: safeNumber(current?.defense?.flyOuts),
+        groundOuts: safeNumber(current?.defense?.groundOuts),
+        lineOuts: safeNumber(current?.defense?.lineOuts),
+      },
+    }
+
+    if (current?._id) {
+      await gameStatsApi.update(current._id, payload)
+    } else {
+      await gameStatsApi.create({ gameId: gameState.currentGameId, playerId, ...payload })
+    }
+  }, [gameState.currentGameId, playersById])
+
+  const upsertPlayerStat = useCallback(async (playerId, patch = {}) => {
+    if (!gameState.currentGameId || !playerId) return
+
+    const found = await gameStatsApi.listByGame(gameState.currentGameId, playerId)
+    const current = found.data?.[0]
+
+    const payload = {
+      type: getRoleType(playersById[playerId]),
+      hitting: {
+        atBats: safeNumber(patch.hitting?.atBats ?? current?.hitting?.atBats),
+        hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
+        strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
+        outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
+      },
+      pitching: {
+        inningsPitched: safeNumber(patch.pitching?.inningsPitched ?? current?.pitching?.inningsPitched),
+        outsPitched: safeNumber(patch.pitching?.outsPitched ?? current?.pitching?.outsPitched),
+        earnedRuns: safeNumber(patch.pitching?.earnedRuns ?? current?.pitching?.earnedRuns),
+        strikeouts: safeNumber(patch.pitching?.strikeouts ?? current?.pitching?.strikeouts),
+        walks: safeNumber(patch.pitching?.walks ?? current?.pitching?.walks),
+        strikes: safeNumber(patch.pitching?.strikes ?? current?.pitching?.strikes),
+        balls: safeNumber(patch.pitching?.balls ?? current?.pitching?.balls),
+        pitchCount: safeNumber(patch.pitching?.pitchCount ?? current?.pitching?.pitchCount),
+      },
+      defense: {
+        errors: safeNumber(patch.defense?.errors ?? current?.defense?.errors),
+        doublePlays: safeNumber(patch.defense?.doublePlays ?? current?.defense?.doublePlays),
+        flyOuts: safeNumber(patch.defense?.flyOuts ?? current?.defense?.flyOuts),
+        groundOuts: safeNumber(patch.defense?.groundOuts ?? current?.defense?.groundOuts),
+        lineOuts: safeNumber(patch.defense?.lineOuts ?? current?.defense?.lineOuts),
+      },
+    }
+
+    if (current?._id) {
+      await gameStatsApi.update(current._id, payload)
+    } else {
+      await gameStatsApi.create({ gameId: gameState.currentGameId, playerId, ...payload })
+    }
+  }, [gameState.currentGameId, playersById])
+
+  const syncDefensivePitcherEvent = useCallback(async ({ outsDelta = 0, earnedRunsDelta = 0, pitchCountDelta = 0, walksDelta = 0, strikeoutsDelta = 0 } = {}) => {
+    if (gameState.isAttacking) return
+    if (!gameState.currentGameId || !gameState.currentPitcherId) return
+
+    const pitcherId = gameState.currentPitcherId
+    const found = await gameStatsApi.listByGame(gameState.currentGameId, pitcherId)
+    const current = found.data?.[0]
+
+    const nextOutsPitched = safeNumber(current?.pitching?.outsPitched) + safeNumber(outsDelta)
+    const patch = {
+      pitching: {
+        outsPitched: nextOutsPitched,
+        inningsPitched: Math.floor(nextOutsPitched / 3) + ((nextOutsPitched % 3) / 10),
+        earnedRuns: safeNumber(current?.pitching?.earnedRuns) + safeNumber(earnedRunsDelta),
+        strikeouts: safeNumber(current?.pitching?.strikeouts) + safeNumber(strikeoutsDelta),
+        walks: safeNumber(current?.pitching?.walks) + safeNumber(walksDelta),
+        strikes: safeNumber(current?.pitching?.strikes),
+        balls: safeNumber(current?.pitching?.balls),
+        pitchCount: safeNumber(current?.pitching?.pitchCount) + safeNumber(pitchCountDelta),
+      },
+    }
+
+    await upsertPlayerStat(pitcherId, patch)
+  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, upsertPlayerStat])
+
+  const showInvalidAction = useCallback((message) => {
+    setInvalidFeedback(message)
+    window.setTimeout(() => setInvalidFeedback(''), 1400)
+  }, [])
+
+  const captureUndoSnapshot = useCallback(async () => {
+    if (!gameState.currentGameId) return
+
+    let statsSnapshot = []
+    try {
+      const response = await gameStatsApi.listByGame(gameState.currentGameId)
+      statsSnapshot = (response.data || []).map((entry) => ({
+        playerId: entry.playerId?._id || entry.playerId,
+        type: entry.type,
+        hitting: {
+          atBats: safeNumber(entry.hitting?.atBats),
+          hits: safeNumber(entry.hitting?.hits),
+          strikeouts: safeNumber(entry.hitting?.strikeouts),
+          outs: safeNumber(entry.hitting?.outs),
+        },
+        pitching: {
+          inningsPitched: safeNumber(entry.pitching?.inningsPitched),
+          outsPitched: safeNumber(entry.pitching?.outsPitched),
+          earnedRuns: safeNumber(entry.pitching?.earnedRuns),
+          strikeouts: safeNumber(entry.pitching?.strikeouts),
+          walks: safeNumber(entry.pitching?.walks),
+          strikes: safeNumber(entry.pitching?.strikes),
+          balls: safeNumber(entry.pitching?.balls),
+          pitchCount: safeNumber(entry.pitching?.pitchCount),
+        },
+        defense: {
+          errors: safeNumber(entry.defense?.errors),
+          doublePlays: safeNumber(entry.defense?.doublePlays),
+          flyOuts: safeNumber(entry.defense?.flyOuts),
+          groundOuts: safeNumber(entry.defense?.groundOuts),
+          lineOuts: safeNumber(entry.defense?.lineOuts),
+        },
+      }))
+    } catch {
+      statsSnapshot = []
+    }
+
+    const stateSnapshot = JSON.parse(JSON.stringify(gameState))
+    setUndoStack((current) => [...current, { stateSnapshot, statsSnapshot }].slice(-80))
+  }, [gameState])
+
+  const handleUndo = useCallback(async () => {
+    const latest = undoStack[undoStack.length - 1]
+    if (!latest) {
+      showInvalidAction('Nada para desfazer')
+      return
+    }
+
+    setUndoStack((current) => current.slice(0, -1))
+    onUpdateGameState(latest.stateSnapshot)
+
+    if (!gameState.currentGameId) return
+
+    try {
+      const currentStatsResponse = await gameStatsApi.listByGame(gameState.currentGameId)
+      const currentStats = currentStatsResponse.data || []
+      const snapshotMap = {}
+      for (const item of latest.statsSnapshot || []) {
+        snapshotMap[item.playerId] = item
+      }
+
+      for (const currentEntry of currentStats) {
+        const pid = currentEntry.playerId?._id || currentEntry.playerId
+        const saved = snapshotMap[pid]
+
+        if (saved) {
+          await upsertPlayerStat(pid, saved)
+          continue
+        }
+
+        await upsertPlayerStat(pid, {
+          type: currentEntry.type,
+          hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+          pitching: {
+            inningsPitched: 0,
+            outsPitched: 0,
+            earnedRuns: 0,
+            strikeouts: 0,
+            walks: 0,
+            strikes: 0,
+            balls: 0,
+            pitchCount: 0,
+          },
+          defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
+        })
+      }
+
+      for (const saved of latest.statsSnapshot || []) {
+        const alreadyExists = currentStats.some((item) => {
+          const pid = item.playerId?._id || item.playerId
+          return pid === saved.playerId
+        })
+        if (!alreadyExists) {
+          await upsertPlayerStat(saved.playerId, saved)
+        }
+      }
+    } catch {
+      showInvalidAction('Falha ao restaurar stats')
+    }
+  }, [gameState.currentGameId, onUpdateGameState, showInvalidAction, undoStack, upsertPlayerStat])
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return
+      if (String(event.key || '').toLowerCase() !== 'z') return
+      event.preventDefault()
+      handleUndo().catch(() => {})
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleUndo])
+
+  const applyPlateAppearance = useCallback(async (kind) => {
+    const order = gameState.battingOrder || []
+    if (!order.length || !gameState.isAttacking) return
+
+    await captureUndoSnapshot()
+
+    const batterIndex = Math.min(gameState.currentBatterIndex || 0, order.length - 1)
+    const batterId = order[batterIndex]
+
+    onUpdateGameState((current) => {
+      const localOrder = current.battingOrder || []
+      if (!localOrder.length) return current
+
+      const currentIndex = Math.min(current.currentBatterIndex || 0, localOrder.length - 1)
+      const nextIndex = (currentIndex + 1) % localOrder.length
+      const isOut = kind === 'strikeout' || kind === 'out'
+      const outs = isOut ? clamp((current.outs || 0) + 1, 0, 3) : current.outs || 0
+
+      let nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
+      let runs = 0
+
+      if (kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun') {
+        const hitResult = applyHitToBases(nextRunners, kind)
+        nextRunners = hitResult.nextRunners
+        runs = hitResult.runs
+      }
+
+      const sideSwitch = outs >= 3
+      const nextHalf = sideSwitch
+        ? current.inningHalf === 'top'
+          ? 'bottom'
+          : 'top'
+        : current.inningHalf || 'top'
+      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+
+      return {
+        ...current,
+        outs: sideSwitch ? 0 : outs,
+        balls: 0,
+        strikes: 0,
+        currentBatterIndex: nextIndex,
+        isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
+        inningHalf: nextHalf,
+        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
+        homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
+        awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
+      }
+    }, `Acao de bastao: ${kind}`)
+
+    try {
+      const endedAsOut = kind === 'strikeout' || kind === 'out'
+      const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
+      const current = found.data?.[0]
+      const patch = {
+        hitting: {
+          atBats: safeNumber(current?.hitting?.atBats) + 1,
+          hits: safeNumber(current?.hitting?.hits) + (kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun' ? 1 : 0),
+          strikeouts: safeNumber(current?.hitting?.strikeouts) + (kind === 'strikeout' ? 1 : 0),
+          outs: safeNumber(current?.hitting?.outs) + (endedAsOut ? 1 : 0),
+        },
+      }
+      await upsertCurrentBatterStats(batterId, patch)
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertCurrentBatterStats])
+
+  const applyDefensiveHit = useCallback(async (kind) => {
+    if (gameState.isAttacking) return
+
+    await captureUndoSnapshot()
+
+    let runsScored = 0
+
+    onUpdateGameState((current) => {
+      if (current.isAttacking) return current
+
+      const hitResult = applyHitToBases(current.runners || { first: false, second: false, third: false }, kind)
+      runsScored = hitResult.runs
+
+      return {
+        ...current,
+        balls: 0,
+        strikes: 0,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        runners: hitResult.nextRunners,
+        homeScore: (current.homeScore || 0) + (current.isAttacking ? hitResult.runs : 0),
+        awayScore: (current.awayScore || 0) + (!current.isAttacking ? hitResult.runs : 0),
+      }
+    }, `Hit do adversario: ${kind}`)
+
+    try {
+      await syncDefensivePitcherEvent({
+        pitchCountDelta: 1,
+        earnedRunsDelta: runsScored > 0 ? runsScored : 0,
+      })
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+
+  const applyAttackCountAction = useCallback(async (kind) => {
+    if (!gameState.isAttacking) return
+
+    await captureUndoSnapshot()
+
+    onUpdateGameState((current) => {
+      if (!current.isAttacking) return current
+
+      const beforeStrikes = Number(current.strikes || 0)
+      const beforeBalls = Number(current.balls || 0)
+      const nextStrikesRaw = kind === 'strike'
+        ? beforeStrikes + 1
+        : kind === 'foul'
+          ? Math.min(2, beforeStrikes + 1)
+          : beforeStrikes
+      const nextBallsRaw = kind === 'ball' ? beforeBalls + 1 : beforeBalls
+
+      const didStrikeout = nextStrikesRaw >= 3
+      const didWalk = !didStrikeout && nextBallsRaw >= 4
+      const order = current.battingOrder || []
+
+      let nextOuts = Number(current.outs || 0)
+      let nextInning = Number(current.inning || 1)
+      let nextHalf = current.inningHalf || 'top'
+      let nextIsAttacking = current.isAttacking
+      let nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
+      let scoredRuns = 0
+
+      if (didStrikeout) {
+        nextOuts += 1
+
+        if (nextOuts >= 3) {
+          nextOuts = 0
+          nextIsAttacking = false
+          nextHalf = current.inningHalf === 'top' ? 'bottom' : 'top'
+          if (current.inningHalf === 'bottom') nextInning = Math.max(1, nextInning + 1)
+          nextRunners = { first: false, second: false, third: false }
+        }
+      }
+
+      if (didWalk) {
+        const forced = forceAdvanceToFirst(nextRunners)
+        nextRunners = forced.nextRunners
+        scoredRuns = forced.runs
+      }
+
+      const shouldAdvanceBatter = order.length > 0 && (didStrikeout || didWalk)
+      const nextBatterIndex = shouldAdvanceBatter
+        ? getNextBatterIndexFromState(current)
+        : Number(current.currentBatterIndex || 0)
+
+      return {
+        ...current,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        strikes: didStrikeout || didWalk ? 0 : nextStrikesRaw,
+        balls: didStrikeout || didWalk ? 0 : nextBallsRaw,
+        currentBatterIndex: nextBatterIndex,
+        outs: nextOuts,
+        inning: nextInning,
+        inningHalf: nextHalf,
+        isAttacking: nextIsAttacking,
+        runners: nextRunners,
+        homeScore: Number(current.homeScore || 0) + scoredRuns,
+        awayScore: Number(current.awayScore || 0),
+      }
+    }, `Contagem no ataque: ${kind}`)
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState])
+
+  const applyDefensiveOutEvent = useCallback(async (kind = 'out') => {
+    if (gameState.isAttacking) return
+
+    await captureUndoSnapshot()
+
+    onUpdateGameState((current) => {
+      if (current.isAttacking) return current
+
+      const nextOutsRaw = Number(current.outs || 0) + 1
+      const sideSwitch = nextOutsRaw >= 3
+      const nextHalf = sideSwitch
+        ? current.inningHalf === 'top'
+          ? 'bottom'
+          : 'top'
+        : current.inningHalf || 'top'
+      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+
+      return {
+        ...current,
+        outs: sideSwitch ? 0 : nextOutsRaw,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        balls: 0,
+        strikes: 0,
+        isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
+        inningHalf: nextHalf,
+        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        runners: sideSwitch ? { first: false, second: false, third: false } : current.runners,
+      }
+    }, `Out defensivo: ${kind}`)
+
+    try {
+      await syncDefensivePitcherEvent({
+        outsDelta: 1,
+        pitchCountDelta: 1,
+        strikeoutsDelta: kind === 'strikeout' ? 1 : 0,
+      })
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+
+  const applyDoublePlayWithRunner = async (runnerBase, defenderIds = []) => {
+    if (!runnerBase) return
+
+    await captureUndoSnapshot()
+
+    const defenderLabel = defenderIds.length
+      ? defenderIds
+        .map((id) => playersById[id])
+        .filter(Boolean)
+        .map((player) => getMainPosition(player))
+        .join(' -> ')
+      : ''
+    const defenderText = defenderLabel ? ` | defesa: ${defenderLabel}` : ''
+
+    onUpdateGameState((current) => {
+      const hasRunner = Boolean(current.runners?.[runnerBase])
+      if (!hasRunner) return current
+
+      const nextRunners = { ...(current.runners || { first: false, second: false, third: false }), [runnerBase]: false }
+      const nextOutsRaw = Number(current.outs || 0) + 2
+      const sideSwitch = nextOutsRaw >= 3
+      const nextHalf = sideSwitch
+        ? current.inningHalf === 'top'
+          ? 'bottom'
+          : 'top'
+        : current.inningHalf || 'top'
+      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+
+      return {
+        ...current,
+        outs: sideSwitch ? 0 : nextOutsRaw,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        balls: 0,
+        strikes: 0,
+        currentBatterIndex: getNextBatterIndexFromState(current),
+        isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
+        inningHalf: nextHalf,
+        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
+      }
+    }, `Double play em ${runnerBase}${defenderText}`)
+
+    try {
+      if (!gameState.isAttacking) {
+        await syncDefensivePitcherEvent({ outsDelta: 2, pitchCountDelta: 1 })
+
+        for (const defenderId of defenderIds) {
+          const found = await gameStatsApi.listByGame(gameState.currentGameId, defenderId)
+          const current = found.data?.[0]
+          await upsertPlayerStat(defenderId, {
+            defense: {
+              errors: safeNumber(current?.defense?.errors),
+              doublePlays: safeNumber(current?.defense?.doublePlays) + 1,
+              flyOuts: safeNumber(current?.defense?.flyOuts),
+              groundOuts: safeNumber(current?.defense?.groundOuts),
+              lineOuts: safeNumber(current?.defense?.lineOuts),
+            },
+          })
+        }
+      }
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+
+    setPendingDoublePlaySelect(false)
+    setSelectedDoublePlayRunnerBase('')
+    setSelectedDoublePlayDefenderIds([])
+  }
+
+  const handleDoublePlayAction = () => {
+    const occupied = ['first', 'second', 'third'].filter((base) => Boolean(gameState.runners?.[base]))
+    if (!occupied.length) {
+      showInvalidAction('Double play exige corredor em base')
+      return
+    }
+
+    if (occupied.length === 1 && gameState.isAttacking) {
+      applyDoublePlayWithRunner(occupied[0], [])
+      return
+    }
+
+    setSelectedDoublePlayRunnerBase(occupied[0])
+    if (!gameState.isAttacking) {
+      setSelectedDoublePlayDefenderIds([])
+    }
+    setPendingDoublePlaySelect(true)
+  }
+
+  const applySacFly = useCallback(async () => {
+    await captureUndoSnapshot()
+
+    let runScored = 0
+
+    onUpdateGameState((current) => {
+      const hadRunnerOnThird = Boolean(current.runners?.third)
+      const nextOutsRaw = Number(current.outs || 0) + 1
+      const sideSwitch = nextOutsRaw >= 3
+
+      const nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
+      if (hadRunnerOnThird) {
+        nextRunners.third = false
+        runScored = 1
+      }
+
+      const nextHalf = sideSwitch
+        ? current.inningHalf === 'top'
+          ? 'bottom'
+          : 'top'
+        : current.inningHalf || 'top'
+      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+
+      return {
+        ...current,
+        outs: sideSwitch ? 0 : nextOutsRaw,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        balls: 0,
+        strikes: 0,
+        currentBatterIndex: getNextBatterIndexFromState(current),
+        isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
+        inningHalf: nextHalf,
+        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
+        homeScore: (current.homeScore || 0) + (current.isAttacking ? runScored : 0),
+        awayScore: (current.awayScore || 0) + (!current.isAttacking ? runScored : 0),
+      }
+    }, 'Sac fly')
+
+    try {
+      if (!gameState.isAttacking) {
+        await syncDefensivePitcherEvent({ outsDelta: 1, earnedRunsDelta: runScored, pitchCountDelta: 1 })
+      }
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+
+  const applyDeadBall = useCallback(async () => {
+    await captureUndoSnapshot()
+
+    onUpdateGameState((current) => {
+      const forced = forceAdvanceToFirst(current.runners || { first: false, second: false, third: false })
+
+      return {
+        ...current,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        currentBatterIndex: getNextBatterIndexFromState(current),
+        runners: forced.nextRunners,
+        homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
+        awayScore: (current.awayScore || 0) + (!current.isAttacking ? forced.runs : 0),
+      }
+    }, 'Dead ball')
+
+    try {
+      if (!gameState.isAttacking) {
+        await syncDefensivePitcherEvent({ pitchCountDelta: 1, walksDelta: 1 })
+      }
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+
+  const applyErrorEvent = async (defenderId = '') => {
+    await captureUndoSnapshot()
+
+    let runsScored = 0
+
+    onUpdateGameState((current) => {
+      const advanced = applyRunnerAdvance(current.runners || { first: false, second: false, third: false }, 1)
+      const nextRunners = { ...advanced.nextRunners, first: true }
+      runsScored = advanced.runs
+
+      return {
+        ...current,
+        pitchCount: Number(current.pitchCount || 0) + 1,
+        balls: 0,
+        strikes: 0,
+        currentBatterIndex: getNextBatterIndexFromState(current),
+        runners: nextRunners,
+        homeScore: (current.homeScore || 0) + (current.isAttacking ? advanced.runs : 0),
+        awayScore: (current.awayScore || 0) + (!current.isAttacking ? advanced.runs : 0),
+      }
+    }, defenderId ? `Erro defensivo: ${defenderId}` : 'Erro defensivo')
+
+    try {
+      if (!gameState.isAttacking) {
+        if (defenderId) {
+          const found = await gameStatsApi.listByGame(gameState.currentGameId, defenderId)
+          const current = found.data?.[0]
+          await upsertPlayerStat(defenderId, {
+            defense: {
+              errors: safeNumber(current?.defense?.errors) + 1,
+              doublePlays: safeNumber(current?.defense?.doublePlays),
+              flyOuts: safeNumber(current?.defense?.flyOuts),
+              groundOuts: safeNumber(current?.defense?.groundOuts),
+              lineOuts: safeNumber(current?.defense?.lineOuts),
+            },
+          })
+        }
+
+        if (runsScored > 0) {
+          await syncDefensivePitcherEvent({ earnedRunsDelta: runsScored, pitchCountDelta: 1 })
+        } else {
+          await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
+        }
+      }
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+
+    setPendingDefenseError(false)
+    setSelectedErrorDefenderId('')
+  }
+
+  const confirmDefensiveError = async () => {
+    if (!selectedErrorDefenderId) return
+    await applyErrorEvent(selectedErrorDefenderId)
+  }
+
+  const openPlayerDetails = useCallback((playerId) => {
+    setFocusedSeasonEntry(null)
+    setFocusedGameEntry(null)
+    setFocusedPlayerId(null)
+    window.requestAnimationFrame(() => setFocusedPlayerId(playerId))
+  }, [setFocusedGameEntry, setFocusedPlayerId, setFocusedSeasonEntry])
+
+  const openEditModal = (playerId) => {
+    const player = playersById[playerId]
+    if (!player) return
+
+    const positions = Array.isArray(player.positions) && player.positions.length
+      ? player.positions
+      : ['DH']
+
+    setEditForm({
+      name: player.name,
+      number: String(player.number),
+      positions,
+      activePosition: positions.includes(player.activePosition) ? player.activePosition : positions[0],
+    })
+    setEditingPlayerId(playerId)
+  }
+
+  const toggleEditPosition = (position) => {
+    setEditForm((current) => {
+      const has = current.positions.includes(position)
+      const nextPositions = has
+        ? current.positions.filter((item) => item !== position)
+        : [...current.positions, position]
+      const safePositions = nextPositions.length ? nextPositions : ['DH']
+
+      return {
+        ...current,
+        positions: safePositions,
+        activePosition: safePositions.includes(current.activePosition)
+          ? current.activePosition
+          : safePositions[0],
+      }
+    })
+  }
+
+  const saveEditedPlayer = async () => {
+    if (!editingPlayerId) return
+    if (!editForm.name.trim() || !editForm.number || !editForm.positions.length) return
+
+    await onUpdatePlayer?.(editingPlayerId, {
+      name: editForm.name.trim(),
+      number: Number(editForm.number),
+      positions: editForm.positions,
+      activePosition: editForm.activePosition,
+    })
+
+    setEditingPlayerId(null)
+  }
+
+  const onPlayerClick = (playerId) => {
+    setSelectedId(playerId)
+  }
+
+  const startDragPlayer = (event, playerId, source) => {
+    if (activeTool !== 'mouse') return
+    event.preventDefault()
+
+    dragRef.current = { type: 'player', source, playerId }
+    dragStartRef.current = { x: event.clientX, y: event.clientY }
+    setDragSource(source)
+    setDraggingPlayerId(playerId)
+    setSelectedId(playerId)
+    setDragPreview({ x: event.clientX, y: event.clientY, label: playersById[playerId]?.name || 'Jogador' })
+
+    if (source === 'field') {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = setTimeout(() => setTooltipId(playerId), LONG_PRESS_MS)
+    }
+  }
+
+  const startPenStroke = (event) => {
+    if (activeTool !== 'pen') return
+    const point = toFieldPoint(event.clientX, event.clientY)
+    if (!point) return
+    isDrawingRef.current = true
+    setStrokes((current) => [...current, [{ x: point.x, y: point.y }]])
+  }
+
+  const movePenStroke = useCallback((event) => {
+    if (!isDrawingRef.current || activeTool !== 'pen') return
+    const point = toFieldPoint(event.clientX, event.clientY)
+    if (!point) return
+    setStrokes((current) => {
+      if (!current.length) return current
+      const next = [...current]
+      next[next.length - 1] = [...next[next.length - 1], point]
+      return next
+    })
+  }, [activeTool, toFieldPoint])
+
+  useEffect(() => {
+    if (!focusedPlayerId) {
+      const frame = window.requestAnimationFrame(() => {
+        setFocusedSeasonEntry(null)
+        setFocusedGameEntry(null)
+      })
+      return () => window.cancelAnimationFrame(frame)
+    }
+
+    const load = async () => {
+      try {
+        const [seasonResponse, gameResponse] = await Promise.all([
+          seasonStatsApi.list(focusedPlayerId),
+          gameState.currentGameId
+            ? gameStatsApi.listByGame(gameState.currentGameId, focusedPlayerId)
+            : Promise.resolve({ data: [] }),
+        ])
+
+        setFocusedSeasonEntry(seasonResponse.data?.[0] || null)
+        setFocusedGameEntry(gameResponse.data?.[0] || null)
+      } catch {
+        setFocusedSeasonEntry(null)
+        setFocusedGameEntry(null)
+      }
+    }
+
+    load()
+    return undefined
+  }, [focusedPlayerId, gameState.currentGameId])
+
+  useEffect(() => {
+    const onMove = (event) => {
+      if (activeTool === 'pointer' && fieldStageRef.current) {
+        const rect = fieldStageRef.current.getBoundingClientRect()
+        setLaser({ visible: true, x: event.clientX - rect.left, y: event.clientY - rect.top })
+      }
+
+      if (activeTool === 'pen') {
+        movePenStroke(event)
+      }
+
+      if (!dragRef.current) return
+      setDragPreview((current) => (current ? { ...current, x: event.clientX, y: event.clientY } : current))
+
+      const inField = isInsideRect(event.clientX, event.clientY, fieldImageRef.current?.getBoundingClientRect())
+      const inBench = isInsideRect(event.clientX, event.clientY, benchRef.current?.getBoundingClientRect())
+      setDropTarget(inField ? 'field' : inBench ? 'bench' : null)
+
+      if (dragRef.current?.type === 'player') {
+        if (dragRef.current.source === 'field' && inBench) {
+          setDropMessage('Soltar para adicionar ao banco')
+        } else if (dragRef.current.source === 'bench' && inField) {
+          const draggedPlayer = playersById[dragRef.current.playerId]
+          const hasConflict = (gameState.onFieldPlayerIds || []).some((id) => {
+            const existing = playersById[id]
+            return existing && draggedPlayer && getMainPosition(existing) === getMainPosition(draggedPlayer)
+          })
+          setDropMessage(hasConflict ? 'Confirmar substituicao' : 'Soltar para colocar no campo')
+        } else {
+          setDropMessage('')
+        }
+      }
+
+      const drag = dragRef.current
+      if (drag.type === 'player' && drag.source === 'field') {
+        const point = toFieldPoint(event.clientX, event.clientY)
+        if (!point) return
+        setPlayers((current) =>
+          current.map((player) => {
+            const id = getPlayerId(player)
+            return id === drag.playerId ? { ...player, x: point.x, y: point.y } : player
+          }),
+        )
+      }
+
+      if (drag.type === 'opponent') {
+        const point = toFieldPoint(event.clientX, event.clientY)
+        if (!point) return
+        setOpponentDefense((current) =>
+          current.map((item) => (item.id === drag.id ? { ...item, x: point.x, y: point.y } : item)),
+        )
+      }
+
+      if (drag.type === 'runner') {
+        const point = toFieldPoint(event.clientX, event.clientY)
+        if (!point) return
+        setRunnerDrag({ base: drag.base, x: point.x, y: point.y })
+      }
+
+    }
+
+    const onUp = (event) => {
+      clearTimeout(longPressTimerRef.current)
+      setTooltipId(null)
+
+      if (activeTool === 'pen') {
+        isDrawingRef.current = false
+      }
+
+      const drag = dragRef.current
+      if (!drag) {
+        setDragPreview(null)
+        setDropTarget(null)
+        return
+      }
+
+      const inField = isInsideRect(event.clientX, event.clientY, fieldImageRef.current?.getBoundingClientRect())
+      const inBench = isInsideRect(event.clientX, event.clientY, benchRef.current?.getBoundingClientRect())
+      const point = toFieldPoint(event.clientX, event.clientY)
+
+      if (drag.type === 'player') {
+        const player = playersById[drag.playerId]
+        const currentOnField = gameState.onFieldPlayerIds || []
+
+        if (drag.source === 'bench' && inField && point) {
+          const defaultPosition = getDefaultFieldPosition(player?.activePosition)
+
+          if (currentOnField.length >= 9) {
+            dragRef.current = null
+            setDragPreview(null)
+            setDropTarget(null)
+            return
+          }
+
+          const duplicateId = currentOnField.find((id) => {
+            const existing = playersById[id]
+            return existing && getMainPosition(existing) === getMainPosition(player)
+          })
+
+          if (duplicateId) {
+            const replaced = playersById[duplicateId]
+            const confirmed = window.confirm(`Confirmar substituicao: ${player?.name || 'Jogador'} entra e ${replaced?.name || 'jogador'} vai para o banco?`)
+            if (!confirmed) {
+              dragRef.current = null
+              setDragPreview(null)
+              setDropTarget(null)
+              setDropMessage('')
+              return
+            }
+          }
+
+          const nextOnField = duplicateId
+            ? [...currentOnField.filter((id) => id !== duplicateId), drag.playerId]
+            : [...currentOnField, drag.playerId]
+
+          setPlayers((current) =>
+            current.map((item) =>
+              getPlayerId(item) === drag.playerId
+                ? { ...item, x: defaultPosition.x, y: defaultPosition.y }
+                : item,
+            ),
+          )
+
+          onUpdateGameState((current) => {
+            const battingOrder = [...(current.battingOrder || [])]
+            if (duplicateId) {
+              const replacedIndex = battingOrder.findIndex((id) => id === duplicateId)
+              if (replacedIndex >= 0) battingOrder[replacedIndex] = drag.playerId
+            } else if (!battingOrder.includes(drag.playerId) && battingOrder.length < 9) {
+              battingOrder.push(drag.playerId)
+            }
+
+            const lineup = (current.lineup || []).filter((item) => nextOnField.includes(item.playerId))
+            const usedPositions = new Set(lineup.map((item) => item.position))
+
+            const enteringPosition = getMainPosition(player)
+            const positionToUse = !usedPositions.has(enteringPosition)
+              ? enteringPosition
+              : DEFENSIVE_POSITIONS.find((position) => !usedPositions.has(position)) || enteringPosition
+
+            const lineupWithoutDuplicate = duplicateId
+              ? lineup.filter((item) => item.playerId !== duplicateId)
+              : lineup
+
+            const nextLineup = [...lineupWithoutDuplicate, { playerId: drag.playerId, position: positionToUse }]
+            const bench = players
+              .map((item) => getPlayerId(item))
+              .filter((id) => !nextOnField.includes(id))
+
+            return {
+              ...current,
+              onFieldPlayerIds: Array.from(new Set(nextOnField)),
+              battingOrder,
+              lineup: nextLineup,
+              bench,
+              participantPlayerIds: [...nextOnField, ...bench],
+              preGameConfigured: current.preGameConfigured || nextOnField.length === 9,
+            }
+          }, duplicateId
+            ? `${player?.name || 'Jogador'} substituiu jogador em ${getMainPosition(player)}`
+            : `${player?.name || 'Jogador'} entrou em campo`)
+        }
+
+        if (drag.source === 'field' && inBench) {
+          onUpdateGameState((current) => {
+            const nextOnField = (current.onFieldPlayerIds || []).filter((id) => id !== drag.playerId)
+            const battingOrder = (current.battingOrder || []).filter((id) => id !== drag.playerId)
+            const lineup = (current.lineup || []).filter((item) => item.playerId !== drag.playerId)
+            const bench = players
+              .map((item) => getPlayerId(item))
+              .filter((id) => !nextOnField.includes(id))
+
+            return {
+              ...current,
+              onFieldPlayerIds: nextOnField,
+              battingOrder,
+              lineup,
+              bench,
+              participantPlayerIds: [...nextOnField, ...bench],
+            }
+          }, `${player?.name || 'Jogador'} foi para o banco`)
+        }
+
+        const start = dragStartRef.current
+        if (start) {
+          const dx = Math.abs(event.clientX - start.x)
+          const dy = Math.abs(event.clientY - start.y)
+          if (dx > 6 || dy > 6) {
+            suppressModalUntilRef.current = Date.now() + 300
+            setRecentlyDroppedId(drag.playerId)
+            window.setTimeout(() => setRecentlyDroppedId(null), 220)
+          }
+        }
+      }
+
+      if (drag.type === 'runner') {
+        const sourceBase = drag.base
+        const fieldPoint = toFieldPoint(event.clientX, event.clientY)
+
+        if (!fieldPoint) {
+          onUpdateGameState((current) => ({
+            ...current,
+            runners: { ...current.runners, [sourceBase]: false },
+          }), `Corredor removido de ${sourceBase}`)
+        } else {
+          const baseKeys = ['first', 'second', 'third']
+          const baseMap = { first: '1B', second: '2B', third: '3B' }
+
+          let nearest = null
+          let nearestDistance = Number.POSITIVE_INFINITY
+
+          for (const base of baseKeys) {
+            const pos = getDefaultFieldPosition(baseMap[base])
+            const distance = Math.hypot(fieldPoint.x - pos.x, fieldPoint.y - pos.y)
+            if (distance < nearestDistance) {
+              nearestDistance = distance
+              nearest = base
+            }
+          }
+
+          if (nearest && nearestDistance <= 12) {
+            onUpdateGameState((current) => {
+              const nextRunners = { ...current.runners, [sourceBase]: false, [nearest]: true }
+              return { ...current, runners: nextRunners }
+            }, `Corredor movido para ${nearest}`)
+          }
+        }
+      }
+
+      dragRef.current = null
+      dragStartRef.current = null
+      setDragSource(null)
+      setDraggingPlayerId(null)
+      setDragPreview(null)
+      setDropMessage('')
+      setRunnerDrag(null)
+      setDropTarget(null)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [activeTool, gameState.onFieldPlayerIds, onUpdateGameState, players, playersById, setPlayers, toFieldPoint, movePenStroke])
+
+  const focusedPlayer = focusedPlayerId ? playersById[focusedPlayerId] : null
+  const pitchersOnField = fieldPlayers.filter((player) => getMainPosition(player) === 'P')
+  const battingOrder = gameState.battingOrder || []
+  const currentBatterId = battingOrder.length
+    ? battingOrder[Math.min(gameState.currentBatterIndex || 0, battingOrder.length - 1)]
+    : null
+  const currentBatter = currentBatterId ? playersById[currentBatterId] : null
+  const onDeckBatter = battingOrder.length
+    ? playersById[battingOrder[(Math.min(gameState.currentBatterIndex || 0, battingOrder.length - 1) + 1) % battingOrder.length]]
+    : null
+  const inTheHoleBatter = battingOrder.length
+    ? playersById[battingOrder[(Math.min(gameState.currentBatterIndex || 0, battingOrder.length - 1) + 2) % battingOrder.length]]
+    : null
+  const livePitching = useMemo(() => pitcherLiveStat?.pitching || {}, [pitcherLiveStat])
+  const pitchingPulseKey = useMemo(() => [
+    safeNumber(livePitching.outsPitched),
+    safeNumber(livePitching.earnedRuns),
+    safeNumber(livePitching.strikeouts),
+    safeNumber(livePitching.walks),
+    safeNumber(livePitching.pitchCount),
+  ].join('|'), [livePitching])
+  const opponentName = activeGame?.opponentName || activeGame?.opponent || 'ADVERSARIO'
+  const opponentMarkers = useMemo(() => opponentDefense, [opponentDefense])
+  const defensivePlayers = useMemo(() => {
+    if (gameState.isAttacking) return []
+    return fieldPlayers
+  }, [fieldPlayers, gameState.isAttacking])
+  const visibleFieldMarkers = useMemo(() => {
+    if (!gameState.preGameConfigured) return []
+    return gameState.isAttacking ? opponentMarkers : defensivePlayers
+  }, [defensivePlayers, gameState.isAttacking, gameState.preGameConfigured, opponentMarkers])
+  const errorDefenderOptions = useMemo(() => {
+    return defensivePlayers.map((player) => ({
+      id: getPlayerId(player),
+      label: `${player.name} #${player.number} (${getMainPosition(player)})`,
+    }))
+  }, [defensivePlayers])
+  const doublePlayRunnerOptions = useMemo(
+    () => ['first', 'second', 'third'].filter((base) => Boolean(gameState.runners?.[base])),
+    [gameState.runners],
+  )
+  const doublePlayDefenderOptions = useMemo(
+    () => defensivePlayers.map((player) => ({
+      id: getPlayerId(player),
+      label: `${player.name} #${player.number} (${getMainPosition(player)})`,
+    })),
+    [defensivePlayers],
+  )
+
+  return (
+    <section className="field-layout" ref={layoutRef}>
+      <div className="game-scoreboard" role="region" aria-label="Placar do jogo">
+        <div className="game-score-main">
+          <strong className="team-name">CAASO</strong>
+          <span key={`score-home-${gameState.homeScore || 0}`} className="score-value score-pulse">{gameState.homeScore || 0}</span>
+          <span className="score-separator">x</span>
+          <span key={`score-away-${gameState.awayScore || 0}`} className="score-value score-pulse">{gameState.awayScore || 0}</span>
+          <strong className="team-name">{opponentName}</strong>
+        </div>
+        <div className="game-score-meta">
+          <span>Inning: {gameState.inning}</span>
+          <span>{(gameState.inningHalf || 'top') === 'top' ? 'Topo' : 'Parte baixa'}</span>
+          <span>Outs: {gameState.outs}</span>
+          <span>{gameState.isAttacking ? 'ATACANDO' : 'DEFENDENDO'}</span>
+        </div>
+      </div>
+
+      <div
+        ref={fieldStageRef}
+        className={`field-stage ${activeTool}-mode ${dropTarget === 'field' ? 'drop-ready' : ''}`}
+        onPointerDown={startPenStroke}
+        onDragEnter={(event) => {
+          event.preventDefault()
+          setDropTarget('field')
+        }}
+        onDragLeave={() => setDropTarget(null)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault()
+          setDropTarget(null)
+        }}
+      >
+        <img
+          ref={fieldImageRef}
+          src="/baseball-3778774_1280.webp"
+          alt="Baseball field"
+          className="field-image"
+          draggable={false}
+        />
+
+        <canvas
+          ref={drawingRef}
+          className="field-draw-layer"
+          style={{
+            left: `${fieldRect.left}px`,
+            top: `${fieldRect.top}px`,
+            width: `${fieldRect.width}px`,
+            height: `${fieldRect.height}px`,
+          }}
+        />
+
+        {visibleFieldMarkers.map((player) => {
+          const id = getPlayerId(player)
+          const isSelected = selectedId === id
+          const screen = toScreenPoint(player.x, player.y)
+          const isOpponent = gameState.isAttacking
+
+          return (
+            <button
+              key={id}
+              type="button"
+              className={`player-marker ${gameState.isAttacking ? 'opponent-marker mode-attack' : 'team-defense-marker mode-defense'} ${isSelected ? 'selected' : ''} ${draggingPlayerId === id ? 'dragging' : ''} ${recentlyDroppedId === id ? 'drop-snap' : ''}`}
+              style={{ left: `${screen.left}px`, top: `${screen.top}px` }}
+              onClick={() => {
+                if (isOpponent) return
+                onPlayerClick(id)
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                if (isOpponent) return
+                if (Date.now() < suppressModalUntilRef.current) return
+                openEditModal(id)
+              }}
+              onPointerDown={(event) => {
+                if (isOpponent) {
+                  if (activeTool !== 'mouse') return
+                  event.preventDefault()
+                  dragRef.current = { type: 'opponent', id }
+                  setSelectedId(null)
+                  return
+                }
+                startDragPlayer(event, id, 'field')
+              }}
+              draggable={!isOpponent}
+              onDragStart={(event) => {
+                if (isOpponent) return
+                event.dataTransfer.setData('text/plain', id)
+                setDragSource('field')
+                setDraggingPlayerId(id)
+              }}
+            >
+              <span>{gameState.isAttacking ? player.label : getMainPosition(player)}</span>
+              {!isOpponent && tooltipId === id && (
+                <div className="player-tooltip">
+                  {player.name} #{player.number}
+                </div>
+              )}
+            </button>
+          )
+        })}
+
+        {['first', 'second', 'third'].map((base) => {
+          if (!gameState.runners?.[base]) return null
+          const map = { first: '1B', second: '2B', third: '3B' }
+          const basePosition = runnerDrag?.base === base
+            ? { x: runnerDrag.x, y: runnerDrag.y }
+            : getDefaultFieldPosition(map[base])
+          const point = toScreenPoint(basePosition.x, basePosition.y)
+          return (
+            <div
+              key={`runner-${base}`}
+              className="player-marker runner-marker"
+              style={{ left: `${point.left}px`, top: `${point.top}px` }}
+              onPointerDown={(event) => {
+                if (activeTool !== 'mouse') return
+                event.preventDefault()
+                dragRef.current = { type: 'runner', base }
+                setRunnerDrag({ base, x: basePosition.x, y: basePosition.y })
+              }}
+            />
+          )
+        })}
+
+        {activeTool === 'pointer' && laser.visible && (
+          <div className="laser-dot" style={{ left: `${laser.x}px`, top: `${laser.y}px` }} />
+        )}
+
+        {dropTarget === 'field' && dragSource === 'bench' && (
+          <div className="drop-hint field-drop-hint">{dropMessage || 'Soltar para colocar no campo'}</div>
+        )}
+      </div>
+
+      <aside
+        ref={benchRef}
+        className={`bench-panel ${dropTarget === 'bench' ? 'drop-ready' : ''}`}
+        aria-label="Banco de reservas"
+        onDragEnter={(event) => {
+          event.preventDefault()
+          setDropTarget('bench')
+          setDropMessage('Soltar para adicionar ao banco')
+        }}
+        onDragLeave={() => {
+          setDropTarget(null)
+          setDropMessage('')
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault()
+          setDropTarget('bench')
+        }}
+      >
+        <div className="bench-head">
+          <h3>Campo: {fieldPlayers.length}</h3>
+          <h3>Banco</h3>
+          <input
+            placeholder="Buscar jogador"
+            value={benchSearch}
+            onChange={(event) => setBenchSearch(event.target.value)}
+          />
+        </div>
+
+        <div className="bench-list">
+          {dropMessage && dropTarget === 'bench' && <div className="drop-hint">{dropMessage}</div>}
+          {benchPlayers.map((player) => {
+            const id = getPlayerId(player)
+            return (
+              <div key={id} className={`bench-card ${selectedId === id ? 'selected' : ''}`}>
+                <button
+                  type="button"
+                  className="bench-player-btn"
+                  onClick={() => setSelectedId(id)}
+                  onPointerDown={(event) => startDragPlayer(event, id, 'bench')}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData('text/plain', id)
+                    setDragSource('bench')
+                    setDraggingPlayerId(id)
+                  }}
+                >
+                  <strong>
+                    {player.name} #{player.number}
+                  </strong>
+                  <span>{(player.positions || []).join(' / ')}</span>
+                </button>
+                <button type="button" className="bench-info-btn" onClick={() => openPlayerDetails(id)}>
+                  Ver stats
+                </button>
+                <button type="button" className="bench-info-btn" onClick={() => openEditModal(id)}>
+                  Editar
+                </button>
+                {(player.positions || []).length > 1 && (
+                  <select
+                    value={getMainPosition(player)}
+                    onChange={(event) => {
+                      const nextPosition = event.target.value
+                      const conflictId = (gameState.onFieldPlayerIds || [])
+                        .filter((fieldId) => fieldId !== id)
+                        .find((fieldId) => getMainPosition(playersById[fieldId]) === nextPosition)
+
+                      setPlayers((current) =>
+                        current.map((item) =>
+                          getPlayerId(item) === id ? { ...item, activePosition: nextPosition } : item,
+                        ),
+                      )
+
+                      if ((gameState.onFieldPlayerIds || []).includes(id) && conflictId) {
+                        onUpdateGameState((current) => {
+                          const nextOnField = (current.onFieldPlayerIds || []).filter((fieldId) => fieldId !== conflictId)
+                          const battingOrder = (current.battingOrder || []).filter((fieldId) => fieldId !== conflictId)
+                          const lineup = (current.lineup || [])
+                            .filter((item) => item.playerId !== conflictId)
+                            .map((item) => (item.playerId === id ? { ...item, position: nextPosition } : item))
+                          const bench = players
+                            .map((item) => getPlayerId(item))
+                            .filter((pid) => !nextOnField.includes(pid))
+
+                          return {
+                            ...current,
+                            onFieldPlayerIds: nextOnField,
+                            battingOrder,
+                            lineup,
+                            bench,
+                            participantPlayerIds: [...nextOnField, ...bench],
+                          }
+                        }, 'Conflito de posicao resolvido: jogador anterior enviado ao banco')
+                      }
+                    }}
+                  >
+                    {(player.positions || []).map((position) => (
+                      <option key={`${id}-${position}`} value={position}>
+                        {position}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </aside>
+
+      <aside className="field-hud">
+        <div className="field-hud-block">
+          <h3>Jogo</h3>
+          {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
+          {gameState.isAttacking && (
+            <p>
+              Rebatedor atual:{' '}
+              <strong>{currentBatter ? `${currentBatter.name} #${currentBatter.number}` : 'Sem ordem de rebatedores'}</strong>
+            </p>
+          )}
+          {gameState.isAttacking && (
+            <p>
+              On Deck: <strong>{onDeckBatter ? `${onDeckBatter.name} #${onDeckBatter.number}` : '--'}</strong>
+              {' | '}
+              In the Hole: <strong>{inTheHoleBatter ? `${inTheHoleBatter.name} #${inTheHoleBatter.number}` : '--'}</strong>
+            </p>
+          )}
+          <div className="count-dots-panel">
+            <CountDots label="Balls" value={gameState.balls || 0} max={4} color="#2f9d58" />
+            <CountDots label="Strikes" value={gameState.strikes || 0} max={3} color="#d2a100" />
+            <CountDots label="Outs" value={gameState.outs || 0} max={3} color="#c33b34" />
+          </div>
+          <div className="hud-grid">
+            <label>
+              Pitch Count
+              <input type="number" value={gameState.pitchCount || 0} readOnly disabled />
+            </label>
+            {!gameState.isAttacking && (
+              <label>
+                Arremessador
+                <select
+                  value={gameState.currentPitcherId || ''}
+                  onChange={(event) =>
+                    onUpdateGameState(
+                      {
+                        currentPitcherId: event.target.value || null,
+                        pitchCount: 0,
+                      },
+                      'Arremessador alterado',
+                    )
+                  }
+                >
+                  {!pitchersOnField.length && <option value="">Sem pitcher em campo</option>}
+                  {pitchersOnField.map((player) => (
+                    <option key={getPlayerId(player)} value={getPlayerId(player)}>
+                      {player.name} #{player.number}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          {!gameState.isAttacking && (
+            <div key={`pitching-pulse-${pitchingPulseKey}`} className="player-stats-block stats-pulse" style={{ marginTop: '8px' }}>
+              <strong>Pitcher</strong>
+              <div className="player-stats-grid" style={{ marginTop: '6px' }}>
+                <div className="player-stats-item"><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
+                <div className="player-stats-item"><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
+                <div className="player-stats-item"><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
+                <div className="player-stats-item"><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
+                <div className="player-stats-item"><span>PC</span><strong>{safeNumber(livePitching.pitchCount)}</strong></div>
+              </div>
+            </div>
+          )}
+          {gameState.isAttacking ? (
+            <div className="hud-actions attack-actions" style={{ marginTop: '8px' }}>
+              <button type="button" onClick={() => applyAttackCountAction('strike')}>
+                Strike
+              </button>
+              <button type="button" onClick={() => applyAttackCountAction('ball')}>
+                Ball
+              </button>
+              <button type="button" onClick={() => applyAttackCountAction('foul')}>
+                Foul
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('out')}>
+                Out
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('single')}>
+                Hit Simples
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('double')}>
+                Hit Dupla
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('triple')}>
+                Hit Tripla
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('homerun')}>
+                Homerun
+              </button>
+              <button type="button" onClick={handleDoublePlayAction}>
+                Double Play
+              </button>
+              <button type="button" onClick={applySacFly}>
+                Sac Fly
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  applyErrorEvent('')
+                }}
+              >
+                Erro
+              </button>
+              <button type="button" onClick={applyDeadBall}>
+                Dead Ball
+              </button>
+            </div>
+          ) : (
+            <div className="hud-actions defense-actions" style={{ marginTop: '8px' }}>
+              <button type="button" onClick={() => onPitchAction?.('strike')}>
+                Strike
+              </button>
+              <button type="button" onClick={() => onPitchAction?.('ball')}>
+                Ball
+              </button>
+              <button type="button" onClick={() => onPitchAction?.('foul')}>
+                Foul
+              </button>
+              <button type="button" onClick={() => applyDefensiveOutEvent('out')}>
+                Out
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('single')}>
+                Single
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('double')}>
+                Double
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('triple')}>
+                Triple
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('homerun')}>
+                Homerun
+              </button>
+              <button type="button" onClick={handleDoublePlayAction}>
+                Double Play
+              </button>
+              <button type="button" onClick={applySacFly}>
+                Sac Fly
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || '')
+                  setPendingDefenseError(true)
+                }}
+              >
+                Erro
+              </button>
+              <button type="button" onClick={applyDeadBall}>
+                Dead Ball
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="field-hud-block">
+          <h3>Corredores</h3>
+          <div className="hud-grid">
+            {['first', 'second', 'third'].map((base) => (
+              <label key={base}>
+                {base.toUpperCase()}
+                <div className="hud-actions">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateGameState((current) => ({
+                        ...current,
+                        runners: { ...current.runners, [base]: true },
+                      }), `Corredor em ${base}`)
+                    }
+                  >
+                    +
+                  </button>
+                  <button type="button" onClick={() => advanceRunner(base)}>
+                    Av
+                  </button>
+                  <button type="button" onClick={() => removeRunner(base)}>
+                    Out
+                  </button>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="field-hud-block">
+          <h3>Campo</h3>
+          <button type="button" className="full-width-btn" onClick={() => onEndGame?.()}>
+            Encerrar jogo
+          </button>
+        </div>
+      </aside>
+
+      {showPreGameSetup && (
+        <div className="modal-backdrop" onClick={() => {}}>
+          <div className="player-stats-modal pregame-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="player-stats-head">
+              <h3>Configuracao Inicial</h3>
+            </div>
+
+            <div className="pregame-grid">
+              <section className="player-stats-block">
+                <h4>1) Inicio</h4>
+                <div className="pregame-radio-row">
+                  <label>
+                    <input
+                      type="radio"
+                      name="setup-start"
+                      checked={setupAttacking}
+                      onChange={() => setSetupAttacking(true)}
+                    />
+                    Comecar atacando
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="setup-start"
+                      checked={!setupAttacking}
+                      onChange={() => setSetupAttacking(false)}
+                    />
+                    Comecar defendendo
+                  </label>
+                </div>
+              </section>
+
+              <section className="player-stats-block">
+                <h4>2) Titulares e posicoes</h4>
+                <div className="pregame-lineup-grid">
+                  {setupStarters.map((slot) => {
+                    const selectedIds = setupStarters
+                      .filter((item) => item.position !== slot.position)
+                      .map((item) => item.playerId)
+                      .filter(Boolean)
+                    const selectedPlayer = playersById[slot.playerId]
+
+                    return (
+                      <div key={`setup-${slot.position}`} className="pregame-slot">
+                        <strong>{slot.position}</strong>
+                        <select
+                          value={slot.playerId}
+                          onChange={(event) => assignStarter(slot.position, event.target.value)}
+                        >
+                          <option value="">Selecionar jogador</option>
+                          {selectedPlayer && (
+                            <option value={slot.playerId}>
+                              {selectedPlayer.name} #{selectedPlayer.number}
+                            </option>
+                          )}
+                          {setupAvailablePlayers
+                            .filter((player) => {
+                              const id = getPlayerId(player)
+                              const allowed = Array.isArray(player.positions) ? player.positions : []
+                              return !selectedIds.includes(id) && allowed.includes(slot.position)
+                            })
+                            .map((player) => {
+                              const id = getPlayerId(player)
+                              return (
+                                <option key={`setup-player-${slot.position}-${id}`} value={id}>
+                                  {player.name} #{player.number}
+                                </option>
+                              )
+                            })}
+                        </select>
+                        <small>Posicao fixa: {slot.position}</small>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section className="player-stats-block">
+                <h4>3) Ordem de rebatida (arraste)</h4>
+                <div className="pregame-order-list">
+                  {setupBattingOrder.map((id, index) => {
+                    const player = playersById[id]
+                    if (!player) return null
+                    return (
+                      <button
+                        key={`order-${id}`}
+                        type="button"
+                        className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
+                        draggable
+                        onDragStart={() => onBattingDragStart(id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => onBattingDrop(id)}
+                      >
+                        <span>{index + 1}.</span>
+                        <strong>{player.name}</strong>
+                        <span>#{player.number}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
+
+            <div className="detail-actions">
+              <button
+                type="button"
+                onClick={confirmPreGameSetup}
+                disabled={setupBattingOrder.length !== 9 || setupStarters.filter((item) => item.playerId).length !== 9}
+              >
+                Iniciar jogo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDoublePlaySelect && (
+        <div className="modal-backdrop" onClick={() => setPendingDoublePlaySelect(false)}>
+          <div className="player-stats-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="player-stats-head">
+              <h3>Double Play: corredor eliminado</h3>
+            </div>
+            <div className="player-stats-block">
+              <select
+                value={selectedDoublePlayRunnerBase}
+                onChange={(event) => setSelectedDoublePlayRunnerBase(event.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">Selecionar base</option>
+                {doublePlayRunnerOptions.map((base) => (
+                  <option key={`dp-base-${base}`} value={base}>
+                    {base.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+
+              {!gameState.isAttacking && (
+                <div style={{ marginTop: '10px' }}>
+                  <strong>Defensores envolvidos (2 ou 3)</strong>
+                  <div className="lineup-picker" style={{ marginTop: '6px' }}>
+                    {doublePlayDefenderOptions.map((defender) => {
+                      const checked = selectedDoublePlayDefenderIds.includes(defender.id)
+                      const disableUnchecked = !checked && selectedDoublePlayDefenderIds.length >= 3
+                      return (
+                        <label key={`dp-defender-${defender.id}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disableUnchecked}
+                            onChange={() => {
+                              setSelectedDoublePlayDefenderIds((current) => {
+                                if (current.includes(defender.id)) {
+                                  return current.filter((id) => id !== defender.id)
+                                }
+                                if (current.length >= 3) return current
+                                return [...current, defender.id]
+                              })
+                            }}
+                          />
+                          {defender.label}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="detail-actions" style={{ marginTop: '10px' }}>
+                <button type="button" className="action-btn" onClick={() => setPendingDoublePlaySelect(false)}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  disabled={
+                    !selectedDoublePlayRunnerBase
+                    || (!gameState.isAttacking && (selectedDoublePlayDefenderIds.length < 2 || selectedDoublePlayDefenderIds.length > 3))
+                  }
+                  onClick={() => applyDoublePlayWithRunner(selectedDoublePlayRunnerBase, selectedDoublePlayDefenderIds)}
+                >
+                  Confirmar DP
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDefenseError && (
+        <div className="modal-backdrop" onClick={() => setPendingDefenseError(false)}>
+          <div className="player-stats-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="player-stats-head">
+              <h3>Selecionar defensor com erro</h3>
+            </div>
+            <div className="player-stats-block">
+              <select
+                value={selectedErrorDefenderId}
+                onChange={(event) => setSelectedErrorDefenderId(event.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">Selecionar jogador</option>
+                {errorDefenderOptions.map((option) => (
+                  <option key={`error-option-${option.id}`} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="detail-actions" style={{ marginTop: '10px' }}>
+                <button type="button" className="action-btn" onClick={() => setPendingDefenseError(false)}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="action-btn"
+                  disabled={!selectedErrorDefenderId}
+                  onClick={() => {
+                    confirmDefensiveError()
+                  }}
+                >
+                  Confirmar erro
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dragPreview && (
+        <div
+          className="drag-preview"
+          style={{ left: `${dragPreview.x + 12}px`, top: `${dragPreview.y + 12}px` }}
+        >
+          {dragPreview.label}
+        </div>
+      )}
+
+      <PlayerStatsModal
+        player={focusedPlayer}
+        seasonEntry={focusedSeasonEntry}
+        gameEntry={focusedGameEntry}
+        onClose={() => setFocusedPlayerId(null)}
+      />
+
+      {editingPlayerId && (
+        <div className="modal-backdrop" onClick={() => setEditingPlayerId(null)}>
+          <div className="player-stats-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="player-stats-head">
+              <h3>Editar jogador</h3>
+              <button type="button" onClick={() => setEditingPlayerId(null)}>
+                Fechar
+              </button>
+            </div>
+
+            <form className="player-form" onSubmit={(event) => { event.preventDefault(); saveEditedPlayer() }}>
+              <input
+                placeholder="Nome"
+                value={editForm.name}
+                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+              />
+              <input
+                placeholder="Numero"
+                type="number"
+                value={editForm.number}
+                onChange={(event) => setEditForm((current) => ({ ...current, number: event.target.value }))}
+              />
+
+              <div className="positions-picker">
+                {VALID_POSITIONS.map((position) => (
+                  <label key={`edit-${position}`}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.positions.includes(position)}
+                      onChange={() => toggleEditPosition(position)}
+                    />
+                    {position}
+                  </label>
+                ))}
+              </div>
+
+              <select
+                value={editForm.activePosition}
+                onChange={(event) => setEditForm((current) => ({ ...current, activePosition: event.target.value }))}
+              >
+                {editForm.positions.map((position) => (
+                  <option key={`edit-active-${position}`} value={position}>
+                    Titular: {position}
+                  </option>
+                ))}
+              </select>
+
+              <button type="submit">Salvar alteracoes</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+export default FieldPage
