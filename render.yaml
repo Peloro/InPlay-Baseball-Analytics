@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: baseball-backend
+    env: node
+    branch: main
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    plan: free
+    autodeploy: true
