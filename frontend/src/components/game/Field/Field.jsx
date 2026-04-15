@@ -11,6 +11,7 @@ export default function Field({
   setDropTarget,
   fieldRect,
   toScreenPoint,
+  animatedBall,
   visibleFieldMarkers,
   getPlayerId,
   selectedId,
@@ -172,6 +173,14 @@ export default function Field({
       {dropTarget === 'field' && dragSource === 'bench' && (
         <div className="drop-hint field-drop-hint">{dropMessage || 'Soltar para colocar no campo'}</div>
       )}
+        {animatedBall?.visible && (
+          <button
+            type="button"
+            className="animated-ball-marker"
+            style={{ left: `${toScreenPoint(animatedBall.x, animatedBall.y).left}px`, top: `${toScreenPoint(animatedBall.x, animatedBall.y).top}px` }}
+            aria-hidden
+          />
+        )}
       </div>
     </div>
   )

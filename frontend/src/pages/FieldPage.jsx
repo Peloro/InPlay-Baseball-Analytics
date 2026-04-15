@@ -187,6 +187,7 @@ function FieldPage({
   const [dragSource, setDragSource] = useState(null)
   const [dropMessage, setDropMessage] = useState('')
   const [runnerDrag, setRunnerDrag] = useState(null)
+  const [animatedBall, setAnimatedBall] = useState({ visible: false, x: 50, y: 87 })
   const [editingPlayerId, setEditingPlayerId] = useState(null)
   const [editForm, setEditForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
   const [showPreGameSetup, setShowPreGameSetup] = useState(false)
@@ -969,6 +970,22 @@ function FieldPage({
 
     const batterIndex = Math.min(gameState.currentBatterIndex || 0, order.length - 1)
     const batterId = order[batterIndex]
+    const isHit = kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun'
+
+    if (isHit) {
+      const preview = applyHitToBases(gameState.runners || { first: false, second: false, third: false }, kind)
+      const bases = preview.bases || 1
+      const destName = bases >= 4 ? 'C' : bases === 3 ? '3B' : bases === 2 ? '2B' : '1B'
+      const homePos = getDefaultFieldPosition('C')
+      const destPos = getDefaultFieldPosition(destName)
+
+      setAnimatedBall({ visible: true, x: homePos.x, y: homePos.y })
+      // allow a render frame
+      await new Promise((r) => setTimeout(r, 40))
+      setAnimatedBall({ visible: true, x: destPos.x, y: destPos.y })
+      // wait for transition to finish (matches runner transition timing)
+      await new Promise((r) => setTimeout(r, 480))
+    }
 
     onUpdateGameState((current) => {
       const localOrder = current.battingOrder || []
@@ -982,7 +999,7 @@ function FieldPage({
       let nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
       let runs = 0
 
-      if (kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun') {
+      if (isHit) {
         const hitResult = applyHitToBases(nextRunners, kind)
         nextRunners = hitResult.nextRunners
         runs = hitResult.runs
@@ -1011,6 +1028,8 @@ function FieldPage({
       }
     }, `Acao de bastao: ${kind}`)
 
+    if (isHit) setAnimatedBall({ visible: false, x: 50, y: 87 })
+
     try {
       const endedAsOut = kind === 'strikeout' || kind === 'out'
       const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
@@ -1027,7 +1046,7 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertCurrentBatterStats])
+  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertCurrentBatterStats, setAnimatedBall, getDefaultFieldPosition, gameState.runners])
 
   const applyDefensiveHit = useCallback(async (kind) => {
     if (gameState.isAttacking) return
@@ -1035,6 +1054,20 @@ function FieldPage({
     await captureUndoSnapshot()
 
     let runsScored = 0
+
+    const isHit = kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun'
+    if (isHit) {
+      const preview = applyHitToBases(gameState.runners || { first: false, second: false, third: false }, kind)
+      const bases = preview.bases || 1
+      const destName = bases >= 4 ? 'C' : bases === 3 ? '3B' : bases === 2 ? '2B' : '1B'
+      const homePos = getDefaultFieldPosition('C')
+      const destPos = getDefaultFieldPosition(destName)
+
+      setAnimatedBall({ visible: true, x: homePos.x, y: homePos.y })
+      await new Promise((r) => setTimeout(r, 40))
+      setAnimatedBall({ visible: true, x: destPos.x, y: destPos.y })
+      await new Promise((r) => setTimeout(r, 480))
+    }
 
     onUpdateGameState((current) => {
       if (current.isAttacking) return current
@@ -1053,6 +1086,8 @@ function FieldPage({
       }
     }, `Hit do adversario: ${kind}`)
 
+    if (isHit) setAnimatedBall({ visible: false, x: 50, y: 87 })
+
     try {
       await syncDefensivePitcherEvent({
         pitchCountDelta: 1,
@@ -1061,7 +1096,7 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent, setAnimatedBall, getDefaultFieldPosition, gameState.runners])
 
   const applyAttackCountAction = useCallback(async (kind) => {
     if (!gameState.isAttacking) return
@@ -1838,6 +1873,7 @@ function FieldPage({
         getDefaultFieldPosition={getDefaultFieldPosition}
         runnerDrag={runnerDrag}
         gameState={gameState}
+        animatedBall={animatedBall}
         laser={laser}
         dragRef={dragRef}
         setRunnerDrag={setRunnerDrag}
