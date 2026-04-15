@@ -4,6 +4,11 @@ import CountDots from '../components/CountDots'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
 import { VALID_POSITIONS } from '../data/positions'
+import Scoreboard from '../components/game/Scoreboard/Scoreboard'
+import Field from '../components/game/Field/Field'
+import Bench from '../components/game/Bench/Bench'
+import usePlayers from '../hooks/usePlayers'
+import useGameState from '../hooks/useGameState'
 
 const LONG_PRESS_MS = 450
 const DEFENSIVE_POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -174,7 +179,6 @@ function FieldPage({
   const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
   const [dragPreview, setDragPreview] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
-  const [benchSearch, setBenchSearch] = useState('')
   const [focusedPlayerId, setFocusedPlayerId] = useState(null)
   const [focusedSeasonEntry, setFocusedSeasonEntry] = useState(null)
   const [focusedGameEntry, setFocusedGameEntry] = useState(null)
@@ -191,7 +195,6 @@ function FieldPage({
   const [setupBattingOrder, setSetupBattingOrder] = useState([])
   const [setupDraggingId, setSetupDraggingId] = useState(null)
   const [opponentDefense, setOpponentDefense] = useState(makeOpponentMarkers)
-  const [pitcherLiveStat, setPitcherLiveStat] = useState(null)
   const [pendingDefenseError, setPendingDefenseError] = useState(false)
   const [selectedErrorDefenderId, setSelectedErrorDefenderId] = useState('')
   const [pendingDoublePlaySelect, setPendingDoublePlaySelect] = useState(false)
@@ -199,54 +202,26 @@ function FieldPage({
   const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
   const [undoStack, setUndoStack] = useState([])
   const [invalidFeedback, setInvalidFeedback] = useState('')
+  const [showFieldContainer, setShowFieldContainer] = useState(true)
+  const [showHud, setShowHud] = useState(true)
+  const [zoom, setZoom] = useState(1)
 
-  const playersById = useMemo(() => {
-    const map = {}
-    for (const player of players) {
-      map[getPlayerId(player)] = player
-    }
-    return map
-  }, [players])
+  const {
+    benchSearch,
+    setBenchSearch,
+    playersById,
+    fieldPlayers,
+    benchPlayers,
+    setupStarterIds,
+    setupAvailablePlayers,
+    playerCanPlayPosition,
+    pitchersOnField: pitchersFromHook,
+    getPlayerId,
+    getMainPosition,
+    setPlayers: setPlayersFromHook,
+  } = usePlayers({ players, setPlayers, gameState })
 
-  const onFieldIds = useMemo(() => new Set(gameState.onFieldPlayerIds || []), [gameState.onFieldPlayerIds])
-
-  const fieldPlayers = useMemo(
-    () => players.filter((player) => onFieldIds.has(getPlayerId(player))),
-    [players, onFieldIds],
-  )
-
-  const benchPlayers = useMemo(() => {
-    const term = benchSearch.trim().toLowerCase()
-    return players
-      .filter((player) => !onFieldIds.has(getPlayerId(player)))
-      .filter((player) => {
-        if (!term) return true
-        return (
-          player.name.toLowerCase().includes(term)
-          || String(player.number).includes(term)
-          || getMainPosition(player).toLowerCase().includes(term)
-        )
-      })
-      .sort((a, b) => {
-        const byPos = getMainPosition(a).localeCompare(getMainPosition(b))
-        if (byPos !== 0) return byPos
-        return a.number - b.number
-      })
-  }, [players, onFieldIds, benchSearch])
-
-  const setupStarterIds = useMemo(() => setupStarters.map((item) => item.playerId), [setupStarters])
-
-  const setupAvailablePlayers = useMemo(
-    () => players.filter((player) => !setupStarterIds.includes(getPlayerId(player))),
-    [players, setupStarterIds],
-  )
-
-  const playerCanPlayPosition = useCallback((playerId, position) => {
-    const player = playersById[playerId]
-    if (!player) return false
-    const allowed = Array.isArray(player.positions) ? player.positions : []
-    return allowed.includes(position)
-  }, [playersById])
+  // keep original setPlayers reference available (setPlayersFromHook === setPlayers)
 
   useEffect(() => {
     if (!gameState.currentGameId) {
@@ -273,31 +248,7 @@ function FieldPage({
     return () => window.clearTimeout(timer)
   }, [gameState.currentGameId, gameState.preGameConfigured, players])
 
-  useEffect(() => {
-    if (!gameState.currentGameId || !gameState.currentPitcherId || gameState.isAttacking) {
-      const timer = window.setTimeout(() => setPitcherLiveStat(null), 0)
-      return () => window.clearTimeout(timer)
-    }
-
-    const load = async () => {
-      try {
-        const response = await gameStatsApi.listByGame(gameState.currentGameId, gameState.currentPitcherId)
-        setPitcherLiveStat(response.data?.[0] || null)
-      } catch {
-        setPitcherLiveStat(null)
-      }
-    }
-
-    load()
-  }, [
-    gameState.currentGameId,
-    gameState.currentPitcherId,
-    gameState.isAttacking,
-    gameState.pitchCount,
-    gameState.outs,
-    gameState.homeScore,
-    gameState.awayScore,
-  ])
+  const { pitcherLiveStat, livePitching, opponentName } = useGameState({ gameState, activeGame })
 
 
   useEffect(() => {
@@ -1632,7 +1583,7 @@ function FieldPage({
   }, [activeTool, gameState.onFieldPlayerIds, onUpdateGameState, players, playersById, setPlayers, toFieldPoint, movePenStroke])
 
   const focusedPlayer = focusedPlayerId ? playersById[focusedPlayerId] : null
-  const pitchersOnField = fieldPlayers.filter((player) => getMainPosition(player) === 'P')
+  const pitchersOnField = pitchersFromHook || fieldPlayers.filter((player) => getMainPosition(player) === 'P')
   const battingOrder = gameState.battingOrder || []
   const currentBatterId = battingOrder.length
     ? battingOrder[Math.min(gameState.currentBatterIndex || 0, battingOrder.length - 1)]
@@ -1644,7 +1595,6 @@ function FieldPage({
   const inTheHoleBatter = battingOrder.length
     ? playersById[battingOrder[(Math.min(gameState.currentBatterIndex || 0, battingOrder.length - 1) + 2) % battingOrder.length]]
     : null
-  const livePitching = useMemo(() => pitcherLiveStat?.pitching || {}, [pitcherLiveStat])
   const pitchingPulseKey = useMemo(() => [
     safeNumber(livePitching.outsPitched),
     safeNumber(livePitching.earnedRuns),
@@ -1652,7 +1602,7 @@ function FieldPage({
     safeNumber(livePitching.walks),
     safeNumber(livePitching.pitchCount),
   ].join('|'), [livePitching])
-  const opponentName = activeGame?.opponentName || activeGame?.opponent || 'ADVERSARIO'
+  
   const opponentMarkers = useMemo(() => opponentDefense, [opponentDefense])
   const defensivePlayers = useMemo(() => {
     if (gameState.isAttacking) return []
@@ -1681,248 +1631,67 @@ function FieldPage({
   )
 
   return (
-    <section className="field-layout" ref={layoutRef}>
-      <div className="game-scoreboard" role="region" aria-label="Placar do jogo">
-        <div className="game-score-main">
-          <strong className="team-name">CAASO</strong>
-          <span key={`score-home-${gameState.homeScore || 0}`} className="score-value score-pulse">{gameState.homeScore || 0}</span>
-          <span className="score-separator">x</span>
-          <span key={`score-away-${gameState.awayScore || 0}`} className="score-value score-pulse">{gameState.awayScore || 0}</span>
-          <strong className="team-name">{opponentName}</strong>
-        </div>
-        <div className="game-score-meta">
-          <span>Inning: {gameState.inning}</span>
-          <span>{(gameState.inningHalf || 'top') === 'top' ? 'Topo' : 'Parte baixa'}</span>
-          <span>Outs: {gameState.outs}</span>
-          <span>{gameState.isAttacking ? 'ATACANDO' : 'DEFENDENDO'}</span>
-        </div>
-      </div>
+      <section className={`field-layout ${showFieldContainer ? '' : 'mode-hidden'}`} ref={layoutRef}>
+        <Scoreboard gameState={gameState} opponentName={opponentName} />
 
-      <div
-        ref={fieldStageRef}
-        className={`field-stage ${activeTool}-mode ${dropTarget === 'field' ? 'drop-ready' : ''}`}
-        onPointerDown={startPenStroke}
-        onDragEnter={(event) => {
-          event.preventDefault()
-          setDropTarget('field')
+      <Field
+        fieldStageRef={fieldStageRef}
+        fieldImageRef={fieldImageRef}
+        drawingRef={drawingRef}
+        activeTool={activeTool}
+        dropTarget={dropTarget}
+        setDropTarget={setDropTarget}
+        fieldRect={fieldRect}
+        toScreenPoint={toScreenPoint}
+        visibleFieldMarkers={visibleFieldMarkers}
+        getPlayerId={getPlayerId}
+        selectedId={selectedId}
+        setSelectedId={setSelectedId}
+        onPlayerClick={onPlayerClick}
+        openEditModal={openEditModal}
+        startDragPlayer={startDragPlayer}
+        draggingPlayerId={draggingPlayerId}
+        recentlyDroppedId={recentlyDroppedId}
+        getDefaultFieldPosition={getDefaultFieldPosition}
+        runnerDrag={runnerDrag}
+        gameState={gameState}
+        laser={laser}
+        dragRef={dragRef}
+        setRunnerDrag={setRunnerDrag}
+        dragSource={dragSource}
+        dropMessage={dropMessage}
+        startPenStroke={startPenStroke}
+        onDragStartPlayer={(id) => {
+          setDragSource('field')
+          setDraggingPlayerId(id)
         }}
-        onDragLeave={() => setDropTarget(null)}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault()
-          setDropTarget(null)
-        }}
-      >
-        <img
-          ref={fieldImageRef}
-          src="/baseball-3778774_1280.webp"
-          alt="Baseball field"
-          className="field-image"
-          draggable={false}
-        />
+        zoom={zoom}
+      />
 
-        <canvas
-          ref={drawingRef}
-          className="field-draw-layer"
-          style={{
-            left: `${fieldRect.left}px`,
-            top: `${fieldRect.top}px`,
-            width: `${fieldRect.width}px`,
-            height: `${fieldRect.height}px`,
-          }}
-        />
-
-        {visibleFieldMarkers.map((player) => {
-          const id = getPlayerId(player)
-          const isSelected = selectedId === id
-          const screen = toScreenPoint(player.x, player.y)
-          const isOpponent = gameState.isAttacking
-
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`player-marker ${gameState.isAttacking ? 'opponent-marker mode-attack' : 'team-defense-marker mode-defense'} ${isSelected ? 'selected' : ''} ${draggingPlayerId === id ? 'dragging' : ''} ${recentlyDroppedId === id ? 'drop-snap' : ''}`}
-              style={{ left: `${screen.left}px`, top: `${screen.top}px` }}
-              onClick={() => {
-                if (isOpponent) return
-                onPlayerClick(id)
-              }}
-              onContextMenu={(event) => {
-                event.preventDefault()
-                if (isOpponent) return
-                if (Date.now() < suppressModalUntilRef.current) return
-                openEditModal(id)
-              }}
-              onPointerDown={(event) => {
-                if (isOpponent) {
-                  if (activeTool !== 'mouse') return
-                  event.preventDefault()
-                  dragRef.current = { type: 'opponent', id }
-                  setSelectedId(null)
-                  return
-                }
-                startDragPlayer(event, id, 'field')
-              }}
-              draggable={!isOpponent}
-              onDragStart={(event) => {
-                if (isOpponent) return
-                event.dataTransfer.setData('text/plain', id)
-                setDragSource('field')
-                setDraggingPlayerId(id)
-              }}
-            >
-              <span>{gameState.isAttacking ? player.label : getMainPosition(player)}</span>
-              {!isOpponent && tooltipId === id && (
-                <div className="player-tooltip">
-                  {player.name} #{player.number}
-                </div>
-              )}
-            </button>
-          )
-        })}
-
-        {['first', 'second', 'third'].map((base) => {
-          if (!gameState.runners?.[base]) return null
-          const map = { first: '1B', second: '2B', third: '3B' }
-          const basePosition = runnerDrag?.base === base
-            ? { x: runnerDrag.x, y: runnerDrag.y }
-            : getDefaultFieldPosition(map[base])
-          const point = toScreenPoint(basePosition.x, basePosition.y)
-          return (
-            <div
-              key={`runner-${base}`}
-              className="player-marker runner-marker"
-              style={{ left: `${point.left}px`, top: `${point.top}px` }}
-              onPointerDown={(event) => {
-                if (activeTool !== 'mouse') return
-                event.preventDefault()
-                dragRef.current = { type: 'runner', base }
-                setRunnerDrag({ base, x: basePosition.x, y: basePosition.y })
-              }}
-            />
-          )
-        })}
-
-        {activeTool === 'pointer' && laser.visible && (
-          <div className="laser-dot" style={{ left: `${laser.x}px`, top: `${laser.y}px` }} />
-        )}
-
-        {dropTarget === 'field' && dragSource === 'bench' && (
-          <div className="drop-hint field-drop-hint">{dropMessage || 'Soltar para colocar no campo'}</div>
-        )}
-      </div>
-
-      <aside
+      {showHud && (
+      <Bench
         ref={benchRef}
-        className={`bench-panel ${dropTarget === 'bench' ? 'drop-ready' : ''}`}
-        aria-label="Banco de reservas"
-        onDragEnter={(event) => {
-          event.preventDefault()
-          setDropTarget('bench')
-          setDropMessage('Soltar para adicionar ao banco')
-        }}
-        onDragLeave={() => {
-          setDropTarget(null)
-          setDropMessage('')
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault()
-          setDropTarget('bench')
-        }}
-      >
-        <div className="bench-head">
-          <h3>Campo: {fieldPlayers.length}</h3>
-          <h3>Banco</h3>
-          <input
-            placeholder="Buscar jogador"
-            value={benchSearch}
-            onChange={(event) => setBenchSearch(event.target.value)}
-          />
-        </div>
+        benchPlayers={benchPlayers}
+        dropTarget={dropTarget}
+        dropMessage={dropMessage}
+        benchSearch={benchSearch}
+        setBenchSearch={setBenchSearch}
+        selectedId={selectedId}
+        setSelectedId={setSelectedId}
+        startDragPlayer={startDragPlayer}
+        openPlayerDetails={openPlayerDetails}
+        openEditModal={openEditModal}
+        getPlayerId={getPlayerId}
+        getMainPosition={getMainPosition}
+        playersById={playersById}
+        setPlayers={setPlayers}
+        gameState={gameState}
+        onUpdateGameState={onUpdateGameState}
+      />
+      )}
 
-        <div className="bench-list">
-          {dropMessage && dropTarget === 'bench' && <div className="drop-hint">{dropMessage}</div>}
-          {benchPlayers.map((player) => {
-            const id = getPlayerId(player)
-            return (
-              <div key={id} className={`bench-card ${selectedId === id ? 'selected' : ''}`}>
-                <button
-                  type="button"
-                  className="bench-player-btn"
-                  onClick={() => setSelectedId(id)}
-                  onPointerDown={(event) => startDragPlayer(event, id, 'bench')}
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('text/plain', id)
-                    setDragSource('bench')
-                    setDraggingPlayerId(id)
-                  }}
-                >
-                  <strong>
-                    {player.name} #{player.number}
-                  </strong>
-                  <span>{(player.positions || []).join(' / ')}</span>
-                </button>
-                <button type="button" className="bench-info-btn" onClick={() => openPlayerDetails(id)}>
-                  Ver stats
-                </button>
-                <button type="button" className="bench-info-btn" onClick={() => openEditModal(id)}>
-                  Editar
-                </button>
-                {(player.positions || []).length > 1 && (
-                  <select
-                    value={getMainPosition(player)}
-                    onChange={(event) => {
-                      const nextPosition = event.target.value
-                      const conflictId = (gameState.onFieldPlayerIds || [])
-                        .filter((fieldId) => fieldId !== id)
-                        .find((fieldId) => getMainPosition(playersById[fieldId]) === nextPosition)
-
-                      setPlayers((current) =>
-                        current.map((item) =>
-                          getPlayerId(item) === id ? { ...item, activePosition: nextPosition } : item,
-                        ),
-                      )
-
-                      if ((gameState.onFieldPlayerIds || []).includes(id) && conflictId) {
-                        onUpdateGameState((current) => {
-                          const nextOnField = (current.onFieldPlayerIds || []).filter((fieldId) => fieldId !== conflictId)
-                          const battingOrder = (current.battingOrder || []).filter((fieldId) => fieldId !== conflictId)
-                          const lineup = (current.lineup || [])
-                            .filter((item) => item.playerId !== conflictId)
-                            .map((item) => (item.playerId === id ? { ...item, position: nextPosition } : item))
-                          const bench = players
-                            .map((item) => getPlayerId(item))
-                            .filter((pid) => !nextOnField.includes(pid))
-
-                          return {
-                            ...current,
-                            onFieldPlayerIds: nextOnField,
-                            battingOrder,
-                            lineup,
-                            bench,
-                            participantPlayerIds: [...nextOnField, ...bench],
-                          }
-                        }, 'Conflito de posicao resolvido: jogador anterior enviado ao banco')
-                      }
-                    }}
-                  >
-                    {(player.positions || []).map((position) => (
-                      <option key={`${id}-${position}`} value={position}>
-                        {position}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </aside>
-
-      <aside className="field-hud">
+      {showHud && (
+        <aside className="field-hud">
         <div className="field-hud-block">
           <h3>Jogo</h3>
           {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
@@ -2110,11 +1879,31 @@ function FieldPage({
 
         <div className="field-hud-block">
           <h3>Campo</h3>
-          <button type="button" className="full-width-btn" onClick={() => onEndGame?.()}>
-            Encerrar jogo
-          </button>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <button type="button" className="full-width-btn" onClick={() => onEndGame?.()}>
+              Encerrar jogo
+            </button>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button type="button" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</button>
+              <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
+              <button type="button" onClick={() => setZoom((z) => Math.min(2, Number((z + 0.1).toFixed(2))))}>+</button>
+              <button type="button" onClick={() => setZoom(1)}>Reset</button>
+            </div>
+          </div>
         </div>
-      </aside>
+        </aside>
+      )}
+      {/* Persistent HUD toggle button (always visible) */}
+      <button
+        type="button"
+        className="mode-toggle-btn"
+        onClick={() => setShowHud((s) => !s)}
+        aria-pressed={!showHud}
+      >
+        {showHud ? 'Esconder HUD' : 'Mostrar HUD'}
+      </button>
+
+    
 
       {showPreGameSetup && (
         <div className="modal-backdrop" onClick={() => {}}>

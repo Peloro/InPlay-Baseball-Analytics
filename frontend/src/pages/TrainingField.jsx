@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
+import Player from '../components/game/Player/Player'
+import Runner from '../components/game/Runner/Runner'
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
@@ -36,6 +38,9 @@ function TrainingField({ activeTool, clearDrawVersion }) {
   const [ball, setBall] = useState({ x: 50, y: 55 })
   const [strokes, setStrokes] = useState([])
   const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
+  const [showTrainingContainer, setShowTrainingContainer] = useState(true)
+  const [showHud, setShowHud] = useState(true)
+  const [zoom, setZoom] = useState(1)
 
   const markers = useMemo(() => {
     const runnerList = Object.entries(runners)
@@ -82,6 +87,8 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     window.addEventListener('resize', updateFieldRect)
     return () => window.removeEventListener('resize', updateFieldRect)
   }, [])
+
+  const scale = fieldRect && fieldRect.width ? Math.max(0.45, Math.min(1.6, fieldRect.width / 980)) : 1
 
   useEffect(() => {
     if (!drawingRef.current) return
@@ -185,12 +192,14 @@ function TrainingField({ activeTool, clearDrawVersion }) {
   }
 
   return (
-    <section className="training-layout">
-      <div
-        ref={fieldStageRef}
-        className={`field-stage ${activeTool}-mode`}
-        onPointerDown={startPenStroke}
-      >
+    <>
+      <section className={`training-layout ${showTrainingContainer ? '' : 'mode-hidden'}`}>
+        <div
+          ref={fieldStageRef}
+          className={`field-stage ${activeTool}-mode`}
+          style={{ ['--field-scale']: Math.max(0.25, Math.min(2.2, scale * zoom)), ['--field-zoom']: zoom }}
+          onPointerDown={startPenStroke}
+        >
         <img
           ref={fieldImageRef}
           src="/baseball-3778774_1280.webp"
@@ -212,23 +221,36 @@ function TrainingField({ activeTool, clearDrawVersion }) {
 
         {markers.map((marker) => {
           const point = toScreenPoint(marker.x, marker.y)
-          return (
-            <button
-              key={marker.id}
-              type="button"
-              className={`player-marker ${marker.id.startsWith('runner-') ? 'runner-marker' : 'training-defense-marker'}`}
-              style={{ left: `${point.left}px`, top: `${point.top}px` }}
-              onPointerDown={() => {
-                if (activeTool !== 'mouse') return
-                if (marker.id.startsWith('runner-')) {
+          if (marker.id.startsWith('runner-')) {
+            return (
+              <Runner
+                key={marker.id}
+                point={marker}
+                pointStyle={{ left: `${point.left}px`, top: `${point.top}px` }}
+                onPointerDown={() => {
+                  if (activeTool !== 'mouse') return
                   dragRef.current = { type: 'runner', base: marker.id.replace('runner-', '') }
-                } else {
-                  dragRef.current = { type: 'player', id: marker.id }
-                }
+                }}
+              />
+            )
+          }
+
+          return (
+            <Player
+              key={marker.id}
+              player={marker}
+              id={marker.id}
+              isOpponent={false}
+              screen={point}
+              className={`training-player training-defense-marker`}
+              startDragPlayer={(event) => {
+                if (activeTool !== 'mouse') return
+                event.preventDefault()
+                dragRef.current = { type: 'player', id: marker.id }
               }}
-            >
-              <span>{marker.label}</span>
-            </button>
+              onDragStart={() => {}}
+              getMainPosition={() => marker.label}
+            />
           )
         })}
 
@@ -247,7 +269,26 @@ function TrainingField({ activeTool, clearDrawVersion }) {
         )}
       </div>
 
-      <aside className="field-hud training-hud">
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button
+          type="button"
+          className="mode-toggle-btn"
+          onClick={() => setShowHud((s) => !s)}
+          aria-pressed={!showHud}
+        >
+          {showHud ? 'Esconder HUD' : 'Mostrar HUD'}
+        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</button>
+          <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
+          <button type="button" onClick={() => setZoom((z) => Math.min(2, Number((z + 0.1).toFixed(2))))}>+</button>
+          <button type="button" onClick={() => setZoom(1)}>Reset</button>
+        </div>
+      </div>
+      </section>
+
+      {showHud && (
+        <aside className="field-hud training-hud">
         <div className="field-hud-block">
           <h3>Modo Treino</h3>
           <p>Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
@@ -275,8 +316,9 @@ function TrainingField({ activeTool, clearDrawVersion }) {
             Resetar treino
           </button>
         </div>
-      </aside>
-    </section>
+        </aside>
+      )}
+    </>
   )
 }
 

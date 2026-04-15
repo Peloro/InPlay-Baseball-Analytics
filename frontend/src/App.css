@@ -245,6 +245,18 @@
   touch-action: none;
 }
 
+/* Field scaling variable (1 = default). Set on the field-stage element. */
+.field-stage {
+  --field-scale: 1;
+}
+
+/* apply visual zoom via CSS variable */
+.field-stage {
+  transform: scale(var(--field-zoom, 1));
+  transform-origin: center center;
+  transition: transform 160ms ease;
+}
+
 .field-stage.drop-ready {
   box-shadow: inset 0 0 0 4px rgba(79, 175, 119, 0.4);
 }
@@ -275,15 +287,15 @@
 .player-marker {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 56px;
-  height: 56px;
+  width: calc(56px * var(--field-scale));
+  height: calc(56px * var(--field-scale));
   border-radius: 999px;
-  border: 2px solid #fff;
+  border: calc(2px * var(--field-scale)) solid #fff;
   display: flex;
   justify-content: center;
   align-items: center;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: calc(0.9rem * var(--field-scale));
   font-weight: 700;
   letter-spacing: 0.04em;
   cursor: grab;
@@ -291,6 +303,13 @@
   touch-action: none;
   transition: left 160ms ease, top 160ms ease, box-shadow 160ms ease, transform 120ms ease, opacity 150ms ease;
   z-index: 5;
+}
+
+/* Smaller player markers in training mode */
+.training-player {
+  width: calc(44px * var(--field-scale));
+  height: calc(44px * var(--field-scale));
+  font-size: calc(0.8rem * var(--field-scale));
 }
 
 .opponent-marker {
@@ -315,9 +334,9 @@
 }
 
 .runner-marker {
-  width: 13px;
-  height: 13px;
-  border-width: 1px;
+  width: calc(13px * var(--field-scale));
+  height: calc(13px * var(--field-scale));
+  border-width: calc(1px * var(--field-scale));
   background: #b7362a;
   pointer-events: auto;
   cursor: grab;
@@ -374,7 +393,7 @@
   white-space: nowrap;
   background: rgba(7, 18, 13, 0.9);
   color: #fff;
-  font-size: 0.8rem;
+  font-size: calc(0.8rem * var(--field-scale));
   padding: 6px 8px;
   border-radius: 8px;
 }
@@ -819,6 +838,114 @@
   gap: 14px;
 }
 
+/* Prevent horizontal scroll globally */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Responsive layout rules */
+/* Mobile: vertical stacking */
+@media (max-width: 767px) {
+  .field-layout,
+  .training-layout {
+    position: relative;
+    height: auto;
+    min-height: calc(100vh - var(--top-nav-height));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 12px;
+  }
+
+  .game-scoreboard {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin: 8px auto;
+    width: min(96vw, 560px);
+  }
+
+  .field-stage {
+    position: relative;
+    inset: auto;
+    height: 56vh;
+    min-height: 320px;
+    max-height: 68vh;
+    display: block;
+  }
+
+  .field-image {
+    height: 100%;
+  }
+
+  .field-draw-layer {
+    position: absolute;
+  }
+
+  .bench-panel {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 8px;
+    box-shadow: none;
+    border-radius: 10px;
+    padding: 10px;
+    overflow: auto;
+    z-index: 1;
+  }
+
+  .field-hud {
+    position: static;
+    left: auto;
+    top: auto;
+    bottom: auto;
+    width: 100%;
+    margin: 0 8px 12px;
+    max-height: none;
+    overflow: visible;
+    z-index: 1;
+  }
+
+  /* Make sure markers remain within the field and not cause horizontal scroll */
+  .player-marker {
+    max-width: 12vw;
+    max-height: 12vw;
+    width: min(56px, 12vw);
+    height: min(56px, 12vw);
+  }
+}
+
+/* Tablet: intermediate layout, keep HUD and bench fixed but narrower */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .bench-panel {
+    width: 280px;
+    right: 10px;
+    top: calc(var(--top-nav-height) + 10px);
+    bottom: 10px;
+  }
+
+  .field-hud {
+    left: 8px;
+    top: calc(var(--top-nav-height) + 10px);
+    bottom: 10px;
+    width: 320px;
+  }
+
+  .game-scoreboard {
+    min-width: 300px;
+    max-width: 88vw;
+  }
+
+  .field-stage {
+    inset: 0;
+  }
+}
+
+
 .stats-page.stats-page-leaving {
   animation: statsPageFadeOut 240ms ease forwards;
 }
@@ -1129,6 +1256,34 @@
 
 .player-row-head {
   background: #2a2617;
+}
+
+/* Hidden mode utility used to collapse entire containers */
+.mode-hidden {
+  display: none !important;
+}
+
+/* Toggle button to show/hide field/training containers */
+.mode-toggle-btn {
+  position: fixed;
+  right: 12px;
+  top: calc(var(--top-nav-height) + 12px);
+  z-index: 120;
+  padding: 8px 10px;
+  background: var(--accent);
+  color: #111;
+  border: 1px solid var(--accent-dark);
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .mode-toggle-btn {
+    right: 12px;
+    bottom: 12px;
+    top: auto;
+  }
 }
 
 .hitting {
