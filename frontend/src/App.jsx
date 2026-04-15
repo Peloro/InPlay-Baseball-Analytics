@@ -169,6 +169,7 @@ function App() {
   const [gameAccessNotice, setGameAccessNotice] = useState('')
   const [isClosingGame, setIsClosingGame] = useState(false)
   const [isGameEntering, setIsGameEntering] = useState(false)
+  const [isPortraitOnMobile, setIsPortraitOnMobile] = useState(false)
 
   useEffect(() => {
     window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
@@ -215,6 +216,29 @@ function App() {
     }
 
     loadData()
+  }, [])
+
+  useEffect(() => {
+    const isTouchDevice = () => ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
+    const mq = window.matchMedia('(orientation: portrait)')
+    const checkOrientation = () => {
+      const smallScreen = window.innerWidth <= 1024
+      const isPortrait = mq.matches
+      setIsPortraitOnMobile(isTouchDevice() && smallScreen && isPortrait)
+    }
+
+    checkOrientation()
+
+    const handler = () => checkOrientation()
+    if (mq.addEventListener) mq.addEventListener('change', handler)
+    else if (mq.addListener) mq.addListener(handler)
+    window.addEventListener('resize', handler)
+
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler)
+      else if (mq.removeListener) mq.removeListener(handler)
+      window.removeEventListener('resize', handler)
+    }
   }, [])
 
   useEffect(() => {
@@ -699,6 +723,15 @@ function App() {
 
   return (
     <main className={`app-shell ${isClosingGame ? 'app-closing' : ''} ${isGameEntering ? 'app-entering-game' : ''}`}>
+      {isPortraitOnMobile && (
+        <div className="orientation-lock-overlay" role="dialog" aria-modal="true">
+          <div className="orientation-lock-inner">
+            <h2>Por favor, gire seu dispositivo</h2>
+            <p>Use o modo paisagem (horizontal) para continuar.</p>
+            <div className="orientation-icon" aria-hidden>🔁</div>
+          </div>
+        </div>
+      )}
       <header className="top-nav">
         <div className="nav-brand" aria-label="Beisebol CAASO">
           <img className="nav-brand-logo" src="/Ativo 1Cporcotransparente.png" alt="Logo C com porco" />

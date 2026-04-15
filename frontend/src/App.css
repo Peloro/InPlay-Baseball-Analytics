@@ -15,10 +15,7 @@
   min-height: 100vh;
   padding-top: calc(var(--top-nav-height) + 8px);
   color: var(--ink);
-  background:
-    radial-gradient(circle at 18% 12%, rgba(245, 212, 0, 0.18) 0%, rgba(245, 212, 0, 0) 36%),
-    radial-gradient(circle at 82% 18%, rgba(245, 212, 0, 0.08) 0%, rgba(245, 212, 0, 0) 34%),
-    linear-gradient(145deg, #0f0f0f 0%, #181818 48%, #101010 100%);
+  background: linear-gradient(145deg, #0f0f0f 0%, #121212 100%);
   transition: opacity 260ms ease;
 }
 
@@ -48,10 +45,8 @@
   z-index: 9999;
   min-height: var(--top-nav-height);
   padding: 10px 16px;
-  background:
-    linear-gradient(90deg, rgba(14, 14, 14, 0.96) 0%, rgba(30, 30, 30, 0.92) 60%, rgba(14, 14, 14, 0.96) 100%),
-    rgba(14, 14, 14, 0.94);
-  border-bottom: 2px solid rgba(245, 212, 0, 0.55);
+  background: rgba(14, 14, 14, 0.96);
+  border-bottom: 1px solid rgba(0,0,0,0.2);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -799,6 +794,7 @@
   border-radius: 10px;
   padding: 8px;
   cursor: grab;
+  color: var(--ink);
 }
 
 .pregame-order-item.dragging {
@@ -872,6 +868,51 @@
 
 .stats-pulse {
   animation: statPulse 320ms ease;
+}
+
+.stats-loading {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  text-align: center;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* Orientation lock overlay for mobile/tablet portrait */
+.orientation-lock-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.95);
+  color: var(--ink);
+  z-index: 99999;
+  padding: 24px;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.orientation-lock-inner {
+  max-width: 520px;
+  background: transparent;
+}
+
+.orientation-lock-inner h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.25rem;
+}
+
+.orientation-lock-inner p {
+  margin: 0 0 12px 0;
+  opacity: 0.95;
+}
+
+.orientation-icon {
+  font-size: 48px;
+  opacity: 0.95;
 }
 
 @keyframes statPulse {
@@ -1504,6 +1545,7 @@ html, body {
 .tool-dock .clear-btn {
   border-color: #cbbda6;
   background: #f4ead8;
+  color: #1a1a1a;
 }
 
 @media (max-width: 760px) {

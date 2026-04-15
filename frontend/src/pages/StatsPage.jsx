@@ -73,7 +73,10 @@ function StatsPage({
   const [games, setGames] = useState([])
   const [gameStats, setGameStats] = useState([])
   const [seasonStats, setSeasonStats] = useState([])
+  const [seasonLoading, setSeasonLoading] = useState(false)
   const [sortBy, setSortBy] = useState('date')
+  const [gamesLoading, setGamesLoading] = useState(false)
+  const [gameStatsLoading, setGameStatsLoading] = useState(false)
   const [playerFilter, setPlayerFilter] = useState('all')
   const [statsTab, setStatsTab] = useState('hitters')
   const [seasonSortBy, setSeasonSortBy] = useState('hits')
@@ -94,13 +97,23 @@ function StatsPage({
   }, [players, participantIds])
 
   const loadGames = useCallback(async () => {
-    const response = await gamesApi.list()
-    setGames(response.data || [])
+    setGamesLoading(true)
+    try {
+      const response = await gamesApi.list()
+      setGames(response.data || [])
+    } finally {
+      setGamesLoading(false)
+    }
   }, [])
 
   const loadSeasonStats = useCallback(async () => {
-    const response = await seasonStatsApi.list(playerFilter === 'all' ? null : playerFilter)
-    setSeasonStats(response.data || [])
+    setSeasonLoading(true)
+    try {
+      const response = await seasonStatsApi.list(playerFilter === 'all' ? null : playerFilter)
+      setSeasonStats(response.data || [])
+    } finally {
+      setSeasonLoading(false)
+    }
   }, [playerFilter])
 
   const loadGameStats = useCallback(async (gameId) => {
@@ -109,8 +122,13 @@ function StatsPage({
       return
     }
 
-    const response = await gameStatsApi.listByGame(gameId)
-    setGameStats(response.data || [])
+    setGameStatsLoading(true)
+    try {
+      const response = await gameStatsApi.listByGame(gameId)
+      setGameStats(response.data || [])
+    } finally {
+      setGameStatsLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -649,7 +667,8 @@ function StatsPage({
           )}
         </div>
         <div className="stats-table-wrap">
-          <table className="stats-table">
+          {seasonLoading && <div className="stats-loading">Carregando estatísticas...</div>}
+          <table className={`stats-table ${seasonLoading ? 'stats-pulse' : ''}`}>
             <thead>
               <tr>
                 <th>Jogador</th>
@@ -831,6 +850,7 @@ function StatsPage({
 
         {selectedGame && (
           <div ref={gameDetailsRef}>
+            {gameStatsLoading && <div className="stats-loading">Carregando estatísticas do jogo...</div>}
             <div className="detail-actions">
               <button type="button" className="action-btn" onClick={() => handleOpenGame(selectedGame)}>
                 Abrir jogo
