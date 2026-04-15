@@ -149,7 +149,7 @@
 .training-layout {
   position: relative;
   width: 100%;
-  height: calc(100vh - var(--top-nav-height));
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -168,6 +168,44 @@
   padding: 8px 10px;
   display: grid;
   gap: 6px;
+}
+
+/* Hidden by default: roll out above the viewport */
+.game-scoreboard.hidden {
+  transform: translate(-50%, -140%);
+  opacity: 0;
+  pointer-events: none;
+  animation: rollOut 220ms ease forwards;
+}
+
+/* Visible state: roll in */
+.game-scoreboard.visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+  animation: rollIn 260ms cubic-bezier(.2,.9,.2,1) forwards;
+}
+
+@keyframes rollIn {
+  from {
+    transform: translate(-50%, -160%) rotateX(18deg);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0) rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes rollOut {
+  from {
+    transform: translate(-50%, 0) rotateX(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -160%) rotateX(18deg);
+    opacity: 0;
+  }
 }
 
 .game-score-main {
@@ -250,11 +288,9 @@
   --field-scale: 1;
 }
 
-/* apply visual zoom via CSS variable */
+/* viewport handles zoom/translate now; keep field-stage transform none */
 .field-stage {
-  transform: scale(var(--field-zoom, 1));
-  transform-origin: center center;
-  transition: transform 160ms ease;
+  transform: none;
 }
 
 .field-stage.drop-ready {
@@ -269,6 +305,14 @@
   cursor: crosshair;
 }
 
+/* Cursor for panning */
+.field-stage {
+  cursor: grab;
+}
+.field-stage.grabbing {
+  cursor: grabbing;
+}
+
 .field-image {
   width: 100%;
   height: 100%;
@@ -276,6 +320,13 @@
   object-position: center;
   user-select: none;
   pointer-events: none;
+}
+
+.field-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 .field-draw-layer {
@@ -340,6 +391,28 @@
   background: #b7362a;
   pointer-events: auto;
   cursor: grab;
+}
+
+/* subtle idle runner animation */
+.runner-animate {
+  animation: runnerBob 1400ms ease-in-out infinite;
+}
+
+@keyframes runnerBob {
+  0% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-4px); }
+  100% { transform: translate(-50%, -50%) translateY(0); }
+}
+
+/* scoring animation: pop + glow */
+.runner-score {
+  animation: runnerScorePop 900ms cubic-bezier(.2,.9,.2,1) forwards;
+}
+
+@keyframes runnerScorePop {
+  0% { transform: translate(-50%, -50%) scale(1); box-shadow: none; }
+  40% { transform: translate(-50%, -50%) scale(1.28); box-shadow: 0 6px 18px rgba(183,54,42,0.35); }
+  100% { transform: translate(-50%, -50%) scale(1); box-shadow: none; }
 }
 
 .runner-marker span {

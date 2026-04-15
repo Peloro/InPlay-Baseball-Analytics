@@ -1,8 +1,8 @@
 import React from 'react'
 
-export default function Scoreboard({ gameState, opponentName }) {
+export default function Scoreboard({ gameState, opponentName, visible = false }) {
   return (
-    <div className="game-scoreboard" role="region" aria-label="Placar do jogo">
+    <div className={`game-scoreboard ${visible ? 'visible' : 'hidden'}`} role="region" aria-label="Placar do jogo">
       <div className="game-score-main">
         <strong className="team-name">CAASO</strong>
         <span key={`score-home-${gameState.homeScore || 0}`} className="score-value score-pulse">{gameState.homeScore || 0}</span>

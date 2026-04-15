@@ -40,7 +40,11 @@ function TrainingField({ activeTool, clearDrawVersion }) {
   const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
   const [showTrainingContainer, setShowTrainingContainer] = useState(true)
   const [showHud, setShowHud] = useState(true)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(0.85)
+  const [offsetX, setOffsetX] = useState(0)
+  const [offsetY, setOffsetY] = useState(0)
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 
   const markers = useMemo(() => {
     const runnerList = Object.entries(runners)
@@ -49,6 +53,17 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     return [...players, ...runnerList]
   }, [players, runners])
 
+  const computeBasePosition = (posName) => {
+    const p = getDefaultFieldPosition(posName)
+    const offsets = {
+      '1B': { dx: -2, dy: -6 },
+      '2B': { dx: -5.5, dy: 0 },
+      '3B': { dx: 0, dy: 6 },
+    }
+    const off = offsets[posName] || { dx: 0, dy: 0 }
+    return { x: p.x + off.dx, y: p.y + off.dy }
+  }
+
   const toFieldPoint = useCallback((clientX, clientY) => {
     if (!fieldStageRef.current || !fieldRect.width || !fieldRect.height) return null
 
@@ -56,30 +71,133 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     const localX = clientX - stageRect.left
     const localY = clientY - stageRect.top
 
-    const fieldX = ((localX - fieldRect.left) / fieldRect.width) * 100
-    const fieldY = ((localY - fieldRect.top) / fieldRect.height) * 100
+    const untransX = (localX - offsetX) / zoom
+    const untransY = (localY - offsetY) / zoom
+
+    const fieldX = ((untransX - fieldRect.left) / fieldRect.width) * 100
+    const fieldY = ((untransY - fieldRect.top) / fieldRect.height) * 100
 
     if (fieldX < 0 || fieldX > 100 || fieldY < 0 || fieldY > 100) return null
     return { x: clamp(fieldX, 0, 100), y: clamp(fieldY, 0, 100) }
-  }, [fieldRect])
+  }, [fieldRect, offsetX, offsetY, zoom])
 
   const toScreenPoint = (x, y) => ({
-    left: fieldRect.left + (x / 100) * fieldRect.width,
-    top: fieldRect.top + (y / 100) * fieldRect.height,
+    left: (x / 100) * fieldRect.width,
+    top: (y / 100) * fieldRect.height,
   })
+
+  // Wheel zoom and pan handlers for training field
+  useEffect(() => {
+    const el = fieldStageRef.current
+    if (!el) return undefined
+    const targetEl = el.querySelector?.('.field-viewport') || el
+
+    const handleWheel = (ev) => {
+      // do not zoom when using pen/pointer tools
+      if (activeTool !== 'mouse') return
+      ev.preventDefault()
+      const stageRect = el.getBoundingClientRect()
+      const mouseX = ev.clientX - stageRect.left
+      const mouseY = ev.clientY - stageRect.top
+      const delta = ev.deltaY < 0 ? 1 : -1
+      const factor = 1 + delta * 0.08
+      const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * factor).toFixed(3))))
+
+      // content coord under cursor (pre-zoom)
+      const contentX = (mouseX - offsetX) / zoom
+      const contentY = (mouseY - offsetY) / zoom
+
+      // compute next offset so the same content point stays under the cursor
+      const nextOffsetX = mouseX - contentX * newZoom
+      const nextOffsetY = mouseY - contentY * newZoom
+
+      const contentWidth = fieldRect.width * newZoom
+      const contentHeight = fieldRect.height * newZoom
+      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+      const maxX = extraX
+      const maxY = extraY
+      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
+      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
+
+      requestAnimationFrame(() => {
+        setZoom(newZoom)
+        setOffsetX(clampX)
+        setOffsetY(clampY)
+      })
+    }
+
+    const handlePointerDown = (ev) => {
+      // only allow panning with mouse tool and left button
+      if (activeTool !== 'mouse') return
+      const target = ev.target
+      if (target.closest && target.closest('.player-marker')) return
+      if (ev.button !== 0) return
+      isPanningRef.current = true
+      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
+      el.classList.add('grabbing')
+      el.setPointerCapture?.(ev.pointerId)
+    }
+
+    const handlePointerMove = (ev) => {
+      if (!isPanningRef.current) return
+      const dx = ev.clientX - panStartRef.current.x
+      const dy = ev.clientY - panStartRef.current.y
+      requestAnimationFrame(() => {
+        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
+        const contentWidth = fieldRect.width * zoom
+        const contentHeight = fieldRect.height * zoom
+        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+        const maxX = extraX
+        const maxY = extraY
+        const rawX = panStartRef.current.offsetX + dx
+        const rawY = panStartRef.current.offsetY + dy
+        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
+        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
+      })
+    }
+
+    const handlePointerUp = (ev) => {
+      if (isPanningRef.current) {
+        isPanningRef.current = false
+        el.classList.remove('grabbing')
+        el.releasePointerCapture?.(ev.pointerId)
+      }
+    }
+
+    targetEl.addEventListener('wheel', handleWheel, { passive: false })
+    targetEl.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      targetEl.removeEventListener('wheel', handleWheel)
+      targetEl.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
 
   useLayoutEffect(() => {
     const updateFieldRect = () => {
-      if (!fieldStageRef.current || !fieldImageRef.current) return
+      if (!fieldStageRef.current) return
 
       const stageRect = fieldStageRef.current.getBoundingClientRect()
-      const imageRect = fieldImageRef.current.getBoundingClientRect()
 
+      // Use the stage container as the basis for the field rect to avoid a
+      // circular dependency where the image size depends on fieldRect and
+      // fieldRect is read from the image. This ensures the viewport has a
+      // deterministic size even before the image finishes loading.
       setFieldRect({
-        left: imageRect.left - stageRect.left,
-        top: imageRect.top - stageRect.top,
-        width: imageRect.width,
-        height: imageRect.height,
+        left: 0,
+        top: 0,
+        width: stageRect.width,
+        height: stageRect.height,
       })
     }
 
@@ -89,6 +207,7 @@ function TrainingField({ activeTool, clearDrawVersion }) {
   }, [])
 
   const scale = fieldRect && fieldRect.width ? Math.max(0.45, Math.min(1.6, fieldRect.width / 980)) : 1
+  const combined = Math.max(0.25, Math.min(2.2, scale * (1 / (zoom || 1))))
 
   useEffect(() => {
     if (!drawingRef.current) return
@@ -196,30 +315,35 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       <section className={`training-layout ${showTrainingContainer ? '' : 'mode-hidden'}`}>
         <div
           ref={fieldStageRef}
+          style={{ ['--field-scale']: combined, ['--field-zoom']: zoom }}
           className={`field-stage ${activeTool}-mode`}
-          style={{ ['--field-scale']: Math.max(0.25, Math.min(2.2, scale * zoom)), ['--field-zoom']: zoom }}
           onPointerDown={startPenStroke}
         >
-        <img
-          ref={fieldImageRef}
-          src="/baseball-3778774_1280.webp"
-          alt="Campo de treino"
-          className="field-image"
-          draggable={false}
-        />
+          <div
+            className="field-viewport"
+            style={{
+              width: `${fieldRect.width}px`,
+              height: `${fieldRect.height}px`,
+              transform: `translate(${offsetX}px, ${offsetY}px) scale(${zoom})`,
+              transformOrigin: '0 0',
+            }}
+          >
+            <img
+              ref={fieldImageRef}
+              src="/baseball-3778774_1280.webp"
+              alt="Campo de treino"
+              className="field-image"
+              draggable={false}
+              style={{ position: 'absolute', left: 0, top: 0, width: `${fieldRect.width}px`, height: `${fieldRect.height}px` }}
+            />
 
-        <canvas
-          ref={drawingRef}
-          className="field-draw-layer"
-          style={{
-            left: `${fieldRect.left}px`,
-            top: `${fieldRect.top}px`,
-            width: `${fieldRect.width}px`,
-            height: `${fieldRect.height}px`,
-          }}
-        />
+            <canvas
+              ref={drawingRef}
+              className="field-draw-layer"
+              style={{ left: 0, top: 0, width: `${fieldRect.width}px`, height: `${fieldRect.height}px` }}
+            />
 
-        {markers.map((marker) => {
+            {markers.map((marker) => {
           const point = toScreenPoint(marker.x, marker.y)
           if (marker.id.startsWith('runner-')) {
             return (
@@ -254,20 +378,21 @@ function TrainingField({ activeTool, clearDrawVersion }) {
           )
         })}
 
-        <button
-          type="button"
-          className="training-ball-marker"
-          style={{ left: `${toScreenPoint(ball.x, ball.y).left}px`, top: `${toScreenPoint(ball.x, ball.y).top}px` }}
-          onPointerDown={() => {
-            if (activeTool !== 'mouse') return
-            dragRef.current = { type: 'ball' }
-          }}
-        />
+            <button
+              type="button"
+              className="training-ball-marker"
+              style={{ left: `${toScreenPoint(ball.x, ball.y).left}px`, top: `${toScreenPoint(ball.x, ball.y).top}px` }}
+              onPointerDown={() => {
+                if (activeTool !== 'mouse') return
+                dragRef.current = { type: 'ball' }
+              }}
+            />
+          </div>
 
-        {activeTool === 'pointer' && laser.visible && (
-          <div className="laser-dot" style={{ left: `${laser.x}px`, top: `${laser.y}px` }} />
-        )}
-      </div>
+          {activeTool === 'pointer' && laser.visible && (
+            <div className="laser-dot" style={{ left: `${laser.x}px`, top: `${laser.y}px` }} />
+          )}
+        </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <button
@@ -281,7 +406,7 @@ function TrainingField({ activeTool, clearDrawVersion }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button type="button" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</button>
           <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
-          <button type="button" onClick={() => setZoom((z) => Math.min(2, Number((z + 0.1).toFixed(2))))}>+</button>
+          <button type="button" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</button>
           <button type="button" onClick={() => setZoom(1)}>Reset</button>
         </div>
       </div>
@@ -293,13 +418,22 @@ function TrainingField({ activeTool, clearDrawVersion }) {
           <h3>Modo Treino</h3>
           <p>Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
           <div className="hud-actions">
-            <button type="button" onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, visible: true } }))}>
+            <button
+              type="button"
+              onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, ...computeBasePosition('1B'), visible: true } }))}
+            >
               + 1B
             </button>
-            <button type="button" onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, visible: true } }))}>
+            <button
+              type="button"
+              onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, ...computeBasePosition('2B'), visible: true } }))}
+            >
               + 2B
             </button>
-            <button type="button" onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, visible: true } }))}>
+            <button
+              type="button"
+              onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, ...computeBasePosition('3B'), visible: true } }))}
+            >
               + 3B
             </button>
           </div>

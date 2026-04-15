@@ -31,9 +31,13 @@ export default function Field({
   startPenStroke,
   onDragStartPlayer,
   zoom = 1,
+  offsetX = 0,
+  offsetY = 0,
+  animateRunners = false,
 }) {
   const scale = fieldRect && fieldRect.width ? Math.max(0.45, Math.min(1.6, fieldRect.width / 980)) : 1
-  const combined = Math.max(0.25, Math.min(2.2, scale * (zoom || 1)))
+  // Invert marker scaling vs. camera zoom: when zoom increases markers get smaller
+  const combined = Math.max(0.25, Math.min(2.2, scale * (1 / (zoom || 1))))
 
   return (
     <div
@@ -52,26 +56,36 @@ export default function Field({
         setDropTarget(null)
       }}
     >
-      <img
-        ref={fieldImageRef}
-        src="/baseball-3778774_1280.webp"
-        alt="Baseball field"
-        className="field-image"
-        draggable={false}
-      />
-
-      <canvas
-        ref={drawingRef}
-        className="field-draw-layer"
+      <div
+        className="field-viewport"
         style={{
-          left: `${fieldRect.left}px`,
-          top: `${fieldRect.top}px`,
           width: `${fieldRect.width}px`,
           height: `${fieldRect.height}px`,
+          transform: `translate(${(offsetX || 0)}px, ${(offsetY || 0)}px) scale(${zoom || 1})`,
+          transformOrigin: '0 0',
         }}
-      />
+      >
+        <img
+          ref={fieldImageRef}
+          src="/baseball-3778774_1280.webp"
+          alt="Baseball field"
+          className="field-image"
+          draggable={false}
+          style={{ position: 'absolute', left: 0, top: 0, width: `${fieldRect.width}px`, height: `${fieldRect.height}px` }}
+        />
 
-      {visibleFieldMarkers.map((player) => {
+        <canvas
+          ref={drawingRef}
+          className="field-draw-layer"
+          style={{
+            left: 0,
+            top: 0,
+            width: `${fieldRect.width}px`,
+            height: `${fieldRect.height}px`,
+          }}
+        />
+
+        {visibleFieldMarkers.map((player) => {
         const id = getPlayerId(player)
         const isSelected = selectedId === id
         const screen = toScreenPoint(player.x, player.y)
@@ -82,7 +96,9 @@ export default function Field({
             key={id}
             player={player}
             id={id}
-            isOpponent={isOpponent}
+              isOpponent={isOpponent}
+              // Always use training-player sizing so both teams match training mode
+              className={'training-player'}
             screen={screen}
             tooltipId={selectedId}
             selectedId={selectedId}
@@ -114,9 +130,23 @@ export default function Field({
       {['first', 'second', 'third'].map((base) => {
         if (!gameState.runners?.[base]) return null
         const map = { first: '1B', second: '2B', third: '3B' }
+        // compute base plate position (separate from fielder position)
+        const computeBasePosition = (posName) => {
+          const p = getDefaultFieldPosition(posName)
+          // small offsets to place runner ON the base plate and avoid overlap
+          // Use same offsets as TrainingField so runner placement is consistent
+          const offsets = {
+            '1B': { dx: -2, dy: -6 },
+            '2B': { dx: -5.5, dy: 0 },
+            '3B': { dx: 0, dy: 6 },
+          }
+          const off = offsets[posName] || { dx: 0, dy: 0 }
+          return { x: p.x + off.dx, y: p.y + off.dy }
+        }
+
         const basePosition = runnerDrag?.base === base
           ? { x: runnerDrag.x, y: runnerDrag.y }
-          : getDefaultFieldPosition(map[base])
+          : computeBasePosition(map[base])
         const point = toScreenPoint(basePosition.x, basePosition.y)
         const style = { left: `${point.left}px`, top: `${point.top}px` }
         return (
@@ -124,6 +154,7 @@ export default function Field({
             key={`runner-${base}`}
             point={basePosition}
             pointStyle={style}
+            animate={animateRunners}
             onPointerDown={(event) => {
               if (activeTool !== 'mouse') return
               event.preventDefault()
@@ -141,6 +172,8 @@ export default function Field({
       {dropTarget === 'field' && dragSource === 'bench' && (
         <div className="drop-hint field-drop-hint">{dropMessage || 'Soltar para colocar no campo'}</div>
       )}
+      </div>
     </div>
   )
 }
+

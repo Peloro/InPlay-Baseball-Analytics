@@ -204,7 +204,13 @@ function FieldPage({
   const [invalidFeedback, setInvalidFeedback] = useState('')
   const [showFieldContainer, setShowFieldContainer] = useState(true)
   const [showHud, setShowHud] = useState(true)
-  const [zoom, setZoom] = useState(1)
+  const [showScoreboard, setShowScoreboard] = useState(false)
+  const touchStartRef = useRef(null)
+  const [zoom, setZoom] = useState(0.85)
+  const [offsetX, setOffsetX] = useState(0)
+  const [offsetY, setOffsetY] = useState(0)
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
 
   const {
     benchSearch,
@@ -221,7 +227,59 @@ function FieldPage({
     setPlayers: setPlayersFromHook,
   } = usePlayers({ players, setPlayers, gameState })
 
+  // helper to return base plate positions (separate from fielder positions)
+  const computeBasePosition = (posName) => {
+    const p = getDefaultFieldPosition(posName)
+    const offsets = {
+      '1B': { dx: 3, dy: 6 },
+      '2B': { dx: 0, dy: 8 },
+      '3B': { dx: -3, dy: 6 },
+    }
+    const off = offsets[posName] || { dx: 0, dy: 0 }
+    return { x: p.x + off.dx, y: p.y + off.dy }
+  }
+
   // keep original setPlayers reference available (setPlayersFromHook === setPlayers)
+
+  useEffect(() => {
+    // show scoreboard when mouse near top or on mobile pull-down from top
+    const handlePointerMoveScore = (ev) => {
+      const y = ev.clientY || (ev.touches && ev.touches[0] && ev.touches[0].clientY) || 0
+      const threshold = 64
+      if (y <= threshold) {
+        if (!showScoreboard) setShowScoreboard(true)
+      } else {
+        if (showScoreboard) setShowScoreboard(false)
+      }
+    }
+
+    const handleTouchStart = (ev) => {
+      const y = ev.touches && ev.touches[0] && ev.touches[0].clientY
+      if (typeof y === 'number' && y <= 64) {
+        touchStartRef.current = y
+      } else {
+        touchStartRef.current = null
+      }
+    }
+
+    const handleTouchMove = (ev) => {
+      if (touchStartRef.current == null) return
+      const y = ev.touches && ev.touches[0] && ev.touches[0].clientY
+      if (typeof y === 'number' && y - touchStartRef.current > 30) {
+        if (!showScoreboard) setShowScoreboard(true)
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMoveScore)
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMoveScore)
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [showScoreboard])
 
   useEffect(() => {
     if (!gameState.currentGameId) {
@@ -249,6 +307,25 @@ function FieldPage({
   }, [gameState.currentGameId, gameState.preGameConfigured, players])
 
   const { pitcherLiveStat, livePitching, opponentName } = useGameState({ gameState, activeGame })
+
+  // animate runners briefly when score increases and show scoreboard
+  const prevScoreRef = useRef({ home: gameState.homeScore || 0, away: gameState.awayScore || 0 })
+  const [animateRunners, setAnimateRunners] = useState(false)
+
+  useEffect(() => {
+    const prev = prevScoreRef.current
+    const nextHome = gameState.homeScore || 0
+    const nextAway = gameState.awayScore || 0
+    const homeInc = nextHome > prev.home
+    const awayInc = nextAway > prev.away
+    if ((homeInc || awayInc) && !gameState.preGameConfigured) {
+      // show scoreboard and animate runners
+      setShowScoreboard(true)
+      setAnimateRunners(true)
+      window.setTimeout(() => setAnimateRunners(false), 900)
+    }
+    prevScoreRef.current = { home: nextHome, away: nextAway }
+  }, [gameState.homeScore, gameState.awayScore, gameState.preGameConfigured])
 
 
   useEffect(() => {
@@ -389,30 +466,136 @@ function FieldPage({
     const localX = clientX - stageRect.left
     const localY = clientY - stageRect.top
 
-    const fieldX = ((localX - fieldRect.left) / fieldRect.width) * 100
-    const fieldY = ((localY - fieldRect.top) / fieldRect.height) * 100
+    const untransX = (localX - offsetX) / zoom
+    const untransY = (localY - offsetY) / zoom
+
+    const fieldX = ((untransX - fieldRect.left) / fieldRect.width) * 100
+    const fieldY = ((untransY - fieldRect.top) / fieldRect.height) * 100
 
     if (fieldX < 0 || fieldX > 100 || fieldY < 0 || fieldY > 100) return null
     return { x: clamp(fieldX, 0, 100), y: clamp(fieldY, 0, 100) }
-  }, [fieldRect])
+  }, [fieldRect, offsetX, offsetY, zoom])
 
   const toScreenPoint = useCallback((x, y) => ({
-    left: fieldRect.left + (x / 100) * fieldRect.width,
-    top: fieldRect.top + (y / 100) * fieldRect.height,
+    // Return position in raw pixels inside the field viewport (before camera transform)
+    left: (x / 100) * fieldRect.width,
+    top: (y / 100) * fieldRect.height,
   }), [fieldRect])
+
+  // Wheel zoom and pan handlers (camera control)
+  useEffect(() => {
+    const el = fieldStageRef.current
+    if (!el) return undefined
+    const targetEl = el.querySelector?.('.field-viewport') || el
+
+    const handleWheel = (ev) => {
+      // do not zoom when using pen/pointer tools
+      if (activeTool !== 'mouse') return
+      ev.preventDefault()
+      const stageRect = el.getBoundingClientRect()
+      const mouseX = ev.clientX - stageRect.left
+      const mouseY = ev.clientY - stageRect.top
+
+      const delta = ev.deltaY < 0 ? 1 : -1
+      const factor = 1 + delta * 0.08
+      const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * factor).toFixed(3))))
+
+      // content coord under cursor (pre-zoom)
+      const contentX = (mouseX - offsetX) / zoom
+      const contentY = (mouseY - offsetY) / zoom
+
+      // compute next offset so the same content point stays under the cursor
+      const nextOffsetX = mouseX - contentX * newZoom
+      const nextOffsetY = mouseY - contentY * newZoom
+
+      const contentWidth = fieldRect.width * newZoom
+      const contentHeight = fieldRect.height * newZoom
+      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+      const maxX = extraX
+      const maxY = extraY
+      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
+      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
+
+      requestAnimationFrame(() => {
+        setZoom(newZoom)
+        setOffsetX(clampX)
+        setOffsetY(clampY)
+      })
+    }
+
+    const handlePointerDown = (ev) => {
+      // only allow panning with mouse tool and left button
+      if (activeTool !== 'mouse') return
+      // only start pan if clicking on background (not on a player marker)
+      const target = ev.target
+      if (target.closest && target.closest('.player-marker')) return
+      if (ev.button !== 0) return
+      isPanningRef.current = true
+      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
+      el.classList.add('grabbing')
+      el.setPointerCapture?.(ev.pointerId)
+    }
+
+    const handlePointerMove = (ev) => {
+      if (!isPanningRef.current) return
+      const dx = ev.clientX - panStartRef.current.x
+      const dy = ev.clientY - panStartRef.current.y
+      requestAnimationFrame(() => {
+        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
+        const contentWidth = fieldRect.width * zoom
+        const contentHeight = fieldRect.height * zoom
+        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+        const maxX = extraX
+        const maxY = extraY
+        const rawX = panStartRef.current.offsetX + dx
+        const rawY = panStartRef.current.offsetY + dy
+        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
+        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
+      })
+    }
+
+    const handlePointerUp = (ev) => {
+      if (isPanningRef.current) {
+        isPanningRef.current = false
+        el.classList.remove('grabbing')
+        el.releasePointerCapture?.(ev.pointerId)
+      }
+    }
+
+    targetEl.addEventListener('wheel', handleWheel, { passive: false })
+    targetEl.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      targetEl.removeEventListener('wheel', handleWheel)
+      targetEl.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
 
   useLayoutEffect(() => {
     const updateFieldRect = () => {
-      if (!fieldStageRef.current || !fieldImageRef.current) return
+      if (!fieldStageRef.current) return
 
       const stageRect = fieldStageRef.current.getBoundingClientRect()
-      const imageRect = fieldImageRef.current.getBoundingClientRect()
 
+      // Use the stage container size as the viewport. Relying on the image
+      // bounding rect created a circular dependency (image size depended on
+      // fieldRect which itself was derived from the image). Using the stage
+      // gives a predictable initial size even before the image loads.
       setFieldRect({
-        left: imageRect.left - stageRect.left,
-        top: imageRect.top - stageRect.top,
-        width: imageRect.width,
-        height: imageRect.height,
+        left: 0,
+        top: 0,
+        width: stageRect.width,
+        height: stageRect.height,
       })
     }
 
@@ -1546,7 +1729,7 @@ function FieldPage({
           let nearestDistance = Number.POSITIVE_INFINITY
 
           for (const base of baseKeys) {
-            const pos = getDefaultFieldPosition(baseMap[base])
+            const pos = computeBasePosition(baseMap[base])
             const distance = Math.hypot(fieldPoint.x - pos.x, fieldPoint.y - pos.y)
             if (distance < nearestDistance) {
               nearestDistance = distance
@@ -1632,7 +1815,7 @@ function FieldPage({
 
   return (
       <section className={`field-layout ${showFieldContainer ? '' : 'mode-hidden'}`} ref={layoutRef}>
-        <Scoreboard gameState={gameState} opponentName={opponentName} />
+        <Scoreboard gameState={gameState} opponentName={opponentName} visible={showScoreboard} />
 
       <Field
         fieldStageRef={fieldStageRef}
@@ -1665,7 +1848,10 @@ function FieldPage({
           setDragSource('field')
           setDraggingPlayerId(id)
         }}
+        animateRunners={animateRunners}
         zoom={zoom}
+        offsetX={offsetX}
+        offsetY={offsetY}
       />
 
       {showHud && (
@@ -1886,7 +2072,7 @@ function FieldPage({
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button type="button" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</button>
               <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
-              <button type="button" onClick={() => setZoom((z) => Math.min(2, Number((z + 0.1).toFixed(2))))}>+</button>
+              <button type="button" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</button>
               <button type="button" onClick={() => setZoom(1)}>Reset</button>
             </div>
           </div>
