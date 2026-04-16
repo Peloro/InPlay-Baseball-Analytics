@@ -401,6 +401,29 @@ function FieldPage({
       // only respect left-button for mouse
       if (ev.pointerType === 'mouse' && ev.button !== 0) return
 
+      // track touch pointers so we can avoid panning when a second finger is present
+      if (!ev.pointerType || ev.pointerType === 'mouse') {
+        // mouse: start panning immediately
+        isPanningRef.current = true
+        panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
+        el.classList.add('grabbing')
+        try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
+        return
+      }
+
+      // touch input: maintain a small registry of active touch pointers
+      if (!handlePointerDown._touchPointers) handlePointerDown._touchPointers = new Map()
+      const touchPointers = handlePointerDown._touchPointers
+      touchPointers.set(ev.pointerId, ev)
+
+      // if more than one touch is active, don't start/continue pan here so pinch handler can run
+      if (touchPointers.size > 1) {
+        isPanningRef.current = false
+        try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
+        return
+      }
+
+      // single touch: start panning
       isPanningRef.current = true
       panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
       el.classList.add('grabbing')
@@ -408,7 +431,13 @@ function FieldPage({
     }
 
     const handlePointerMove = (ev) => {
+      // if we're not panning, ignore
       if (!isPanningRef.current) return
+
+      // if multiple touches are present, abandon this pan (pinch-to-zoom should take over)
+      const touchPointers = handlePointerDown._touchPointers
+      if (ev.pointerType === 'touch' && touchPointers && touchPointers.size > 1) return
+
       if (ev.pointerType === 'touch') ev.preventDefault()
       const dx = ev.clientX - panStartRef.current.x
       const dy = ev.clientY - panStartRef.current.y
@@ -430,6 +459,12 @@ function FieldPage({
     }
 
     const handlePointerUp = (ev) => {
+      // clean up touch pointer registry if present
+      const touchPointers = handlePointerDown._touchPointers
+      if (ev.pointerType === 'touch' && touchPointers) {
+        touchPointers.delete(ev.pointerId)
+      }
+
       if (isPanningRef.current) {
         isPanningRef.current = false
         el.classList.remove('grabbing')
