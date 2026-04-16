@@ -178,7 +178,13 @@ export default function Field({
             type="button"
             className="animated-ball-marker"
             style={{ left: `${toScreenPoint(animatedBall.x, animatedBall.y).left}px`, top: `${toScreenPoint(animatedBall.x, animatedBall.y).top}px` }}
-            aria-hidden
+              aria-hidden
+              onPointerDown={(event) => {
+                if (activeTool !== 'mouse') return
+                try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch (e) {}
+                // let parent effect handle movement via dragRef
+                dragRef.current = { type: 'ball', el: event.currentTarget }
+              }}
           />
         )}
       </div>

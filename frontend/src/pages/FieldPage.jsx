@@ -530,9 +530,12 @@ function FieldPage({
     const handlePointerDown = (ev) => {
       // only allow panning with mouse tool and left button
       if (activeTool !== 'mouse') return
-      // only start pan if clicking on background (not on a player marker)
+      // only start pan if clicking on background (not on a player marker or ball)
       const target = ev.target
-      if (target.closest && target.closest('.player-marker')) return
+      if (
+        target.closest &&
+        target.closest('.player-marker, .training-ball-marker, .animated-ball-marker, .runner-marker')
+      ) return
       if (ev.button !== 0) return
       isPanningRef.current = true
       panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
@@ -1611,6 +1614,12 @@ function FieldPage({
         setRunnerDrag({ base: drag.base, x: point.x, y: point.y })
       }
 
+      if (drag.type === 'ball') {
+        const point = toFieldPoint(event.clientX, event.clientY)
+        if (!point) return
+        setAnimatedBall({ visible: true, x: point.x, y: point.y })
+      }
+
     }
 
     const onUp = (event) => {
@@ -1747,6 +1756,10 @@ function FieldPage({
         }
       }
 
+      if (drag.type === 'ball') {
+        if (point) setAnimatedBall({ visible: true, x: point.x, y: point.y })
+      }
+
       if (drag.type === 'runner') {
         const sourceBase = drag.base
         const fieldPoint = toFieldPoint(event.clientX, event.clientY)
@@ -1781,6 +1794,11 @@ function FieldPage({
         }
       }
 
+      try {
+        if (dragRef.current && dragRef.current.el && event && event.pointerId != null) {
+          dragRef.current.el.releasePointerCapture?.(event.pointerId)
+        }
+      } catch (e) {}
       dragRef.current = null
       dragStartRef.current = null
       setDragSource(null)

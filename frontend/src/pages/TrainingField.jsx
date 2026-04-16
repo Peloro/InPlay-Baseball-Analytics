@@ -133,7 +133,10 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       // only allow panning with mouse tool and left button
       if (activeTool !== 'mouse') return
       const target = ev.target
-      if (target.closest && target.closest('.player-marker')) return
+      if (
+        target.closest &&
+        target.closest('.player-marker, .training-ball-marker, .animated-ball-marker, .runner-marker')
+      ) return
       if (ev.button !== 0) return
       isPanningRef.current = true
       panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
@@ -288,7 +291,15 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       }
     }
 
-    const onUp = () => {
+    const onUp = (ev) => {
+      // release pointer capture for dragged element (if any)
+      try {
+        if (dragRef.current && dragRef.current.el && ev && ev.pointerId != null) {
+          dragRef.current.el.releasePointerCapture?.(ev.pointerId)
+        }
+      } catch (e) {
+        // ignore
+      }
       dragRef.current = null
       isDrawingRef.current = false
     }
@@ -301,6 +312,79 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       window.removeEventListener('pointerup', onUp)
     }
   }, [activeTool, toFieldPoint])
+
+  // Touch pinch-to-zoom handling for mobile/tablet
+  useEffect(() => {
+    const el = fieldStageRef.current
+    if (!el) return undefined
+
+    let pinch = null
+
+    const getDistance = (t0, t1) => Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+
+    const handleTouchStart = (ev) => {
+      if (!ev.touches || ev.touches.length !== 2) return
+      ev.preventDefault()
+      const t0 = ev.touches[0]
+      const t1 = ev.touches[1]
+      const dist = getDistance(t0, t1)
+      const centerX = (t0.clientX + t1.clientX) / 2
+      const centerY = (t0.clientY + t1.clientY) / 2
+      pinch = { startDist: dist, centerX, centerY, startZoom: zoom, startOffsetX: offsetX, startOffsetY: offsetY }
+    }
+
+    const handleTouchMove = (ev) => {
+      if (!pinch || !ev.touches || ev.touches.length !== 2) return
+      ev.preventDefault()
+      const t0 = ev.touches[0]
+      const t1 = ev.touches[1]
+      const dist = getDistance(t0, t1)
+      const factor = dist / pinch.startDist
+      const newZoom = Math.max(0.5, Math.min(2.5, Number((pinch.startZoom * factor).toFixed(3))))
+
+      const stageRect = el.getBoundingClientRect()
+      const mouseX = pinch.centerX - stageRect.left
+      const mouseY = pinch.centerY - stageRect.top
+
+      const contentX = (mouseX - pinch.startOffsetX) / pinch.startZoom
+      const contentY = (mouseY - pinch.startOffsetY) / pinch.startZoom
+
+      const nextOffsetX = mouseX - contentX * newZoom
+      const nextOffsetY = mouseY - contentY * newZoom
+
+      const contentWidth = fieldRect.width * newZoom
+      const contentHeight = fieldRect.height * newZoom
+      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+      const maxX = extraX
+      const maxY = extraY
+      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
+      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
+
+      requestAnimationFrame(() => {
+        setZoom(newZoom)
+        setOffsetX(clampX)
+        setOffsetY(clampY)
+      })
+    }
+
+    const handleTouchEnd = (ev) => {
+      if (!pinch) return
+      if (!ev.touches || ev.touches.length < 2) pinch = null
+    }
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: false })
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    el.addEventListener('touchend', handleTouchEnd)
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart)
+      el.removeEventListener('touchmove', handleTouchMove)
+      el.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [fieldStageRef, zoom, offsetX, offsetY, fieldRect])
 
   const startPenStroke = (event) => {
     if (activeTool !== 'pen') return
@@ -351,9 +435,10 @@ function TrainingField({ activeTool, clearDrawVersion }) {
                 key={marker.id}
                 point={marker}
                 pointStyle={{ left: `${point.left}px`, top: `${point.top}px` }}
-                onPointerDown={() => {
+                onPointerDown={(event) => {
                   if (activeTool !== 'mouse') return
-                  dragRef.current = { type: 'runner', base: marker.id.replace('runner-', '') }
+                  try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch (e) {}
+                  dragRef.current = { type: 'runner', base: marker.id.replace('runner-', ''), el: event.currentTarget }
                 }}
               />
             )
@@ -370,7 +455,8 @@ function TrainingField({ activeTool, clearDrawVersion }) {
               startDragPlayer={(event) => {
                 if (activeTool !== 'mouse') return
                 event.preventDefault()
-                dragRef.current = { type: 'player', id: marker.id }
+                try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch (e) {}
+                dragRef.current = { type: 'player', id: marker.id, el: event.currentTarget }
               }}
               onDragStart={() => {}}
               getMainPosition={() => marker.label}
@@ -382,9 +468,10 @@ function TrainingField({ activeTool, clearDrawVersion }) {
               type="button"
               className="training-ball-marker"
               style={{ left: `${toScreenPoint(ball.x, ball.y).left}px`, top: `${toScreenPoint(ball.x, ball.y).top}px` }}
-              onPointerDown={() => {
+              onPointerDown={(event) => {
                 if (activeTool !== 'mouse') return
-                dragRef.current = { type: 'ball' }
+                try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch (e) {}
+                dragRef.current = { type: 'ball', el: event.currentTarget }
               }}
             />
           </div>
@@ -416,7 +503,10 @@ function TrainingField({ activeTool, clearDrawVersion }) {
         <aside className="field-hud training-hud">
         <div className="field-hud-block">
           <h3>Modo Treino</h3>
-          <p>Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
+          <p>Movo jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
+          <div className="shortcut-hints" style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
+            <strong>Atalhos:</strong>&nbsp;1 Ponteiro • 2 Caneta • 3 Mouse • C Limpar desenhos
+          </div>
           <div className="hud-actions">
             <button
               type="button"
