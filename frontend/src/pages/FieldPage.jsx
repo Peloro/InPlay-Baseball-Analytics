@@ -530,6 +530,8 @@ function FieldPage({
     const handlePointerDown = (ev) => {
       // only allow panning with mouse tool and left button
       if (activeTool !== 'mouse') return
+      // only allow mouse pointer to start panning (prevent touch from grabbing)
+      if (ev.pointerType !== 'mouse') return
       // only start pan if clicking on background (not on a player marker or ball)
       const target = ev.target
       if (
@@ -584,6 +586,82 @@ function FieldPage({
       window.removeEventListener('pointerup', handlePointerUp)
     }
   }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
+
+  // Pointer-based pinch-to-zoom for game field (mobile)
+  useEffect(() => {
+    const el = fieldStageRef.current
+    if (!el) return undefined
+
+    const pointers = new Map()
+    let pinch = null
+    const getDistance = (p0, p1) => Math.hypot(p0.clientX - p1.clientX, p0.clientY - p1.clientY)
+
+    const onPointerDown = (ev) => {
+      if (ev.pointerType !== 'touch') return
+      pointers.set(ev.pointerId, ev)
+      try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
+      if (pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values())
+        pinch = { startDist: getDistance(a, b), centerX: (a.clientX + b.clientX) / 2, centerY: (a.clientY + b.clientY) / 2, startZoom: zoom, startOffsetX: offsetX, startOffsetY: offsetY }
+      }
+    }
+
+    const onPointerMove = (ev) => {
+      if (ev.pointerType !== 'touch') return
+      if (!pointers.has(ev.pointerId)) return
+      pointers.set(ev.pointerId, ev)
+      if (!pinch || pointers.size !== 2) return
+      ev.preventDefault()
+      const [a, b] = Array.from(pointers.values())
+      const dist = getDistance(a, b)
+      const factor = dist / pinch.startDist
+      const newZoom = Math.max(0.5, Math.min(2.5, Number((pinch.startZoom * factor).toFixed(3))))
+
+      const stageRect = el.getBoundingClientRect()
+      const mouseX = pinch.centerX - stageRect.left
+      const mouseY = pinch.centerY - stageRect.top
+
+      const contentX = (mouseX - pinch.startOffsetX) / pinch.startZoom
+      const contentY = (mouseY - pinch.startOffsetY) / pinch.startZoom
+
+      const nextOffsetX = mouseX - contentX * newZoom
+      const nextOffsetY = mouseY - contentY * newZoom
+
+      const contentWidth = fieldRect.width * newZoom
+      const contentHeight = fieldRect.height * newZoom
+      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+      const maxX = extraX
+      const maxY = extraY
+      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
+      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
+
+      requestAnimationFrame(() => {
+        setZoom(newZoom)
+        setOffsetX(clampX)
+        setOffsetY(clampY)
+      })
+    }
+
+    const onPointerUp = (ev) => {
+      if (ev.pointerType !== 'touch') return
+      pointers.delete(ev.pointerId)
+      try { el.releasePointerCapture?.(ev.pointerId) } catch (e) {}
+      if (pointers.size < 2) pinch = null
+    }
+
+    el.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [fieldStageRef, zoom, offsetX, offsetY, fieldRect])
 
   useLayoutEffect(() => {
     const updateFieldRect = () => {

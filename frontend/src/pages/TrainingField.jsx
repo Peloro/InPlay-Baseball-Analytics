@@ -132,6 +132,8 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     const handlePointerDown = (ev) => {
       // only allow panning with mouse tool and left button
       if (activeTool !== 'mouse') return
+      // only allow mouse pointer to start panning (prevent touch from grabbing)
+      if (ev.pointerType !== 'mouse') return
       const target = ev.target
       if (
         target.closest &&
@@ -318,27 +320,37 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     const el = fieldStageRef.current
     if (!el) return undefined
 
+    // Pointer-based multi-touch pinch handling (more reliable across browsers)
+    const pointers = new Map()
     let pinch = null
 
-    const getDistance = (t0, t1) => Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+    const getDistance = (p0, p1) => Math.hypot(p0.clientX - p1.clientX, p0.clientY - p1.clientY)
 
-    const handleTouchStart = (ev) => {
-      if (!ev.touches || ev.touches.length !== 2) return
-      ev.preventDefault()
-      const t0 = ev.touches[0]
-      const t1 = ev.touches[1]
-      const dist = getDistance(t0, t1)
-      const centerX = (t0.clientX + t1.clientX) / 2
-      const centerY = (t0.clientY + t1.clientY) / 2
-      pinch = { startDist: dist, centerX, centerY, startZoom: zoom, startOffsetX: offsetX, startOffsetY: offsetY }
+    const onPointerDown = (ev) => {
+      if (ev.pointerType !== 'touch') return
+      pointers.set(ev.pointerId, ev)
+      try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
+      if (pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values())
+        pinch = {
+          startDist: getDistance(a, b),
+          centerX: (a.clientX + b.clientX) / 2,
+          centerY: (a.clientY + b.clientY) / 2,
+          startZoom: zoom,
+          startOffsetX: offsetX,
+          startOffsetY: offsetY,
+        }
+      }
     }
 
-    const handleTouchMove = (ev) => {
-      if (!pinch || !ev.touches || ev.touches.length !== 2) return
+    const onPointerMove = (ev) => {
+      if (ev.pointerType !== 'touch') return
+      if (!pointers.has(ev.pointerId)) return
+      pointers.set(ev.pointerId, ev)
+      if (!pinch || pointers.size !== 2) return
       ev.preventDefault()
-      const t0 = ev.touches[0]
-      const t1 = ev.touches[1]
-      const dist = getDistance(t0, t1)
+      const [a, b] = Array.from(pointers.values())
+      const dist = getDistance(a, b)
       const factor = dist / pinch.startDist
       const newZoom = Math.max(0.5, Math.min(2.5, Number((pinch.startZoom * factor).toFixed(3))))
 
@@ -370,19 +382,21 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       })
     }
 
-    const handleTouchEnd = (ev) => {
-      if (!pinch) return
-      if (!ev.touches || ev.touches.length < 2) pinch = null
+    const onPointerUp = (ev) => {
+      if (ev.pointerType !== 'touch') return
+      pointers.delete(ev.pointerId)
+      try { el.releasePointerCapture?.(ev.pointerId) } catch (e) {}
+      if (pointers.size < 2) pinch = null
     }
 
-    el.addEventListener('touchstart', handleTouchStart, { passive: false })
-    el.addEventListener('touchmove', handleTouchMove, { passive: false })
-    el.addEventListener('touchend', handleTouchEnd)
+    el.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
 
     return () => {
-      el.removeEventListener('touchstart', handleTouchStart)
-      el.removeEventListener('touchmove', handleTouchMove)
-      el.removeEventListener('touchend', handleTouchEnd)
+      el.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
     }
   }, [fieldStageRef, zoom, offsetX, offsetY, fieldRect])
 
