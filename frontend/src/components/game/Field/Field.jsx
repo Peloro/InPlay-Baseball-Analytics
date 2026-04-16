@@ -57,13 +57,15 @@ export default function Field({
         setDropTarget(null)
       }}
     >
-      <div
+        <div
         className="field-viewport"
         style={{
           width: `${fieldRect.width}px`,
           height: `${fieldRect.height}px`,
           transform: `translate(${(offsetX || 0)}px, ${(offsetY || 0)}px) scale(${zoom || 1})`,
           transformOrigin: '0 0',
+          // always disable native touch gestures so the app can handle pan/pinch
+          touchAction: 'none',
         }}
       >
         <img
@@ -75,16 +77,6 @@ export default function Field({
           style={{ position: 'absolute', left: 0, top: 0, width: `${fieldRect.width}px`, height: `${fieldRect.height}px` }}
         />
 
-        <canvas
-          ref={drawingRef}
-          className="field-draw-layer"
-          style={{
-            left: 0,
-            top: 0,
-            width: `${fieldRect.width}px`,
-            height: `${fieldRect.height}px`,
-          }}
-        />
 
         {visibleFieldMarkers.map((player) => {
         const id = getPlayerId(player)
@@ -187,6 +179,19 @@ export default function Field({
               }}
           />
         )}
+        <canvas
+          ref={drawingRef}
+          className="field-draw-layer"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: `${fieldRect.width}px`,
+            height: `${fieldRect.height}px`,
+            zIndex: 200,
+            pointerEvents: activeTool === 'pen' ? 'auto' : 'none',
+          }}
+        />
       </div>
     </div>
   )

@@ -130,10 +130,9 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     }
 
     const handlePointerDown = (ev) => {
-      // only allow panning with mouse tool and left button
-      if (activeTool !== 'mouse') return
-      // only allow mouse pointer to start panning (prevent touch from grabbing)
-      if (ev.pointerType !== 'mouse') return
+      // allow touch panning; only block when using pen tool or when mouse input but tool isn't mouse
+      if (ev.pointerType === 'mouse' && activeTool !== 'mouse') return
+      if (ev.pointerType === 'touch' && activeTool === 'pen') return
       const target = ev.target
       if (
         target.closest &&
@@ -417,6 +416,7 @@ function TrainingField({ activeTool, clearDrawVersion }) {
           className={`field-stage ${activeTool}-mode`}
           onPointerDown={startPenStroke}
         >
+        
           <div
             className="field-viewport"
             style={{
