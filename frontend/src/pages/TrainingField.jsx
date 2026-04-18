@@ -80,9 +80,14 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       if (target && target.closest && (target.closest('.player-marker') || target.closest('.training-ball-marker') || target.closest('.runner-marker'))) {
         return
       }
-      isPanningRef.current = true
-      panStartRef.current = { x: t.clientX, y: t.clientY, offsetX, offsetY }
-      ev.preventDefault()
+      // Only allow pan by single-finger when using the mouse tool. When in
+      // pen/pointer mode the single touch should be used for drawing/laser and
+      // must not start a camera pan.
+      if (activeTool === 'mouse') {
+        isPanningRef.current = true
+        panStartRef.current = { x: t.clientX, y: t.clientY, offsetX, offsetY }
+        ev.preventDefault()
+      }
     }
   }
 

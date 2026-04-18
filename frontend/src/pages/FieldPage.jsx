@@ -258,9 +258,13 @@ function FieldPage({
         // touched an interactive element — let its handlers take precedence
         return
       }
-      isPanningRef.current = true
-      panStartRef.current = { x: t.clientX, y: t.clientY, offsetX, offsetY }
-      ev.preventDefault()
+      // Only start panning on touch when in mouse tool. Pen/pointer should
+      // allow their own interactions (drawing/laser) and must not trigger pan.
+      if (activeTool === 'mouse') {
+        isPanningRef.current = true
+        panStartRef.current = { x: t.clientX, y: t.clientY, offsetX, offsetY }
+        ev.preventDefault()
+      }
     }
   }
 
