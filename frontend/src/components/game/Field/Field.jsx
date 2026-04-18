@@ -37,6 +37,9 @@ export default function Field({
   animateRunners = false,
   isDragging = false,
   onStartDrag,
+  onTouchStartMobile,
+  onTouchMoveMobile,
+  onTouchEndMobile,
 }) {
   const scale = fieldRect && fieldRect.width ? Math.max(0.45, Math.min(1.6, fieldRect.width / 980)) : 1
   // Invert marker scaling vs. camera zoom: when zoom increases markers get smaller
@@ -45,9 +48,12 @@ export default function Field({
   return (
     <div
       ref={fieldStageRef}
-      style={{ ['--field-scale']: combined, ['--field-zoom']: zoom }}
+      style={{ ['--field-scale']: combined, ['--field-zoom']: zoom, touchAction: 'none' }}
       className={`field-stage ${activeTool}-mode ${dropTarget === 'field' ? 'drop-ready' : ''} ${isDragging ? 'is-dragging' : ''}`}
       onPointerDown={startPenStroke}
+      onTouchStart={onTouchStartMobile}
+      onTouchMove={onTouchMoveMobile}
+      onTouchEnd={onTouchEndMobile}
       onDragEnter={(event) => {
         event.preventDefault()
         setDropTarget('field')

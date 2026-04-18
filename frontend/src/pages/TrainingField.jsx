@@ -47,6 +47,116 @@ function TrainingField({ activeTool, clearDrawVersion }) {
   const [offsetY, setOffsetY] = useState(0)
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
+  const isPinchingRef = useRef(false)
+  const pinchRef = useRef({ initialDistance: 0, initialScale: 1, centerClientX: 0, centerClientY: 0, offsetX: 0, offsetY: 0 })
+
+  const getDistance = (t1, t2) => {
+    const dx = t2.clientX - t1.clientX
+    const dy = t2.clientY - t1.clientY
+    return Math.hypot(dx, dy)
+  }
+
+  const getCenter = (t1, t2) => ({ x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 })
+
+  const handleTouchStartMobile = (ev) => {
+    if (!ev.touches) return
+    if (ev.touches.length === 2) {
+      isPinchingRef.current = true
+      const d = getDistance(ev.touches[0], ev.touches[1])
+      const center = getCenter(ev.touches[0], ev.touches[1])
+      pinchRef.current = {
+        initialDistance: d,
+        initialScale: zoom,
+        centerClientX: center.x,
+        centerClientY: center.y,
+        offsetX,
+        offsetY,
+      }
+      ev.preventDefault()
+      isPanningRef.current = false
+    } else if (ev.touches.length === 1) {
+      const t = ev.touches[0]
+      const target = ev.target
+      if (target && target.closest && (target.closest('.player-marker') || target.closest('.training-ball-marker') || target.closest('.runner-marker'))) {
+        return
+      }
+      isPanningRef.current = true
+      panStartRef.current = { x: t.clientX, y: t.clientY, offsetX, offsetY }
+      ev.preventDefault()
+    }
+  }
+
+  const handleTouchMoveMobile = (ev) => {
+    if (!ev.touches) return
+    if (isPinchingRef.current && ev.touches.length === 2) {
+      const d = getDistance(ev.touches[0], ev.touches[1])
+      const factor = d / (pinchRef.current.initialDistance || 1)
+      let newScale = pinchRef.current.initialScale * factor
+      newScale = Math.max(0.5, Math.min(2.5, newScale))
+
+      const center = getCenter(ev.touches[0], ev.touches[1])
+      const stageRect = fieldStageRef.current?.getBoundingClientRect() || { left: 0, top: 0, width: 0, height: 0 }
+      const centerLocalX = center.x - stageRect.left
+      const centerLocalY = center.y - stageRect.top
+
+      const contentX = (centerLocalX - pinchRef.current.offsetX) / pinchRef.current.initialScale
+      const contentY = (centerLocalY - pinchRef.current.offsetY) / pinchRef.current.initialScale
+
+      const nextOffsetX = centerLocalX - contentX * newScale
+      const nextOffsetY = centerLocalY - contentY * newScale
+
+      const contentWidth = fieldRect.width * newScale
+      const contentHeight = fieldRect.height * newScale
+      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+      const maxX = extraX
+      const maxY = extraY
+      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
+      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
+
+      requestAnimationFrame(() => {
+        setZoom(Number(newScale.toFixed(3)))
+        setOffsetX(clampX)
+        setOffsetY(clampY)
+      })
+
+      ev.preventDefault()
+      return
+    }
+
+    if (isPanningRef.current && ev.touches.length === 1) {
+      const t = ev.touches[0]
+      const dx = t.clientX - panStartRef.current.x
+      const dy = t.clientY - panStartRef.current.y
+      requestAnimationFrame(() => {
+        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
+        const contentWidth = fieldRect.width * zoom
+        const contentHeight = fieldRect.height * zoom
+        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+        const maxX = extraX
+        const maxY = extraY
+        const rawX = panStartRef.current.offsetX + dx
+        const rawY = panStartRef.current.offsetY + dy
+        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
+        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
+      })
+      ev.preventDefault()
+    }
+  }
+
+  const handleTouchEndMobile = (ev) => {
+    if (!ev.touches || ev.touches.length < 2) {
+      isPinchingRef.current = false
+    }
+    if (!ev.touches || ev.touches.length === 0) {
+      isPanningRef.current = false
+    }
+  }
 
   const markers = useMemo(() => {
     const runnerList = Object.entries(runners)
@@ -342,9 +452,12 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       <section className={`training-layout ${showTrainingContainer ? '' : 'mode-hidden'}`}>
           <div
             ref={fieldStageRef}
-            style={{ ['--field-scale']: combined, ['--field-zoom']: zoom }}
+            style={{ ['--field-scale']: combined, ['--field-zoom']: zoom, touchAction: 'none' }}
             className={`field-stage ${activeTool}-mode ${isDragging ? 'is-dragging' : ''}`}
             onPointerDown={startPenStroke}
+            onTouchStart={handleTouchStartMobile}
+            onTouchMove={handleTouchMoveMobile}
+            onTouchEnd={handleTouchEndMobile}
           >
           <div
             className="field-viewport"
