@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import useDragPosition from '../hooks/useDragPosition'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
 import Player from '../components/game/Player/Player'
+import Button from '../components/ui/Button'
 import Runner from '../components/game/Runner/Runner'
 
 function clamp(value, min, max) {
@@ -428,22 +429,22 @@ function TrainingField({ activeTool, clearDrawVersion }) {
           )}
         </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button
-          type="button"
-          className="mode-toggle-btn"
-          onClick={() => setShowHud((s) => !s)}
-          aria-pressed={!showHud}
-        >
-          {showHud ? 'Esconder HUD' : 'Mostrar HUD'}
-        </button>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</button>
-          <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
-          <button type="button" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</button>
-          <button type="button" onClick={() => setZoom(1)}>Reset</button>
+          <button
+            type="button"
+            className="mode-toggle-btn"
+            onClick={() => setShowHud((s) => !s)}
+            aria-pressed={!showHud}
+          >
+            {showHud ? 'Esconder HUD' : 'Mostrar HUD'}
+          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</Button>
+            <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
+            <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
+            <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
+          </div>
         </div>
-      </div>
       </section>
 
       {showHud && (
@@ -452,26 +453,29 @@ function TrainingField({ activeTool, clearDrawVersion }) {
           <h3>Modo Treino</h3>
           <p>Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
           <div className="hud-actions">
-            <button
+            <Button
               type="button"
+              variant="primary"
               onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, ...computeBasePosition('1B'), visible: true } }))}
             >
               + 1B
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
               onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, ...computeBasePosition('2B'), visible: true } }))}
             >
               + 2B
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
               onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, ...computeBasePosition('3B'), visible: true } }))}
             >
               + 3B
-            </button>
+            </Button>
           </div>
-          <button
+          <Button
             type="button"
             className="full-width-btn"
             onClick={() => {
@@ -482,7 +486,7 @@ function TrainingField({ activeTool, clearDrawVersion }) {
             }}
           >
             Resetar treino
-          </button>
+          </Button>
         </div>
         </aside>
       )}

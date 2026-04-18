@@ -1,4 +1,6 @@
 import React from 'react'
+import Button from '../../ui/Button'
+import Input from '../../ui/Input'
 
 const Bench = React.forwardRef(function Bench({
   benchPlayers,
@@ -27,7 +29,7 @@ const Bench = React.forwardRef(function Bench({
       <div className="bench-head">
         <h3>Campo: {Object.keys(playersById || {}).length}</h3>
         <h3>Banco</h3>
-        <input
+        <Input
           placeholder="Buscar jogador"
           value={benchSearch}
           onChange={(event) => setBenchSearch(event.target.value)}
@@ -53,12 +55,12 @@ const Bench = React.forwardRef(function Bench({
                 </strong>
                 <span>{(player.positions || []).join(' / ')}</span>
               </button>
-              <button type="button" className="bench-info-btn" onClick={() => openPlayerDetails(id)}>
+              <Button type="button" className="bench-info-btn" onClick={() => openPlayerDetails(id)}>
                 Ver stats
-              </button>
-              <button type="button" className="bench-info-btn" onClick={() => openEditModal(id)}>
+              </Button>
+              <Button type="button" className="bench-info-btn" onClick={() => openEditModal(id)}>
                 Editar
-              </button>
+              </Button>
               {(player.positions || []).length > 1 && (
                 <select
                   value={getMainPosition(player)}

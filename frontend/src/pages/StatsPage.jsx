@@ -3,6 +3,8 @@ import GameDetailPage from './GameDetailPage'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import { VALID_POSITIONS } from '../data/positions'
 import PlayerStatsModal from '../components/PlayerStatsModal'
+import Modal from '../components/ui/Modal'
+import Button from '../components/ui/Button'
 
 function getPlayerId(player) {
   return player?._id || player?.id
@@ -51,6 +53,25 @@ function detectPlayerType(player) {
   return Array.isArray(player?.positions) && player.positions.includes('P') ? 'pitcher' : 'hitter'
 }
 
+function hasAnyStat(entry) {
+  if (!entry) return false
+  const role = entry.roleSummary || {}
+  const games = safeNumber(role.hitterGames) + safeNumber(role.pitcherGames)
+  if (games > 0) return true
+
+  const h = entry.hitting || {}
+  const p = entry.pitching || {}
+  const d = entry.defense || {}
+
+  const fields = [
+    h.atBats, h.hits, h.strikeouts, h.outs,
+    p.inningsPitched, p.outsPitched, p.earnedRuns, p.strikeouts, p.walks, p.pitchCount,
+    d.errors, d.doublePlays, d.flyOuts, d.groundOuts, d.lineOuts,
+  ]
+
+  return fields.some((v) => safeNumber(v) > 0)
+}
+
 function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms)
@@ -67,9 +88,12 @@ function StatsPage({
   gameState,
   onUpdateGameState,
   onGoField,
+  onUpdatePlayer,
 }) {
   const [form, setForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
   const [gameForm, setGameForm] = useState({ date: '', opponentName: '', competition: '', location: '' })
+  const [editingPlayerId, setEditingPlayerId] = useState(null)
+  const [editingForm, setEditingForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
   const [games, setGames] = useState([])
   const [gameStats, setGameStats] = useState([])
   const [seasonStats, setSeasonStats] = useState([])
@@ -185,10 +209,14 @@ function StatsPage({
   )
 
   const visibleSeasonRows = useMemo(() => {
-    const rows = seasonRows.filter(({ player }) => {
+    let rows = seasonRows.filter(({ player }) => {
       if (statsTab === 'hitters') return true
       return detectPlayerType(player) === 'pitcher'
     })
+
+    if (playerFilter === 'all') {
+      rows = rows.filter(({ entry }) => hasAnyStat(entry))
+    }
 
     const byMetric = {
       hits: (entry) => safeNumber(entry.hitting?.hits),
@@ -202,7 +230,7 @@ function StatsPage({
 
     const metricFn = byMetric[seasonSortBy] || byMetric.hits
     return [...rows].sort((a, b) => metricFn(b.entry) - metricFn(a.entry))
-  }, [seasonRows, statsTab, seasonSortBy])
+  }, [seasonRows, statsTab, seasonSortBy, playerFilter])
 
   const leaders = useMemo(() => {
     if (!visibleSeasonRows.length) {
@@ -400,6 +428,45 @@ function StatsPage({
     })
   }
 
+  const openEditModal = (playerId) => {
+    const player = players.find((p) => getPlayerId(p) === playerId)
+    if (!player) return
+    setEditingPlayerId(playerId)
+    setEditingForm({
+      name: player.name || '',
+      number: String(player.number || ''),
+      positions: Array.isArray(player.positions) && player.positions.length ? player.positions : ['DH'],
+      activePosition: player.activePosition || (player.positions && player.positions[0]) || 'DH',
+    })
+  }
+
+  const toggleEditPosition = (position) => {
+    setEditingForm((current) => {
+      const has = current.positions.includes(position)
+      const positions = has ? current.positions.filter((p) => p !== position) : [...current.positions, position]
+      const safePositions = positions.length ? positions : ['DH']
+      const activePosition = safePositions.includes(current.activePosition) ? current.activePosition : safePositions[0]
+      return { ...current, positions: safePositions, activePosition }
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingPlayerId) return
+    try {
+      const patch = {
+        name: (editingForm.name || '').trim(),
+        number: Number(editingForm.number) || 0,
+        positions: editingForm.positions,
+        activePosition: editingForm.activePosition,
+      }
+      await onUpdatePlayer?.(editingPlayerId, patch)
+    } catch {
+      // ignore
+    }
+    setEditingPlayerId(null)
+    await loadSeasonStats()
+  }
+
   const toggleParticipant = (playerId) => {
     const current = gameState.participantPlayerIds || players.map((player) => getPlayerId(player))
     const has = current.includes(playerId)
@@ -537,7 +604,7 @@ function StatsPage({
               </option>
             ))}
           </select>
-          <button type="submit">Salvar jogador</button>
+          <Button type="submit">Salvar jogador</Button>
         </form>
 
         <div className="managed-list">
@@ -548,9 +615,12 @@ function StatsPage({
                 <span>
                   {player.name} #{player.number} ({getMainPosition(player)})
                 </span>
-                <button type="button" className="danger-btn" onClick={() => handleDeletePlayerItem(player)}>
+                <Button type="button" variant="primary" onClick={() => openEditModal(id)}>
+                  Editar
+                </Button>
+                <Button type="button" variant="danger" onClick={() => handleDeletePlayerItem(player)}>
                   Apagar
-                </button>
+                </Button>
               </div>
             )
           })}
@@ -699,13 +769,9 @@ function StatsPage({
                     className={id === leaders.topHitsId || id === leaders.topAvgId ? 'season-leader-row' : ''}
                   >
                     <td>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => openPlayerDetails(id)}
-                      >
+                      <Button type="button" variant="link" onClick={() => openPlayerDetails(id)}>
                         {player.name}
-                      </button>
+                      </Button>
                     </td>
                     <td>{player.number}</td>
                     <td>{getMainPosition(player)}</td>
@@ -810,38 +876,38 @@ function StatsPage({
                     <span>{game.competition}</span>
                     <span>Placar: {score}</span>
                   </div>
-                  <div className="game-card-actions">
-                    <button
-                      type="button"
-                      className="action-btn"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleOpenGame(game)
-                      }}
-                    >
-                      Abrir jogo
-                    </button>
-                    <button
-                      type="button"
-                      className="action-btn"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleViewGameStats(game)
-                      }}
-                    >
-                      Ver estatisticas
-                    </button>
-                    <button
-                      type="button"
-                      className="action-btn danger-btn"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleDeleteGameItem(game)
-                      }}
-                    >
-                      Excluir
-                    </button>
-                  </div>
+                    <div className="game-card-actions">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleOpenGame(game)
+                        }}
+                      >
+                        Abrir jogo
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleViewGameStats(game)
+                        }}
+                      >
+                        Ver estatisticas
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleDeleteGameItem(game)
+                        }}
+                      >
+                        Excluir
+                      </Button>
+                    </div>
                 </article>
               </li>
             )
@@ -852,15 +918,15 @@ function StatsPage({
           <div ref={gameDetailsRef}>
             {gameStatsLoading && <div className="stats-loading">Carregando estatísticas do jogo...</div>}
             <div className="detail-actions">
-              <button type="button" className="action-btn" onClick={() => handleOpenGame(selectedGame)}>
+              <Button type="button" variant="primary" onClick={() => handleOpenGame(selectedGame)}>
                 Abrir jogo
-              </button>
-              <button type="button" className="action-btn" onClick={onGoField}>
+              </Button>
+              <Button type="button" variant="primary" onClick={onGoField}>
                 Ir para campo
-              </button>
-              <button type="button" className="action-btn" onClick={resetCurrentGameStats}>
+              </Button>
+              <Button type="button" variant="primary" onClick={resetCurrentGameStats}>
                 Resetar stats do jogo
-              </button>
+              </Button>
             </div>
             <GameDetailPage
               game={selectedGame}
@@ -908,6 +974,57 @@ function StatsPage({
         }
         onClose={() => setFocusedPlayerId(null)}
       />
+      {editingPlayerId && (
+        <Modal title="Editar jogador" onClose={() => setEditingPlayerId(null)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleSaveEdit()
+            }}
+          >
+            <input
+              placeholder="Nome"
+              value={editingForm.name}
+              onChange={(e) => setEditingForm((c) => ({ ...c, name: e.target.value }))}
+            />
+            <input
+              placeholder="Numero"
+              value={editingForm.number}
+              onChange={(e) => setEditingForm((c) => ({ ...c, number: e.target.value }))}
+            />
+            <div className="positions-picker">
+              {VALID_POSITIONS.map((position) => (
+                <label key={`edit-pos-${position}`}>
+                  <input
+                    type="checkbox"
+                    checked={editingForm.positions.includes(position)}
+                    onChange={() => toggleEditPosition(position)}
+                  />
+                  {position}
+                </label>
+              ))}
+            </div>
+            <select
+              value={editingForm.activePosition}
+              onChange={(e) => setEditingForm((c) => ({ ...c, activePosition: e.target.value }))}
+            >
+              {editingForm.positions.map((position) => (
+                <option key={`edit-active-${position}`} value={position}>
+                  Titular: {position}
+                </option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <Button type="button" variant="primary" onClick={handleSaveEdit}>
+                Salvar
+              </Button>
+              <Button type="button" variant="danger" onClick={() => setEditingPlayerId(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </section>
   )
 }

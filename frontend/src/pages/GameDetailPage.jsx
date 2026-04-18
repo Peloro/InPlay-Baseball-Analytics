@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import Button from '../components/ui/Button'
 
 function getPlayerId(player) {
   return player?._id || player?.id
@@ -185,9 +186,9 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
         {rows.map((row) => (
           <div key={`h-${row.playerId}`} className="player-row">
             <div>
-              <button type="button" className="link-btn" onClick={() => onOpenPlayer?.(row.playerId)}>
+              <Button type="button" variant="link" onClick={() => onOpenPlayer?.(row.playerId)}>
                 {row.player.name}
-              </button>
+              </Button>
             </div>
             <div>{row.player.number}</div>
             <div>{getMainPosition(row.player)}</div>

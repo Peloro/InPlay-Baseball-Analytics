@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import useDragPosition from '../hooks/useDragPosition'
 import PlayerStatsModal from '../components/PlayerStatsModal'
+import Button from '../components/ui/Button'
+import Modal from '../components/ui/Modal'
 import CountDots from '../components/CountDots'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
@@ -2069,9 +2071,9 @@ function FieldPage({
             )}
             {gameState.isAttacking && (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button type="button" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
+                <Button type="button" variant="primary" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
                   Trocar Pitcher Adversário
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -2216,10 +2218,10 @@ function FieldPage({
               Encerrar jogo
             </button>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <button type="button" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</button>
+              <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</Button>
               <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
-              <button type="button" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</button>
-              <button type="button" onClick={() => setZoom(1)}>Reset</button>
+              <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
+              <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
             </div>
           </div>
         </div>
@@ -2238,230 +2240,214 @@ function FieldPage({
     
 
       {showPreGameSetup && (
-        <div className="modal-backdrop" onClick={() => {}}>
-          <div className="player-stats-modal pregame-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="player-stats-head">
-              <h3>Configuracao Inicial</h3>
-            </div>
+        <Modal title="Configuracao Inicial" onClose={() => setShowPreGameSetup(false)}>
+          <div className="pregame-grid">
+            <section className="player-stats-block">
+              <h4>1) Inicio</h4>
+              <div className="pregame-radio-row">
+                <label>
+                  <input
+                    type="radio"
+                    name="setup-start"
+                    checked={setupAttacking}
+                    onChange={() => setSetupAttacking(true)}
+                  />
+                  Comecar atacando
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="setup-start"
+                    checked={!setupAttacking}
+                    onChange={() => setSetupAttacking(false)}
+                  />
+                  Comecar defendendo
+                </label>
+              </div>
+            </section>
 
-            <div className="pregame-grid">
-              <section className="player-stats-block">
-                <h4>1) Inicio</h4>
-                <div className="pregame-radio-row">
-                  <label>
-                    <input
-                      type="radio"
-                      name="setup-start"
-                      checked={setupAttacking}
-                      onChange={() => setSetupAttacking(true)}
-                    />
-                    Comecar atacando
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="setup-start"
-                      checked={!setupAttacking}
-                      onChange={() => setSetupAttacking(false)}
-                    />
-                    Comecar defendendo
-                  </label>
-                </div>
-              </section>
+            <section className="player-stats-block">
+              <h4>2) Titulares e posicoes</h4>
+              <div className="pregame-lineup-grid">
+                {setupStarters.map((slot) => {
+                  const selectedIds = setupStarters
+                    .filter((item) => item.position !== slot.position)
+                    .map((item) => item.playerId)
+                    .filter(Boolean)
+                  const selectedPlayer = playersById[slot.playerId]
 
-              <section className="player-stats-block">
-                <h4>2) Titulares e posicoes</h4>
-                <div className="pregame-lineup-grid">
-                  {setupStarters.map((slot) => {
-                    const selectedIds = setupStarters
-                      .filter((item) => item.position !== slot.position)
-                      .map((item) => item.playerId)
-                      .filter(Boolean)
-                    const selectedPlayer = playersById[slot.playerId]
-
-                    return (
-                      <div key={`setup-${slot.position}`} className="pregame-slot">
-                        <strong>{slot.position}</strong>
-                        <select
-                          value={slot.playerId}
-                          onChange={(event) => assignStarter(slot.position, event.target.value)}
-                        >
-                          <option value="">Selecionar jogador</option>
-                          {selectedPlayer && (
-                            <option value={slot.playerId}>
-                              {selectedPlayer.name} #{selectedPlayer.number}
-                            </option>
-                          )}
-                          {setupAvailablePlayers
-                            .filter((player) => {
-                              const id = getPlayerId(player)
-                              const allowed = Array.isArray(player.positions) ? player.positions : []
-                              return !selectedIds.includes(id) && allowed.includes(slot.position)
-                            })
-                            .map((player) => {
-                              const id = getPlayerId(player)
-                              return (
-                                <option key={`setup-player-${slot.position}-${id}`} value={id}>
-                                  {player.name} #{player.number}
-                                </option>
-                              )
-                            })}
-                        </select>
-                        <small>Posicao fixa: {slot.position}</small>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-
-              <section className="player-stats-block">
-                <h4>3) Ordem de rebatida (arraste)</h4>
-                <div className="pregame-order-list">
-                  {setupBattingOrder.map((id, index) => {
-                    const player = playersById[id]
-                    if (!player) return null
-                    return (
-                      <button
-                        key={`order-${id}`}
-                        type="button"
-                        className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
-                        draggable
-                        onDragStart={() => onBattingDragStart(id)}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => onBattingDrop(id)}
+                  return (
+                    <div key={`setup-${slot.position}`} className="pregame-slot">
+                      <strong>{slot.position}</strong>
+                      <select
+                        value={slot.playerId}
+                        onChange={(event) => assignStarter(slot.position, event.target.value)}
                       >
-                        <span>{index + 1}.</span>
-                        <strong>{player.name}</strong>
-                        <span>#{player.number}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </section>
-            </div>
+                        <option value="">Selecionar jogador</option>
+                        {selectedPlayer && (
+                          <option value={slot.playerId}>
+                            {selectedPlayer.name} #{selectedPlayer.number}
+                          </option>
+                        )}
+                        {setupAvailablePlayers
+                          .filter((player) => {
+                            const id = getPlayerId(player)
+                            const allowed = Array.isArray(player.positions) ? player.positions : []
+                            return !selectedIds.includes(id) && allowed.includes(slot.position)
+                          })
+                          .map((player) => {
+                            const id = getPlayerId(player)
+                            return (
+                              <option key={`setup-player-${slot.position}-${id}`} value={id}>
+                                {player.name} #{player.number}
+                              </option>
+                            )
+                          })}
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
 
-            <div className="detail-actions">
-              <button
-                type="button"
-                onClick={confirmPreGameSetup}
-                disabled={setupBattingOrder.length !== 9 || setupStarters.filter((item) => item.playerId).length !== 9}
-              >
-                Iniciar jogo
-              </button>
-            </div>
+            <section className="player-stats-block">
+              <h4>3) Ordem de rebatida</h4>
+              <div className="pregame-order-list">
+                {setupBattingOrder.map((id, index) => {
+                  const player = playersById[id]
+                  if (!player) return null
+                  return (
+                    <button
+                      key={`order-${id}`}
+                      type="button"
+                      className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
+                      draggable
+                      onDragStart={() => onBattingDragStart(id)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => onBattingDrop(id)}
+                    >
+                      <span>{index + 1}.</span>
+                      <strong>{player.name}</strong>
+                      <span>#{player.number}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
           </div>
-        </div>
+
+          <div className="detail-actions">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={confirmPreGameSetup}
+              disabled={setupBattingOrder.length !== 9 || setupStarters.filter((item) => item.playerId).length !== 9}
+            >
+              Iniciar jogo
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {pendingDoublePlaySelect && (
-        <div className="modal-backdrop" onClick={() => setPendingDoublePlaySelect(false)}>
-          <div className="player-stats-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="player-stats-head">
-              <h3>Double Play: corredor eliminado</h3>
-            </div>
-            <div className="player-stats-block">
-              <select
-                value={selectedDoublePlayRunnerBase}
-                onChange={(event) => setSelectedDoublePlayRunnerBase(event.target.value)}
-                style={{ width: '100%' }}
-              >
-                <option value="">Selecionar base</option>
-                {doublePlayRunnerOptions.map((base) => (
-                  <option key={`dp-base-${base}`} value={base}>
-                    {base.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+        <Modal title="Double Play: corredor eliminado" onClose={() => setPendingDoublePlaySelect(false)}>
+          <div className="player-stats-block">
+            <select
+              value={selectedDoublePlayRunnerBase}
+              onChange={(event) => setSelectedDoublePlayRunnerBase(event.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">Selecionar base</option>
+              {doublePlayRunnerOptions.map((base) => (
+                <option key={`dp-base-${base}`} value={base}>
+                  {base.toUpperCase()}
+                </option>
+              ))}
+            </select>
 
-              {!gameState.isAttacking && (
-                <div style={{ marginTop: '10px' }}>
-                  <strong>Defensores envolvidos (2 ou 3)</strong>
-                  <div className="lineup-picker" style={{ marginTop: '6px' }}>
-                    {doublePlayDefenderOptions.map((defender) => {
-                      const checked = selectedDoublePlayDefenderIds.includes(defender.id)
-                      const disableUnchecked = !checked && selectedDoublePlayDefenderIds.length >= 3
-                      return (
-                        <label key={`dp-defender-${defender.id}`}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={disableUnchecked}
-                            onChange={() => {
-                              setSelectedDoublePlayDefenderIds((current) => {
-                                if (current.includes(defender.id)) {
-                                  return current.filter((id) => id !== defender.id)
-                                }
-                                if (current.length >= 3) return current
-                                return [...current, defender.id]
-                              })
-                            }}
-                          />
-                          {defender.label}
-                        </label>
-                      )
-                    })}
-                  </div>
+            {!gameState.isAttacking && (
+              <div style={{ marginTop: '10px' }}>
+                <strong>Defensores envolvidos (2 ou 3)</strong>
+                <div className="lineup-picker" style={{ marginTop: '6px' }}>
+                  {doublePlayDefenderOptions.map((defender) => {
+                    const checked = selectedDoublePlayDefenderIds.includes(defender.id)
+                    const disableUnchecked = !checked && selectedDoublePlayDefenderIds.length >= 3
+                    return (
+                      <label key={`dp-defender-${defender.id}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disableUnchecked}
+                          onChange={() => {
+                            setSelectedDoublePlayDefenderIds((current) => {
+                              if (current.includes(defender.id)) {
+                                return current.filter((id) => id !== defender.id)
+                              }
+                              if (current.length >= 3) return current
+                              return [...current, defender.id]
+                            })
+                          }}
+                        />
+                        {defender.label}
+                      </label>
+                    )
+                  })}
                 </div>
-              )}
-
-              <div className="detail-actions" style={{ marginTop: '10px' }}>
-                <button type="button" className="action-btn" onClick={() => setPendingDoublePlaySelect(false)}>
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="action-btn"
-                  disabled={
-                    !selectedDoublePlayRunnerBase
-                    || (!gameState.isAttacking && (selectedDoublePlayDefenderIds.length < 2 || selectedDoublePlayDefenderIds.length > 3))
-                  }
-                  onClick={() => applyDoublePlayWithRunner(selectedDoublePlayRunnerBase, selectedDoublePlayDefenderIds)}
-                >
-                  Confirmar DP
-                </button>
               </div>
+            )}
+
+            <div className="detail-actions" style={{ marginTop: '10px' }}>
+              <Button type="button" variant="primary" onClick={() => setPendingDoublePlaySelect(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={
+                  !selectedDoublePlayRunnerBase
+                  || (!gameState.isAttacking && (selectedDoublePlayDefenderIds.length < 2 || selectedDoublePlayDefenderIds.length > 3))
+                }
+                onClick={() => applyDoublePlayWithRunner(selectedDoublePlayRunnerBase, selectedDoublePlayDefenderIds)}
+              >
+                Confirmar DP
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {pendingDefenseError && (
-        <div className="modal-backdrop" onClick={() => setPendingDefenseError(false)}>
-          <div className="player-stats-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="player-stats-head">
-              <h3>Selecionar defensor com erro</h3>
-            </div>
-            <div className="player-stats-block">
-              <select
-                value={selectedErrorDefenderId}
-                onChange={(event) => setSelectedErrorDefenderId(event.target.value)}
-                style={{ width: '100%' }}
+        <Modal title="Selecionar defensor com erro" onClose={() => setPendingDefenseError(false)}>
+          <div className="player-stats-block">
+            <select
+              value={selectedErrorDefenderId}
+              onChange={(event) => setSelectedErrorDefenderId(event.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">Selecionar jogador</option>
+              {errorDefenderOptions.map((option) => (
+                <option key={`error-option-${option.id}`} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className="detail-actions" style={{ marginTop: '10px' }}>
+              <Button type="button" variant="primary" onClick={() => setPendingDefenseError(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={!selectedErrorDefenderId}
+                onClick={() => {
+                  confirmDefensiveError()
+                }}
               >
-                <option value="">Selecionar jogador</option>
-                {errorDefenderOptions.map((option) => (
-                  <option key={`error-option-${option.id}`} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <div className="detail-actions" style={{ marginTop: '10px' }}>
-                <button type="button" className="action-btn" onClick={() => setPendingDefenseError(false)}>
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="action-btn"
-                  disabled={!selectedErrorDefenderId}
-                  onClick={() => {
-                    confirmDefensiveError()
-                  }}
-                >
-                  Confirmar erro
-                </button>
-              </div>
+                Confirmar erro
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {dragPreview && (
@@ -2481,56 +2467,54 @@ function FieldPage({
       />
 
       {editingPlayerId && (
-        <div className="modal-backdrop" onClick={() => setEditingPlayerId(null)}>
-          <div className="player-stats-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="player-stats-head">
-              <h3>Editar jogador</h3>
-              <button type="button" onClick={() => setEditingPlayerId(null)}>
-                Fechar
-              </button>
+        <Modal title="Editar jogador" onClose={() => setEditingPlayerId(null)}>
+          <form className="player-form" onSubmit={(event) => { event.preventDefault(); saveEditedPlayer() }}>
+            <input
+              placeholder="Nome"
+              value={editForm.name}
+              onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+            />
+            <input
+              placeholder="Numero"
+              type="number"
+              value={editForm.number}
+              onChange={(event) => setEditForm((current) => ({ ...current, number: event.target.value }))}
+            />
+
+            <div className="positions-picker">
+              {VALID_POSITIONS.map((position) => (
+                <label key={`edit-${position}`}>
+                  <input
+                    type="checkbox"
+                    checked={editForm.positions.includes(position)}
+                    onChange={() => toggleEditPosition(position)}
+                  />
+                  {position}
+                </label>
+              ))}
             </div>
 
-            <form className="player-form" onSubmit={(event) => { event.preventDefault(); saveEditedPlayer() }}>
-              <input
-                placeholder="Nome"
-                value={editForm.name}
-                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
-              />
-              <input
-                placeholder="Numero"
-                type="number"
-                value={editForm.number}
-                onChange={(event) => setEditForm((current) => ({ ...current, number: event.target.value }))}
-              />
+            <select
+              value={editForm.activePosition}
+              onChange={(event) => setEditForm((current) => ({ ...current, activePosition: event.target.value }))}
+            >
+              {editForm.positions.map((position) => (
+                <option key={`edit-active-${position}`} value={position}>
+                  Titular: {position}
+                </option>
+              ))}
+            </select>
 
-              <div className="positions-picker">
-                {VALID_POSITIONS.map((position) => (
-                  <label key={`edit-${position}`}>
-                    <input
-                      type="checkbox"
-                      checked={editForm.positions.includes(position)}
-                      onChange={() => toggleEditPosition(position)}
-                    />
-                    {position}
-                  </label>
-                ))}
-              </div>
-
-              <select
-                value={editForm.activePosition}
-                onChange={(event) => setEditForm((current) => ({ ...current, activePosition: event.target.value }))}
-              >
-                {editForm.positions.map((position) => (
-                  <option key={`edit-active-${position}`} value={position}>
-                    Titular: {position}
-                  </option>
-                ))}
-              </select>
-
-              <button type="submit">Salvar alteracoes</button>
-            </form>
-          </div>
-        </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <Button type="button" variant="primary" onClick={saveEditedPlayer}>
+                Salvar alteracoes
+              </Button>
+              <Button type="button" variant="danger" onClick={() => setEditingPlayerId(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
     </section>
   )

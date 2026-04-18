@@ -5,6 +5,7 @@ import StatsPage from './pages/StatsPage'
 import api, { gameStatsApi, gamesApi } from './services/api'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
+import Button from './components/ui/Button'
 
 const TOOLS = [
   { id: 'pointer', label: 'Ponteiro' },
@@ -867,28 +868,29 @@ function App() {
           gameState={gameState}
           onUpdateGameState={updateGameState}
           onGoField={() => setPage('game')}
+          onUpdatePlayer={handleUpdatePlayer}
         />
       )}
 
       {page === 'training' && (
         <aside className="tool-dock" aria-label="Ferramentas do campo">
           {TOOLS.map((tool) => (
-            <button
+            <Button
               key={tool.id}
               type="button"
               className={activeTool === tool.id ? 'active' : ''}
               onClick={() => setActiveTool(tool.id)}
             >
               {tool.label}
-            </button>
+            </Button>
           ))}
-          <button
+          <Button
             type="button"
             className="clear-btn"
             onClick={() => setClearDrawVersion((current) => current + 1)}
           >
             Limpar desenhos
-          </button>
+          </Button>
         </aside>
       )}
     </main>
