@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import useDragPosition from '../hooks/useDragPosition'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
 import Player from '../components/game/Player/Player'
 import Runner from '../components/game/Runner/Runner'
@@ -132,9 +133,21 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     const handlePointerDown = (ev) => {
       // only allow panning with mouse tool and left button
       if (activeTool !== 'mouse') return
-      const target = ev.target
-      if (target.closest && target.closest('.player-marker')) return
       if (ev.button !== 0) return
+      const target = ev.target
+      // Do not start pan when interacting with markers, runners, the training ball,
+      // animated ball, tool dock, or other interactive UI — only start pan on pure background
+      if (
+        target.closest &&
+        (target.closest('.player-marker') ||
+          target.closest('.training-ball-marker') ||
+          target.closest('.runner-marker') ||
+          target.closest('.animated-ball-marker') ||
+          target.closest('.tool-dock') ||
+          target.closest('.player-tooltip'))
+      )
+        return
+
       isPanningRef.current = true
       panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
       el.classList.add('grabbing')
@@ -247,33 +260,20 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     return () => window.cancelAnimationFrame(frame)
   }, [clearDrawVersion])
 
-  useEffect(() => {
-    const onMove = (event) => {
-      if (activeTool === 'pointer' && fieldStageRef.current) {
-        const rect = fieldStageRef.current.getBoundingClientRect()
-        setLaser({ visible: true, x: event.clientX - rect.left, y: event.clientY - rect.top })
-      }
+  const [isDragging, setIsDragging] = useState(false)
 
-      if (activeTool === 'pen' && isDrawingRef.current) {
-        const point = toFieldPoint(event.clientX, event.clientY)
-        if (!point) return
-        setStrokes((current) => {
-          if (!current.length) return current
-          const next = [...current]
-          next[next.length - 1] = [...next[next.length - 1], point]
-          return next
-        })
-      }
-
-      if (!dragRef.current || activeTool !== 'mouse') return
-      const point = toFieldPoint(event.clientX, event.clientY)
-      if (!point) return
-
-      const drag = dragRef.current
+  // Unified drag handler: forward events to state updaters depending on dragRef
+  useDragPosition({
+    dragRef,
+    toFieldPoint,
+    activeTool,
+    setIsDragging,
+    onMove: (drag, point) => {
       if (drag.type === 'player') {
         setPlayers((current) =>
           current.map((player) => (player.id === drag.id ? { ...player, x: point.x, y: point.y } : player)),
         )
+        return
       }
 
       if (drag.type === 'runner') {
@@ -281,26 +281,18 @@ function TrainingField({ activeTool, clearDrawVersion }) {
           ...current,
           [drag.base]: { ...current[drag.base], x: point.x, y: point.y },
         }))
+        return
       }
 
       if (drag.type === 'ball') {
         setBall({ x: point.x, y: point.y })
+        return
       }
-    }
-
-    const onUp = () => {
-      dragRef.current = null
-      isDrawingRef.current = false
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-  }, [activeTool, toFieldPoint])
+    },
+    onEnd: () => {
+      // Nothing extra to do for training end-of-drag; state cleared by hook
+    },
+  })
 
   const startPenStroke = (event) => {
     if (activeTool !== 'pen') return
@@ -310,15 +302,49 @@ function TrainingField({ activeTool, clearDrawVersion }) {
     setStrokes((current) => [...current, [{ x: point.x, y: point.y }]])
   }
 
+  const movePenStroke = useCallback((event) => {
+    if (!isDrawingRef.current || activeTool !== 'pen') return
+    const point = toFieldPoint(event.clientX, event.clientY)
+    if (!point) return
+    setStrokes((current) => {
+      if (!current.length) return current
+      const next = [...current]
+      next[next.length - 1] = [...next[next.length - 1], point]
+      return next
+    })
+  }, [activeTool, toFieldPoint])
+
+  useEffect(() => {
+    const pointerHandler = (event) => {
+      if (activeTool === 'pointer' && fieldStageRef.current) {
+        const rect = fieldStageRef.current.getBoundingClientRect()
+        setLaser({ visible: true, x: event.clientX - rect.left, y: event.clientY - rect.top })
+      }
+
+      if (activeTool === 'pen') movePenStroke(event)
+    }
+
+    const handlePointerUp = () => {
+      if (isDrawingRef.current) isDrawingRef.current = false
+    }
+
+    window.addEventListener('pointermove', pointerHandler)
+    window.addEventListener('pointerup', handlePointerUp)
+    return () => {
+      window.removeEventListener('pointermove', pointerHandler)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [activeTool, movePenStroke])
+
   return (
     <>
       <section className={`training-layout ${showTrainingContainer ? '' : 'mode-hidden'}`}>
-        <div
-          ref={fieldStageRef}
-          style={{ ['--field-scale']: combined, ['--field-zoom']: zoom }}
-          className={`field-stage ${activeTool}-mode`}
-          onPointerDown={startPenStroke}
-        >
+          <div
+            ref={fieldStageRef}
+            style={{ ['--field-scale']: combined, ['--field-zoom']: zoom }}
+            className={`field-stage ${activeTool}-mode ${isDragging ? 'is-dragging' : ''}`}
+            onPointerDown={startPenStroke}
+          >
           <div
             className="field-viewport"
             style={{
@@ -351,9 +377,12 @@ function TrainingField({ activeTool, clearDrawVersion }) {
                 key={marker.id}
                 point={marker}
                 pointStyle={{ left: `${point.left}px`, top: `${point.top}px` }}
-                onPointerDown={() => {
+                onPointerDown={(event) => {
                   if (activeTool !== 'mouse') return
+                  event.preventDefault()
+                  event.stopPropagation()
                   dragRef.current = { type: 'runner', base: marker.id.replace('runner-', '') }
+                  setIsDragging(true)
                 }}
               />
             )
@@ -370,7 +399,9 @@ function TrainingField({ activeTool, clearDrawVersion }) {
               startDragPlayer={(event) => {
                 if (activeTool !== 'mouse') return
                 event.preventDefault()
+                event.stopPropagation()
                 dragRef.current = { type: 'player', id: marker.id }
+                setIsDragging(true)
               }}
               onDragStart={() => {}}
               getMainPosition={() => marker.label}
@@ -382,9 +413,12 @@ function TrainingField({ activeTool, clearDrawVersion }) {
               type="button"
               className="training-ball-marker"
               style={{ left: `${toScreenPoint(ball.x, ball.y).left}px`, top: `${toScreenPoint(ball.x, ball.y).top}px` }}
-              onPointerDown={() => {
+              onPointerDown={(event) => {
                 if (activeTool !== 'mouse') return
+                event.preventDefault()
+                event.stopPropagation()
                 dragRef.current = { type: 'ball' }
+                setIsDragging(true)
               }}
             />
           </div>

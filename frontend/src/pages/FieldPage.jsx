@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import useDragPosition from '../hooks/useDragPosition'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import CountDots from '../components/CountDots'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
@@ -183,6 +184,7 @@ function FieldPage({
   const [focusedSeasonEntry, setFocusedSeasonEntry] = useState(null)
   const [focusedGameEntry, setFocusedGameEntry] = useState(null)
   const [draggingPlayerId, setDraggingPlayerId] = useState(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [recentlyDroppedId, setRecentlyDroppedId] = useState(null)
   const [dragSource, setDragSource] = useState(null)
   const [dropMessage, setDropMessage] = useState('')
@@ -530,10 +532,20 @@ function FieldPage({
     const handlePointerDown = (ev) => {
       // only allow panning with mouse tool and left button
       if (activeTool !== 'mouse') return
-      // only start pan if clicking on background (not on a player marker)
-      const target = ev.target
-      if (target.closest && target.closest('.player-marker')) return
       if (ev.button !== 0) return
+      const target = ev.target
+      // Do not start pan when interacting with markers, runners, animated ball,
+      // tool dock, or other interactive UI — only start pan on pure background
+      if (
+        target.closest &&
+        (target.closest('.player-marker') ||
+          target.closest('.animated-ball-marker') ||
+          target.closest('.runner-marker') ||
+          target.closest('.tool-dock') ||
+          target.closest('.player-tooltip'))
+      )
+        return
+
       isPanningRef.current = true
       panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
       el.classList.add('grabbing')
@@ -1079,7 +1091,15 @@ function FieldPage({
         ...current,
         balls: 0,
         strikes: 0,
+        // defensive event: increment our counts and per-pitcher mapping
         pitchCount: Number(current.pitchCount || 0) + 1,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(current.pitchCounts || {}) }
+          const pid = current.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         runners: hitResult.nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? hitResult.runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? hitResult.runs : 0),
@@ -1151,7 +1171,8 @@ function FieldPage({
 
       return {
         ...current,
-        pitchCount: Number(current.pitchCount || 0) + 1,
+        // attack-side increment goes to opponentPitchCount only
+        opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
         strikes: didStrikeout || didWalk ? 0 : nextStrikesRaw,
         balls: didStrikeout || didWalk ? 0 : nextBallsRaw,
         currentBatterIndex: nextBatterIndex,
@@ -1186,7 +1207,15 @@ function FieldPage({
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
+        // defensive event: increment our counts and per-pitcher mapping
         pitchCount: Number(current.pitchCount || 0) + 1,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(current.pitchCounts || {}) }
+          const pid = current.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         balls: 0,
         strikes: 0,
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
@@ -1238,7 +1267,15 @@ function FieldPage({
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
+        // defensive double play: increment our counts and per-pitcher mapping
         pitchCount: Number(current.pitchCount || 0) + 1,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(current.pitchCounts || {}) }
+          const pid = current.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -1321,7 +1358,15 @@ function FieldPage({
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
+        // defensive sac fly: increment our counts and per-pitcher mapping
         pitchCount: Number(current.pitchCount || 0) + 1,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(current.pitchCounts || {}) }
+          const pid = current.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -1349,9 +1394,28 @@ function FieldPage({
     onUpdateGameState((current) => {
       const forced = forceAdvanceToFirst(current.runners || { first: false, second: false, third: false })
 
+      if (current.isAttacking) {
+        return {
+          ...current,
+          opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
+          currentBatterIndex: getNextBatterIndexFromState(current),
+          runners: forced.nextRunners,
+          homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
+          awayScore: (current.awayScore || 0) + (!current.isAttacking ? forced.runs : 0),
+        }
+      }
+
       return {
         ...current,
+        // defensive dead ball
         pitchCount: Number(current.pitchCount || 0) + 1,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(current.pitchCounts || {}) }
+          const pid = current.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         currentBatterIndex: getNextBatterIndexFromState(current),
         runners: forced.nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
@@ -1378,9 +1442,29 @@ function FieldPage({
       const nextRunners = { ...advanced.nextRunners, first: true }
       runsScored = advanced.runs
 
+      if (current.isAttacking) {
+        return {
+          ...current,
+          opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
+          balls: 0,
+          strikes: 0,
+          currentBatterIndex: getNextBatterIndexFromState(current),
+          runners: nextRunners,
+          homeScore: (current.homeScore || 0) + (current.isAttacking ? advanced.runs : 0),
+          awayScore: (current.awayScore || 0) + (!current.isAttacking ? advanced.runs : 0),
+        }
+      }
+
       return {
         ...current,
         pitchCount: Number(current.pitchCount || 0) + 1,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(current.pitchCounts || {}) }
+          const pid = current.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -1485,9 +1569,21 @@ function FieldPage({
     setSelectedId(playerId)
   }
 
-  const startDragPlayer = (event, playerId, source) => {
+  const startDragPlayer = (event, playerId, source, options = {}) => {
     if (activeTool !== 'mouse') return
     event.preventDefault()
+
+    // support starting opponent drags via options.asType === 'opponent'
+    if (options && options.asType === 'opponent') {
+      dragRef.current = { type: 'opponent', id: playerId }
+      dragStartRef.current = { x: event.clientX, y: event.clientY }
+      setDragSource(source)
+      setDraggingPlayerId(playerId)
+      setSelectedId(null)
+      setDragPreview({ x: event.clientX, y: event.clientY, label: playersById[playerId]?.name || 'Jogador' })
+      setIsDragging(true)
+      return
+    }
 
     dragRef.current = { type: 'player', source, playerId }
     dragStartRef.current = { x: event.clientX, y: event.clientY }
@@ -1495,6 +1591,9 @@ function FieldPage({
     setDraggingPlayerId(playerId)
     setSelectedId(playerId)
     setDragPreview({ x: event.clientX, y: event.clientY, label: playersById[playerId]?.name || 'Jogador' })
+
+    // mark dragging state to disable transitions
+    setIsDragging(true)
 
     if (source === 'field') {
       clearTimeout(longPressTimerRef.current)
@@ -1552,29 +1651,40 @@ function FieldPage({
     return undefined
   }, [focusedPlayerId, gameState.currentGameId])
 
+  // Separate small pointer handler for laser and pen drawing (non-drag responsibilities)
   useEffect(() => {
-    const onMove = (event) => {
+    const pointerHandler = (event) => {
       if (activeTool === 'pointer' && fieldStageRef.current) {
         const rect = fieldStageRef.current.getBoundingClientRect()
         setLaser({ visible: true, x: event.clientX - rect.left, y: event.clientY - rect.top })
       }
 
-      if (activeTool === 'pen') {
-        movePenStroke(event)
-      }
+      if (activeTool === 'pen') movePenStroke(event)
+    }
 
-      if (!dragRef.current) return
-      setDragPreview((current) => (current ? { ...current, x: event.clientX, y: event.clientY } : current))
+    window.addEventListener('pointermove', pointerHandler)
+    return () => window.removeEventListener('pointermove', pointerHandler)
+  }, [activeTool, movePenStroke])
 
-      const inField = isInsideRect(event.clientX, event.clientY, fieldImageRef.current?.getBoundingClientRect())
-      const inBench = isInsideRect(event.clientX, event.clientY, benchRef.current?.getBoundingClientRect())
+  // Unified drag handling for field entities (players, opponents, runners)
+  useDragPosition({
+    dragRef,
+    toFieldPoint,
+    activeTool,
+    setIsDragging,
+    onMove: (drag, point, ev) => {
+      // update preview and drop hints
+      setDragPreview((current) => (current ? { ...current, x: ev.clientX, y: ev.clientY } : current))
+
+      const inField = isInsideRect(ev.clientX, ev.clientY, fieldImageRef.current?.getBoundingClientRect())
+      const inBench = isInsideRect(ev.clientX, ev.clientY, benchRef.current?.getBoundingClientRect())
       setDropTarget(inField ? 'field' : inBench ? 'bench' : null)
 
-      if (dragRef.current?.type === 'player') {
-        if (dragRef.current.source === 'field' && inBench) {
+      if (drag.type === 'player') {
+        if (drag.source === 'field' && inBench) {
           setDropMessage('Soltar para adicionar ao banco')
-        } else if (dragRef.current.source === 'bench' && inField) {
-          const draggedPlayer = playersById[dragRef.current.playerId]
+        } else if (drag.source === 'bench' && inField) {
+          const draggedPlayer = playersById[drag.playerId]
           const hasConflict = (gameState.onFieldPlayerIds || []).some((id) => {
             const existing = playersById[id]
             return existing && draggedPlayer && getMainPosition(existing) === getMainPosition(draggedPlayer)
@@ -1585,10 +1695,7 @@ function FieldPage({
         }
       }
 
-      const drag = dragRef.current
       if (drag.type === 'player' && drag.source === 'field') {
-        const point = toFieldPoint(event.clientX, event.clientY)
-        if (!point) return
         setPlayers((current) =>
           current.map((player) => {
             const id = getPlayerId(player)
@@ -1598,39 +1705,28 @@ function FieldPage({
       }
 
       if (drag.type === 'opponent') {
-        const point = toFieldPoint(event.clientX, event.clientY)
-        if (!point) return
         setOpponentDefense((current) =>
           current.map((item) => (item.id === drag.id ? { ...item, x: point.x, y: point.y } : item)),
         )
       }
 
       if (drag.type === 'runner') {
-        const point = toFieldPoint(event.clientX, event.clientY)
-        if (!point) return
         setRunnerDrag({ base: drag.base, x: point.x, y: point.y })
       }
-
-    }
-
-    const onUp = (event) => {
+    },
+    onEnd: (drag, point, ev) => {
       clearTimeout(longPressTimerRef.current)
       setTooltipId(null)
+      if (activeTool === 'pen') isDrawingRef.current = false
 
-      if (activeTool === 'pen') {
-        isDrawingRef.current = false
-      }
-
-      const drag = dragRef.current
       if (!drag) {
         setDragPreview(null)
         setDropTarget(null)
         return
       }
 
-      const inField = isInsideRect(event.clientX, event.clientY, fieldImageRef.current?.getBoundingClientRect())
-      const inBench = isInsideRect(event.clientX, event.clientY, benchRef.current?.getBoundingClientRect())
-      const point = toFieldPoint(event.clientX, event.clientY)
+      const inField = isInsideRect(ev.clientX, ev.clientY, fieldImageRef.current?.getBoundingClientRect())
+      const inBench = isInsideRect(ev.clientX, ev.clientY, benchRef.current?.getBoundingClientRect())
 
       if (drag.type === 'player') {
         const player = playersById[drag.playerId]
@@ -1640,7 +1736,6 @@ function FieldPage({
           const defaultPosition = getDefaultFieldPosition(player?.activePosition)
 
           if (currentOnField.length >= 9) {
-            dragRef.current = null
             setDragPreview(null)
             setDropTarget(null)
             return
@@ -1655,7 +1750,6 @@ function FieldPage({
             const replaced = playersById[duplicateId]
             const confirmed = window.confirm(`Confirmar substituicao: ${player?.name || 'Jogador'} entra e ${replaced?.name || 'jogador'} vai para o banco?`)
             if (!confirmed) {
-              dragRef.current = null
               setDragPreview(null)
               setDropTarget(null)
               setDropMessage('')
@@ -1737,8 +1831,8 @@ function FieldPage({
 
         const start = dragStartRef.current
         if (start) {
-          const dx = Math.abs(event.clientX - start.x)
-          const dy = Math.abs(event.clientY - start.y)
+          const dx = Math.abs(ev.clientX - start.x)
+          const dy = Math.abs(ev.clientY - start.y)
           if (dx > 6 || dy > 6) {
             suppressModalUntilRef.current = Date.now() + 300
             setRecentlyDroppedId(drag.playerId)
@@ -1749,7 +1843,7 @@ function FieldPage({
 
       if (drag.type === 'runner') {
         const sourceBase = drag.base
-        const fieldPoint = toFieldPoint(event.clientX, event.clientY)
+        const fieldPoint = point
 
         if (!fieldPoint) {
           onUpdateGameState((current) => ({
@@ -1781,24 +1875,14 @@ function FieldPage({
         }
       }
 
-      dragRef.current = null
-      dragStartRef.current = null
       setDragSource(null)
       setDraggingPlayerId(null)
       setDragPreview(null)
       setDropMessage('')
       setRunnerDrag(null)
       setDropTarget(null)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-  }, [activeTool, gameState.onFieldPlayerIds, onUpdateGameState, players, playersById, setPlayers, toFieldPoint, movePenStroke])
+    },
+  })
 
   const focusedPlayer = focusedPlayerId ? playersById[focusedPlayerId] : null
   const pitchersOnField = pitchersFromHook || fieldPlayers.filter((player) => getMainPosition(player) === 'P')
@@ -1884,7 +1968,17 @@ function FieldPage({
           setDragSource('field')
           setDraggingPlayerId(id)
         }}
+        onStartDrag={(event, descriptor) => {
+          dragRef.current = descriptor
+          dragStartRef.current = { x: event.clientX, y: event.clientY }
+          setDragSource('field')
+          setDraggingPlayerId(descriptor.playerId || descriptor.id || null)
+          setSelectedId(descriptor.playerId || descriptor.id || null)
+          setDragPreview({ x: event.clientX, y: event.clientY, label: descriptor.label || '' })
+          setIsDragging(true)
+        }}
         animateRunners={animateRunners}
+        isDragging={isDragging}
         zoom={zoom}
         offsetX={offsetX}
         offsetY={offsetY}
@@ -1937,23 +2031,26 @@ function FieldPage({
           </div>
           <div className="hud-grid">
             <label>
-              Pitch Count
-              <input type="number" value={gameState.pitchCount || 0} readOnly disabled />
+              Pitch Count (Nosso)
+              <input type="number" value={gameState.ourPitchCount || 0} readOnly disabled />
+            </label>
+            <label>
+              Pitch Count (Adversário)
+              <input type="number" value={gameState.opponentPitchCount || 0} readOnly disabled />
             </label>
             {!gameState.isAttacking && (
               <label>
                 Arremessador
                 <select
                   value={gameState.currentPitcherId || ''}
-                  onChange={(event) =>
-                    onUpdateGameState(
-                      {
-                        currentPitcherId: event.target.value || null,
-                        pitchCount: 0,
-                      },
-                      'Arremessador alterado',
-                    )
-                  }
+                  onChange={(event) => {
+                    const nextId = event.target.value || null
+                    onUpdateGameState((current) => {
+                      const nextPitchCounts = { ...(current.pitchCounts || {}) }
+                      if (nextId && !Number.isFinite(nextPitchCounts[nextId])) nextPitchCounts[nextId] = 0
+                      return { ...current, currentPitcherId: nextId, pitchCounts: nextPitchCounts }
+                    }, 'Arremessador alterado')
+                  }}
                 >
                   {!pitchersOnField.length && <option value="">Sem pitcher em campo</option>}
                   {pitchersOnField.map((player) => (
@@ -1963,6 +2060,19 @@ function FieldPage({
                   ))}
                 </select>
               </label>
+            )}
+            {!gameState.isAttacking && (
+              <label>
+                Pitcher PC
+                <input type="number" value={(gameState.currentPitcherId && gameState.pitchCounts && Number.isFinite(gameState.pitchCounts[gameState.currentPitcherId]) ? gameState.pitchCounts[gameState.currentPitcherId] : 0)} readOnly disabled />
+              </label>
+            )}
+            {gameState.isAttacking && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button type="button" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
+                  Trocar Pitcher Adversário
+                </button>
+              </div>
             )}
           </div>
           {!gameState.isAttacking && (

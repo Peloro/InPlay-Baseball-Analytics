@@ -21,6 +21,9 @@ const INITIAL_GAME_STATE = {
   balls: 0,
   strikes: 0,
   pitchCount: 0,
+  ourPitchCount: 0,
+  opponentPitchCount: 0,
+  pitchCounts: {},
   homeScore: 0,
   awayScore: 0,
   isAttacking: true,
@@ -75,6 +78,14 @@ function getSavedGameState() {
     return {
       ...INITIAL_GAME_STATE,
       ...parsed,
+      // migrate legacy `pitchCount` to `ourPitchCount` when needed
+      ourPitchCount: Number.isFinite(parsed?.ourPitchCount)
+        ? parsed.ourPitchCount
+        : Number.isFinite(parsed?.pitchCount)
+          ? parsed.pitchCount
+          : 0,
+      opponentPitchCount: Number.isFinite(parsed?.opponentPitchCount) ? parsed.opponentPitchCount : 0,
+      pitchCounts: parsed?.pitchCounts || {},
       homeScore: Number.isFinite(parsed?.homeScore)
         ? parsed.homeScore
         : Number.isFinite(parsed?.score?.home)
@@ -88,8 +99,8 @@ function getSavedGameState() {
       score: { ...INITIAL_GAME_STATE.score, ...(parsed?.score || {}) },
       runners: { ...INITIAL_GAME_STATE.runners, ...(parsed?.runners || {}) },
       onFieldPlayerIds: Array.isArray(parsed?.onFieldPlayerIds) ? parsed.onFieldPlayerIds : [],
-      participantPlayerIds: Array.isArray(parsed?.participantPlayerIds)
-        ? parsed.participantPlayerIds
+      participantPlayerIds: Array.isArray(parsed?.participantPlayerIds) ?
+        parsed.participantPlayerIds
         : [],
       battingOrder: Array.isArray(parsed?.battingOrder) ? parsed.battingOrder : [],
       lineup: Array.isArray(parsed?.lineup) ? parsed.lineup : [],
@@ -269,7 +280,11 @@ function App() {
 
     if (nextPitcherId !== gameState.currentPitcherId) {
       const timer = window.setTimeout(() => {
-        setGameState((current) => ({ ...current, currentPitcherId: nextPitcherId }))
+        setGameState((current) => {
+          const nextPitchCounts = { ...(current.pitchCounts || {}) }
+          if (nextPitcherId && !Number.isFinite(nextPitchCounts[nextPitcherId])) nextPitchCounts[nextPitcherId] = 0
+          return { ...current, currentPitcherId: nextPitcherId, pitchCounts: nextPitchCounts }
+        })
       }, 0)
       return () => window.clearTimeout(timer)
     }
@@ -321,6 +336,13 @@ function App() {
             balls: Number.isFinite(persistedState?.balls) ? persistedState.balls : current.balls,
             strikes: Number.isFinite(persistedState?.strikes) ? persistedState.strikes : current.strikes,
             pitchCount: Number.isFinite(persistedState?.pitchCount) ? persistedState.pitchCount : current.pitchCount,
+            ourPitchCount: Number.isFinite(persistedState?.ourPitchCount)
+              ? persistedState.ourPitchCount
+              : Number.isFinite(persistedState?.pitchCount)
+                ? persistedState.pitchCount
+                : current.ourPitchCount || 0,
+            opponentPitchCount: Number.isFinite(persistedState?.opponentPitchCount) ? persistedState.opponentPitchCount : current.opponentPitchCount || 0,
+            pitchCounts: persistedState?.pitchCounts || current.pitchCounts || {},
             homeScore: Number.isFinite(persistedState?.homeScore) ? persistedState.homeScore : current.homeScore,
             awayScore: Number.isFinite(persistedState?.awayScore) ? persistedState.awayScore : current.awayScore,
             battingOrder,
@@ -340,6 +362,13 @@ function App() {
             balls: Number.isFinite(persistedState?.balls) ? persistedState.balls : current.balls,
             strikes: Number.isFinite(persistedState?.strikes) ? persistedState.strikes : current.strikes,
             pitchCount: Number.isFinite(persistedState?.pitchCount) ? persistedState.pitchCount : current.pitchCount,
+            ourPitchCount: Number.isFinite(persistedState?.ourPitchCount)
+              ? persistedState.ourPitchCount
+              : Number.isFinite(persistedState?.pitchCount)
+                ? persistedState.pitchCount
+                : current.ourPitchCount || 0,
+            opponentPitchCount: Number.isFinite(persistedState?.opponentPitchCount) ? persistedState.opponentPitchCount : current.opponentPitchCount || 0,
+            pitchCounts: persistedState?.pitchCounts || current.pitchCounts || {},
             homeScore: Number.isFinite(persistedState?.homeScore) ? persistedState.homeScore : current.homeScore,
             awayScore: Number.isFinite(persistedState?.awayScore) ? persistedState.awayScore : current.awayScore,
             lineup: [],
@@ -378,7 +407,11 @@ function App() {
           outs: gameState.outs,
           balls: gameState.balls,
           strikes: gameState.strikes,
-          pitchCount: gameState.pitchCount,
+          // keep legacy `pitchCount` for backwards compatibility (reflect ourPitchCount)
+          pitchCount: gameState.ourPitchCount,
+          ourPitchCount: gameState.ourPitchCount,
+          opponentPitchCount: gameState.opponentPitchCount,
+          pitchCounts: gameState.pitchCounts || {},
           homeScore: gameState.homeScore,
           awayScore: gameState.awayScore,
           isAttacking: gameState.isAttacking,
@@ -500,6 +533,9 @@ function App() {
       balls: 0,
       strikes: 0,
       pitchCount: 0,
+      ourPitchCount: 0,
+      opponentPitchCount: 0,
+      pitchCounts: {},
       homeScore: 0,
       awayScore: 0,
       isAttacking: true,
@@ -634,7 +670,14 @@ function App() {
 
       return {
         ...state,
-        pitchCount: Number(state.pitchCount || 0) + 1,
+        // Defensive pitch increment: update our team pitch counts and per-pitcher mapping
+        ourPitchCount: Number(state.ourPitchCount || 0) + 1,
+        pitchCounts: (() => {
+          const next = { ...(state.pitchCounts || {}) }
+          const pid = state.currentPitcherId
+          if (pid) next[pid] = Number(next[pid] || 0) + 1
+          return next
+        })(),
         strikes: didStrikeout || didWalk ? 0 : nextStrikesRaw,
         balls: didStrikeout || didWalk ? 0 : nextBallsRaw,
         currentBatterIndex: nextBatterIndex,
@@ -691,6 +734,9 @@ function App() {
           balls: 0,
           strikes: 0,
           pitchCount: 0,
+          ourPitchCount: 0,
+          opponentPitchCount: 0,
+          pitchCounts: {},
           homeScore: 0,
           awayScore: 0,
           isAttacking: true,

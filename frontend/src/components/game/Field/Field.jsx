@@ -35,6 +35,8 @@ export default function Field({
   offsetX = 0,
   offsetY = 0,
   animateRunners = false,
+  isDragging = false,
+  onStartDrag,
 }) {
   const scale = fieldRect && fieldRect.width ? Math.max(0.45, Math.min(1.6, fieldRect.width / 980)) : 1
   // Invert marker scaling vs. camera zoom: when zoom increases markers get smaller
@@ -44,7 +46,7 @@ export default function Field({
     <div
       ref={fieldStageRef}
       style={{ ['--field-scale']: combined, ['--field-zoom']: zoom }}
-      className={`field-stage ${activeTool}-mode ${dropTarget === 'field' ? 'drop-ready' : ''}`}
+      className={`field-stage ${activeTool}-mode ${dropTarget === 'field' ? 'drop-ready' : ''} ${isDragging ? 'is-dragging' : ''}`}
       onPointerDown={startPenStroke}
       onDragEnter={(event) => {
         event.preventDefault()
@@ -109,13 +111,16 @@ export default function Field({
             openEditModal={openEditModal}
             startDragPlayer={startDragPlayer}
             onPointerDown={(event) => {
+              if (activeTool !== 'mouse') return
+              // start drag for both teams via the provided callback; opponent drags
+              // are signaled via the options param
               if (isOpponent) {
-                if (activeTool !== 'mouse') return
                 event.preventDefault()
-                dragRef.current = { type: 'opponent', id }
-                setSelectedId(null)
+                if (typeof startDragPlayer === 'function') startDragPlayer(event, id, 'field', { asType: 'opponent' })
                 return
               }
+              // for our team, allow the normal startDragPlayer flow
+              if (typeof startDragPlayer === 'function') startDragPlayer(event, id, 'field')
             }}
             onDragStart={(event, pid) => {
               if (isOpponent) return
@@ -151,18 +156,19 @@ export default function Field({
         const point = toScreenPoint(basePosition.x, basePosition.y)
         const style = { left: `${point.left}px`, top: `${point.top}px` }
         return (
-          <Runner
-            key={`runner-${base}`}
-            point={basePosition}
-            pointStyle={style}
-            animate={animateRunners}
-            onPointerDown={(event) => {
-              if (activeTool !== 'mouse') return
-              event.preventDefault()
-              dragRef.current = { type: 'runner', base }
-              setRunnerDrag({ base, x: basePosition.x, y: basePosition.y })
-            }}
-          />
+            <Runner
+              key={`runner-${base}`}
+              point={basePosition}
+              pointStyle={style}
+              animate={animateRunners}
+              onPointerDown={(event) => {
+                if (activeTool !== 'mouse') return
+                event.preventDefault()
+                event.stopPropagation()
+                setRunnerDrag({ base, x: basePosition.x, y: basePosition.y })
+                if (typeof onStartDrag === 'function') onStartDrag(event, { type: 'runner', base })
+              }}
+            />
         )
       })}
 

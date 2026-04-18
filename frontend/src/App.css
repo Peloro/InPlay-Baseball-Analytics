@@ -941,6 +941,12 @@
   }
 }
 
+/* Disable CSS transitions for markers while dragging to have 1:1 movement */
+.field-stage.is-dragging .player-marker,
+.field-stage.is-dragging .runner-marker,
+.field-stage.is-dragging .animated-ball-marker {
+  transition: none !important;
+}
 .stats-page {
   min-height: calc(100vh - var(--top-nav-height));
   width: 100%;
