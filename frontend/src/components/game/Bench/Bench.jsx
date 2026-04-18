@@ -19,50 +19,7 @@ const Bench = React.forwardRef(function Bench({
   setPlayers,
   gameState,
   onUpdateGameState,
-  isMobile = false,
 }, ref) {
-  const [drawerOpen, setDrawerOpen] = React.useState(false)
-  React.useImperativeHandle(ref, () => ({
-    openDrawer: () => setDrawerOpen(true),
-    closeDrawer: () => setDrawerOpen(false),
-  }))
-  if (isMobile) {
-    return (
-      <div>
-        <button type="button" className="full-width-btn" onClick={() => setDrawerOpen(true)} aria-expanded={drawerOpen}>
-          Abrir Banco
-        </button>
-        {drawerOpen && (
-          <div className={`bench-panel bench-panel--drawer ${dropTarget === 'bench' ? 'drop-ready' : ''}`} role="dialog" aria-label="Banco de reservas">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <div className="bench-head">
-                <h3>Banco</h3>
-                <Input placeholder="Buscar jogador" value={benchSearch} onChange={(event) => setBenchSearch(event.target.value)} />
-              </div>
-              <button type="button" className="mode-toggle-btn" onClick={() => setDrawerOpen(false)}>Fechar</button>
-            </div>
-            <div className="bench-list">
-              {dropMessage && dropTarget === 'bench' && <div className="drop-hint">{dropMessage}</div>}
-              {benchPlayers.map((player) => {
-                const id = getPlayerId(player)
-                return (
-                  <div key={id} className={`bench-card ${selectedId === id ? 'selected' : ''}`}>
-                    <button type="button" className="bench-player-btn" onClick={() => setSelectedId(id)} onPointerDown={(event) => startDragPlayer(event, id, 'bench')} draggable onDragStart={(event) => startDragPlayer(event, id, 'bench')}>
-                      <strong>{player.name} #{player.number}</strong>
-                      <span>{(player.positions || []).join(' / ')}</span>
-                    </button>
-                    <Button type="button" className="bench-info-btn" onClick={() => openPlayerDetails(id)}>Ver stats</Button>
-                    <Button type="button" className="bench-info-btn" onClick={() => openEditModal(id)}>Editar</Button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
   return (
     <aside
       ref={ref}

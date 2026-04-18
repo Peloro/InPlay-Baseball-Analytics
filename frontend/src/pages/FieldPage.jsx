@@ -10,8 +10,6 @@ import { VALID_POSITIONS } from '../data/positions'
 import Scoreboard from '../components/game/Scoreboard/Scoreboard'
 import Field from '../components/game/Field/Field'
 import Bench from '../components/game/Bench/Bench'
-import GameHUD from '../components/game/GameHUD'
-import useResponsive from '../hooks/useResponsive'
 import usePlayers from '../hooks/usePlayers'
 import useGameState from '../hooks/useGameState'
 
@@ -437,8 +435,6 @@ function FieldPage({
   }, [gameState.currentGameId, gameState.preGameConfigured, players])
 
   const { pitcherLiveStat, livePitching, opponentName } = useGameState({ gameState, activeGame })
-
-  const { isMobile } = useResponsive()
 
   // animate runners briefly when score increases and show scoreboard
   const prevScoreRef = useRef({ home: gameState.homeScore || 0, away: gameState.awayScore || 0 })
@@ -2135,37 +2131,228 @@ function FieldPage({
         setPlayers={setPlayers}
         gameState={gameState}
         onUpdateGameState={onUpdateGameState}
-        isMobile={isMobile}
       />
       )}
 
       {showHud && (
-        <GameHUD
-          invalidFeedback={invalidFeedback}
-          gameState={gameState}
-          currentBatter={currentBatter}
-          onDeckBatter={onDeckBatter}
-          inTheHoleBatter={inTheHoleBatter}
-          pitchersOnField={pitchersOnField}
-          livePitching={livePitching}
-          applyAttackCountAction={applyAttackCountAction}
-          applyPlateAppearance={applyPlateAppearance}
-          applyDefensiveHit={applyDefensiveHit}
-          handleDoublePlayAction={handleDoublePlayAction}
-          applySacFly={applySacFly}
-          applyErrorEvent={applyErrorEvent}
-          applyDeadBall={applyDeadBall}
-          applyDefensiveOutEvent={applyDefensiveOutEvent}
-          advanceRunner={advanceRunner}
-          removeRunner={removeRunner}
-          setZoom={setZoom}
-          zoom={zoom}
-          onEndGame={onEndGame}
-          isMobile={isMobile}
-          benchRef={benchRef}
-        />
+        <aside className="field-hud">
+        <div className="field-hud-block">
+          <h3>Jogo</h3>
+          {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
+          {gameState.isAttacking && (
+            <p>
+              Rebatedor atual:{' '}
+              <strong>{currentBatter ? `${currentBatter.name} #${currentBatter.number}` : 'Sem ordem de rebatedores'}</strong>
+            </p>
+          )}
+          {gameState.isAttacking && (
+            <p>
+              On Deck: <strong>{onDeckBatter ? `${onDeckBatter.name} #${onDeckBatter.number}` : '--'}</strong>
+              {' | '}
+              In the Hole: <strong>{inTheHoleBatter ? `${inTheHoleBatter.name} #${inTheHoleBatter.number}` : '--'}</strong>
+            </p>
+          )}
+          <div className="count-dots-panel">
+            <CountDots label="Balls" value={gameState.balls || 0} max={4} color="#2f9d58" />
+            <CountDots label="Strikes" value={gameState.strikes || 0} max={3} color="#d2a100" />
+            <CountDots label="Outs" value={gameState.outs || 0} max={3} color="#c33b34" />
+          </div>
+          <div className="hud-grid">
+            <label>
+              Pitch Count (Nosso)
+              <input type="number" value={gameState.ourPitchCount || 0} readOnly disabled />
+            </label>
+            <label>
+              Pitch Count (Adversário)
+              <input type="number" value={gameState.opponentPitchCount || 0} readOnly disabled />
+            </label>
+            {!gameState.isAttacking && (
+              <label>
+                Arremessador
+                <select
+                  value={gameState.currentPitcherId || ''}
+                  onChange={(event) => {
+                    const nextId = event.target.value || null
+                    onUpdateGameState((current) => {
+                      const nextPitchCounts = { ...(current.pitchCounts || {}) }
+                      if (nextId && !Number.isFinite(nextPitchCounts[nextId])) nextPitchCounts[nextId] = 0
+                      return { ...current, currentPitcherId: nextId, pitchCounts: nextPitchCounts }
+                    }, 'Arremessador alterado')
+                  }}
+                >
+                  {!pitchersOnField.length && <option value="">Sem pitcher em campo</option>}
+                  {pitchersOnField.map((player) => (
+                    <option key={getPlayerId(player)} value={getPlayerId(player)}>
+                      {player.name} #{player.number}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {!gameState.isAttacking && (
+              <label>
+                Pitcher PC
+                <input type="number" value={(gameState.currentPitcherId && gameState.pitchCounts && Number.isFinite(gameState.pitchCounts[gameState.currentPitcherId]) ? gameState.pitchCounts[gameState.currentPitcherId] : 0)} readOnly disabled />
+              </label>
+            )}
+            {gameState.isAttacking && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Button type="button" variant="primary" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
+                  Trocar Pitcher Adversário
+                </Button>
+              </div>
+            )}
+          </div>
+          {!gameState.isAttacking && (
+            <div key={`pitching-pulse-${pitchingPulseKey}`} className="player-stats-block stats-pulse" style={{ marginTop: '8px' }}>
+              <strong>Pitcher</strong>
+              <div className="player-stats-grid" style={{ marginTop: '6px' }}>
+                <div className="player-stats-item"><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
+                <div className="player-stats-item"><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
+                <div className="player-stats-item"><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
+                <div className="player-stats-item"><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
+                <div className="player-stats-item"><span>PC</span><strong>{safeNumber(livePitching.pitchCount)}</strong></div>
+              </div>
+            </div>
+          )}
+          {gameState.isAttacking ? (
+            <div className="hud-actions attack-actions" style={{ marginTop: '8px' }}>
+              <button type="button" onClick={() => applyAttackCountAction('strike')}>
+                Strike
+              </button>
+              <button type="button" onClick={() => applyAttackCountAction('ball')}>
+                Ball
+              </button>
+              <button type="button" onClick={() => applyAttackCountAction('foul')}>
+                Foul
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('out')}>
+                Out
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('single')}>
+                Hit Simples
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('double')}>
+                Hit Dupla
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('triple')}>
+                Hit Tripla
+              </button>
+              <button type="button" onClick={() => applyPlateAppearance('homerun')}>
+                Homerun
+              </button>
+              <button type="button" onClick={handleDoublePlayAction}>
+                Double Play
+              </button>
+              <button type="button" onClick={applySacFly}>
+                Sac Fly
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  applyErrorEvent('')
+                }}
+              >
+                Erro
+              </button>
+              <button type="button" onClick={applyDeadBall}>
+                Dead Ball
+              </button>
+            </div>
+          ) : (
+            <div className="hud-actions defense-actions" style={{ marginTop: '8px' }}>
+              <button type="button" onClick={() => onPitchAction?.('strike')}>
+                Strike
+              </button>
+              <button type="button" onClick={() => onPitchAction?.('ball')}>
+                Ball
+              </button>
+              <button type="button" onClick={() => onPitchAction?.('foul')}>
+                Foul
+              </button>
+              <button type="button" onClick={() => applyDefensiveOutEvent('out')}>
+                Out
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('single')}>
+                Single
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('double')}>
+                Double
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('triple')}>
+                Triple
+              </button>
+              <button type="button" onClick={() => applyDefensiveHit('homerun')}>
+                Homerun
+              </button>
+              <button type="button" onClick={handleDoublePlayAction}>
+                Double Play
+              </button>
+              <button type="button" onClick={applySacFly}>
+                Sac Fly
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || '')
+                  setPendingDefenseError(true)
+                }}
+              >
+                Erro
+              </button>
+              <button type="button" onClick={applyDeadBall}>
+                Dead Ball
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="field-hud-block">
+          <h3>Corredores</h3>
+          <div className="hud-grid">
+            {['first', 'second', 'third'].map((base) => (
+              <label key={base}>
+                {base.toUpperCase()}
+                <div className="hud-actions">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateGameState((current) => ({
+                        ...current,
+                        runners: { ...current.runners, [base]: true },
+                      }), `Corredor em ${base}`)
+                    }
+                  >
+                    +
+                  </button>
+                  <button type="button" onClick={() => advanceRunner(base)}>
+                    Av
+                  </button>
+                  <button type="button" onClick={() => removeRunner(base)}>
+                    Out
+                  </button>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="field-hud-block">
+          <h3>Campo</h3>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <button type="button" className="full-width-btn" onClick={() => onEndGame?.()}>
+              Encerrar jogo
+            </button>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</Button>
+              <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
+              <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
+              <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
+            </div>
+          </div>
+        </div>
+        </aside>
       )}
-        
       {/* Persistent HUD toggle button (always visible) */}
       <button
         type="button"

@@ -5,8 +5,6 @@ import { VALID_POSITIONS } from '../data/positions'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
-import useResponsive from '../hooks/useResponsive'
-import PlayerStatsCard from '../components/stats/PlayerStatsCard'
 
 function getPlayerId(player) {
   return player?._id || player?.id
@@ -740,98 +738,71 @@ function StatsPage({
         </div>
         <div className="stats-table-wrap">
           {seasonLoading && <div className="stats-loading">Carregando estatísticas...</div>}
-          {/* Responsive rendering: cards on mobile, compact table on tablet, full table on desktop */}
-          {(() => {
-            const { isMobile, isTablet } = useResponsive()
-            if (isMobile) {
-              return (
-                <div className="player-cards-grid">
-                  {visibleSeasonRows.map(({ player, entry }) => {
-                    const id = getPlayerId(player)
-                    return (
-                      <PlayerStatsCard
-                        key={id}
-                        player={player}
-                        entry={entry}
-                        statsTab={statsTab}
-                        onOpenPlayer={openPlayerDetails}
-                        isLeader={id === leaders.topHitsId || id === leaders.topAvgId}
-                      />
-                    )
-                  })}
-                </div>
-              )
-            }
+          <table className={`stats-table ${seasonLoading ? 'stats-pulse' : ''}`}>
+            <thead>
+              <tr>
+                <th>Jogador</th>
+                <th>N</th>
+                <th>Posicao</th>
+                {statsTab === 'hitters' ? (
+                  <>
+                    <th>AB</th>
+                    <th>H</th>
+                    <th>SO</th>
+                    <th>OUT</th>
+                    <th>AVG</th>
+                  </>
+                ) : (
+                  <>
+                    <th>Pitching</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleSeasonRows.map(({ player, entry }) => {
+                const id = getPlayerId(player)
 
-            // tablet or desktop: keep table but add compact class for tablet
-            return (
-              <table className={`stats-table ${seasonLoading ? 'stats-pulse' : ''} ${isTablet ? 'stats-table--tablet' : ''}`}>
-                <thead>
-                  <tr>
-                    <th>Jogador</th>
-                    <th>N</th>
-                    <th>Posicao</th>
+                return (
+                  <tr
+                    key={id}
+                    className={id === leaders.topHitsId || id === leaders.topAvgId ? 'season-leader-row' : ''}
+                  >
+                    <td>
+                      <Button type="button" variant="link" onClick={() => openPlayerDetails(id)}>
+                        {player.name}
+                      </Button>
+                    </td>
+                    <td>{player.number}</td>
+                    <td>{getMainPosition(player)}</td>
                     {statsTab === 'hitters' ? (
                       <>
-                        <th>AB</th>
-                        <th>H</th>
-                        <th>SO</th>
-                        <th>OUT</th>
-                        <th>AVG</th>
+                        <td>{safeNumber(entry.hitting?.atBats)}</td>
+                        <td>{safeNumber(entry.hitting?.hits)}</td>
+                        <td>{safeNumber(entry.hitting?.strikeouts)}</td>
+                        <td>{safeNumber(entry.hitting?.outs)}</td>
+                        <td>{entry.avg ? Number(entry.avg).toFixed(3) : getAvg(entry)}</td>
                       </>
                     ) : (
                       <>
-                        <th>Pitching</th>
+                        <td>
+                          <div className="pitcher-stat-grid">
+                            <span>IP: {safeNumber(entry.pitching?.inningsPitched)}</span>
+                            <span>ERA: {entry.era ? Number(entry.era).toFixed(3) : getEra(entry)}</span>
+                            <span>SO: {safeNumber(entry.pitching?.strikeouts)}</span>
+                            <span>BB: {safeNumber(entry.pitching?.walks)}</span>
+                            <span>PC: {safeNumber(entry.pitching?.pitchCount)}</span>
+                            <span>STR: {safeNumber(entry.pitching?.strikes)}</span>
+                            <span>BAL: {safeNumber(entry.pitching?.balls)}</span>
+                          </div>
+                        </td>
                       </>
                     )}
                   </tr>
-                </thead>
-                <tbody>
-                  {visibleSeasonRows.map(({ player, entry }) => {
-                    const id = getPlayerId(player)
-
-                    return (
-                      <tr
-                        key={id}
-                        className={id === leaders.topHitsId || id === leaders.topAvgId ? 'season-leader-row' : ''}
-                      >
-                        <td>
-                          <Button type="button" variant="link" onClick={() => openPlayerDetails(id)}>
-                            {player.name}
-                          </Button>
-                        </td>
-                        <td>{player.number}</td>
-                        <td>{getMainPosition(player)}</td>
-                        {statsTab === 'hitters' ? (
-                          <>
-                            <td>{safeNumber(entry.hitting?.atBats)}</td>
-                            <td>{safeNumber(entry.hitting?.hits)}</td>
-                            <td>{safeNumber(entry.hitting?.strikeouts)}</td>
-                            <td>{safeNumber(entry.hitting?.outs)}</td>
-                            <td>{entry.avg ? Number(entry.avg).toFixed(3) : getAvg(entry)}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td>
-                              <div className="pitcher-stat-grid">
-                                <span>IP: {safeNumber(entry.pitching?.inningsPitched)}</span>
-                                <span>ERA: {entry.era ? Number(entry.era).toFixed(3) : getEra(entry)}</span>
-                                <span>SO: {safeNumber(entry.pitching?.strikeouts)}</span>
-                                <span>BB: {safeNumber(entry.pitching?.walks)}</span>
-                                <span>PC: {safeNumber(entry.pitching?.pitchCount)}</span>
-                                <span>STR: {safeNumber(entry.pitching?.strikes)}</span>
-                                <span>BAL: {safeNumber(entry.pitching?.balls)}</span>
-                              </div>
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )
-          })()}
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
