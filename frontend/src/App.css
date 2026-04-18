@@ -528,6 +528,24 @@
   z-index: 25;
 }
 
+/* Drawer variant for mobile bench */
+.bench-panel--drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  height: 56vh;
+  max-height: 78vh;
+  width: 100%;
+  margin: 0;
+  border-radius: 12px 12px 0 0;
+  padding: 12px;
+  overflow-y: auto;
+  z-index: 60;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.6);
+}
+
 .bench-panel.drop-ready {
   box-shadow: inset 0 0 0 4px rgba(79, 175, 119, 0.35), 0 8px 22px rgba(16, 35, 26, 0.2);
 }
@@ -605,6 +623,33 @@
 .training-hud {
   left: 16px;
   bottom: 16px;
+}
+
+/* Bottom bar for mobile tools (training) */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(16,16,16,0.96), rgba(8,8,8,0.98));
+  border-top: 1px solid rgba(80,72,40,0.25);
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.6);
+}
+.bottom-bar-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .training-hud {
+    display: none;
+  }
+  .bottom-bar { display: block }
 }
 
 .field-hud-block {
@@ -826,6 +871,13 @@
   font-weight: 700;
 }
 
+/* touch targets: ensure buttons are large enough on mobile */
+.hud-actions button {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+
 .hud-actions button,
 .full-width-btn,
 .bench-info-btn,
@@ -1028,6 +1080,11 @@ html, body {
     max-height: none;
     overflow: visible;
     z-index: 1;
+  }
+
+  /* compact HUD blocks on mobile */
+  .field-hud .field-hud-block {
+    padding: 8px;
   }
 
   /* Make sure markers remain within the field and not cause horizontal scroll */
@@ -1694,3 +1751,55 @@ html, body {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Player stats cards (mobile) */
+.player-cards-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.player-stats-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: #1c1c1c;
+  display: grid;
+  gap: 8px;
+}
+
+.player-stats-card.leader {
+  box-shadow: 0 0 0 3px rgba(198,87,47,0.12);
+}
+
+.psc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.psc-title { display: flex; gap: 8px; align-items: baseline; }
+.psc-title strong { font-size: 1rem; }
+.psc-number { color: #cfc6a3; font-weight: 700; font-size: 0.92rem }
+
+.psc-actions { display: flex; gap: 8px; }
+
+.psc-metrics { display: grid; gap: 8px; }
+.psc-row { display: flex; gap: 8px; }
+.psc-metric { flex: 1 1 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px; text-align: center; font-size: 0.92rem }
+.psc-metric.important { background: rgba(245,212,0,0.08); font-weight: 800 }
+.psc-value { display: block; font-size: 1.05rem; margin-top: 4px }
+
+.psc-defense { transition: max-height 220ms ease; overflow: hidden }
+.psc-defense.collapsed { max-height: 0 }
+.psc-defense-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px }
+
+/* Tablet compact table styles: show metrics on two lines inside cells */
+.stats-table--tablet td, .stats-table--tablet th { padding: 6px; font-size: 0.92rem }
+.stats-table--tablet td { vertical-align: top }
+.stats-table--tablet td:nth-child(4) { min-width: 72px }
+.stats-table--tablet .pitcher-stat-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+
+/* Ensure no horizontal scroll and good spacing on small widths */
+.stats-table-wrap, .player-cards-grid { width: 100%; box-sizing: border-box }
+

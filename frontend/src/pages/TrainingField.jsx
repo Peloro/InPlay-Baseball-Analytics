@@ -3,6 +3,9 @@ import useDragPosition from '../hooks/useDragPosition'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
 import Player from '../components/game/Player/Player'
 import Button from '../components/ui/Button'
+import useResponsive from '../hooks/useResponsive'
+import TrainingHUD from '../components/game/TrainingHUD'
+import BottomBar from '../components/ui/BottomBar'
 import Runner from '../components/game/Runner/Runner'
 
 function clamp(value, min, max) {
@@ -169,6 +172,10 @@ function TrainingField({ activeTool, clearDrawVersion }) {
       .map(([base, data]) => ({ id: `runner-${base}`, label: `R-${base[0].toUpperCase()}`, ...data }))
     return [...players, ...runnerList]
   }, [players, runners])
+
+  const { isMobile } = useResponsive()
+
+  const resetTraining = () => { setPlayers(INITIAL_PLAYERS); setRunners(INITIAL_RUNNERS); setBall({ x:50, y:55 }); setStrokes([]) }
 
   const computeBasePosition = (posName) => {
     const p = getDefaultFieldPosition(posName)
@@ -565,48 +572,25 @@ function TrainingField({ activeTool, clearDrawVersion }) {
         </div>
       </section>
 
+      
       {showHud && (
-        <aside className="field-hud training-hud">
-        <div className="field-hud-block">
-          <h3>Modo Treino</h3>
-          <p>Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
-          <div className="hud-actions">
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, ...computeBasePosition('1B'), visible: true } }))}
-            >
-              + 1B
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, ...computeBasePosition('2B'), visible: true } }))}
-            >
-              + 2B
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, ...computeBasePosition('3B'), visible: true } }))}
-            >
-              + 3B
-            </Button>
+        <TrainingHUD
+          computeBasePosition={computeBasePosition}
+          setRunners={setRunners}
+          resetTraining={resetTraining}
+          isMobile={isMobile}
+        />
+      )}
+
+      {isMobile && showHud && (
+        <BottomBar>
+          <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'space-around' }}>
+            <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, ...computeBasePosition('1B'), visible: true } }))}>+1B</Button>
+            <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, ...computeBasePosition('2B'), visible: true } }))}>+2B</Button>
+            <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, ...computeBasePosition('3B'), visible: true } }))}>+3B</Button>
+            <Button type="button" className="full-width-btn" onClick={() => { setPlayers(INITIAL_PLAYERS); setRunners(INITIAL_RUNNERS); setBall({ x: 50, y: 55 }); setStrokes([]) }}>Reset</Button>
           </div>
-          <Button
-            type="button"
-            className="full-width-btn"
-            onClick={() => {
-              setPlayers(INITIAL_PLAYERS)
-              setRunners(INITIAL_RUNNERS)
-              setBall({ x: 50, y: 55 })
-              setStrokes([])
-            }}
-          >
-            Resetar treino
-          </Button>
-        </div>
-        </aside>
+        </BottomBar>
       )}
     </>
   )
