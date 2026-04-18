@@ -350,140 +350,27 @@ function FieldPage({
   }, [gameState.isAttacking, gameState.onFieldPlayerIds, gameState.lineup, setPlayers])
 
   useEffect(() => {
-    const el = fieldStageRef.current
-    if (!el) return undefined
+    if (!gameState.currentGameId || !gameState.preGameConfigured || showPreGameSetup) return
 
-    const targetEl = el.querySelector?.('.field-viewport') || el
+    const lineup = Array.isArray(gameState.lineup) ? gameState.lineup : []
+    const battingOrder = Array.isArray(gameState.battingOrder) ? gameState.battingOrder : []
+    const bench = Array.isArray(gameState.bench) ? gameState.bench : []
 
-    const handleWheel = (ev) => {
-      if (activeTool !== 'mouse') return
-      ev.preventDefault()
-      const stageRect = el.getBoundingClientRect()
-      const mouseX = ev.clientX - stageRect.left
-      const mouseY = ev.clientY - stageRect.top
-      const delta = ev.deltaY < 0 ? 1 : -1
-      const factor = 1 + delta * 0.08
-      const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * factor).toFixed(3))))
-
-      const contentX = (mouseX - offsetX) / zoom
-      const contentY = (mouseY - offsetY) / zoom
-      const nextOffsetX = mouseX - contentX * newZoom
-      const nextOffsetY = mouseY - contentY * newZoom
-
-      const contentWidth = fieldRect.width * newZoom
-      const contentHeight = fieldRect.height * newZoom
-      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-      const maxX = extraX
-      const maxY = extraY
-      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
-      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
-
-      requestAnimationFrame(() => {
-        setZoom(newZoom)
-        setOffsetX(clampX)
-        setOffsetY(clampY)
-      })
-    }
-
-    const handlePointerDown = (ev) => {
-      // allow touch panning even when tool isn't "mouse"; only block when using pen tool
-      if (ev.pointerType === 'mouse' && activeTool !== 'mouse') return
-      if (ev.pointerType === 'touch' && activeTool === 'pen') return
-      // ignore interactions that start on markers/players
-      const target = ev.target
-      if (
-        target.closest &&
-        target.closest('.player-marker, .training-ball-marker, .animated-ball-marker, .runner-marker')
-      ) return
-      // only respect left-button for mouse
-      if (ev.pointerType === 'mouse' && ev.button !== 0) return
-
-      // track touch pointers so we can avoid panning when a second finger is present
-      if (!ev.pointerType || ev.pointerType === 'mouse') {
-        // mouse: start panning immediately
-        isPanningRef.current = true
-        panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
-        el.classList.add('grabbing')
-        try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
-        return
-      }
-
-      // touch input: maintain a small registry of active touch pointers
-      if (!handlePointerDown._touchPointers) handlePointerDown._touchPointers = new Map()
-      const touchPointers = handlePointerDown._touchPointers
-      touchPointers.set(ev.pointerId, ev)
-
-      // if more than one touch is active, don't start/continue pan here so pinch handler can run
-      if (touchPointers.size > 1) {
-        isPanningRef.current = false
-        try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
-        return
-      }
-
-      // single touch: start panning
-      isPanningRef.current = true
-      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
-      el.classList.add('grabbing')
-      try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
-    }
-
-    const handlePointerMove = (ev) => {
-      // if we're not panning, ignore
-      if (!isPanningRef.current) return
-
-      // if multiple touches are present, abandon this pan (pinch-to-zoom should take over)
-      const touchPointers = handlePointerDown._touchPointers
-      if (ev.pointerType === 'touch' && touchPointers && touchPointers.size > 1) return
-
-      if (ev.pointerType === 'touch') ev.preventDefault()
-      const dx = ev.clientX - panStartRef.current.x
-      const dy = ev.clientY - panStartRef.current.y
-      requestAnimationFrame(() => {
-        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
-        const contentWidth = fieldRect.width * zoom
-        const contentHeight = fieldRect.height * zoom
-        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-        const maxX = extraX
-        const maxY = extraY
-        const rawX = panStartRef.current.offsetX + dx
-        const rawY = panStartRef.current.offsetY + dy
-        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
-        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
-      })
-    }
-
-    const handlePointerUp = (ev) => {
-      // clean up touch pointer registry if present
-      const touchPointers = handlePointerDown._touchPointers
-      if (ev.pointerType === 'touch' && touchPointers) {
-        touchPointers.delete(ev.pointerId)
-      }
-
-      if (isPanningRef.current) {
-        isPanningRef.current = false
-        el.classList.remove('grabbing')
-        try { el.releasePointerCapture?.(ev.pointerId) } catch (e) {}
-      }
-    }
-
-    targetEl.addEventListener('wheel', handleWheel, { passive: false })
-    targetEl.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-
-    return () => {
-      targetEl.removeEventListener('wheel', handleWheel)
-      targetEl.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
+    gamesApi.update(gameState.currentGameId, {
+      isAttacking: gameState.isAttacking,
+      lineup,
+      battingOrder,
+      bench,
+    }).catch(() => {})
+  }, [
+    gameState.currentGameId,
+    gameState.preGameConfigured,
+    gameState.isAttacking,
+    gameState.lineup,
+    gameState.battingOrder,
+    gameState.bench,
+    showPreGameSetup,
+  ])
 
   const confirmPreGameSetup = async () => {
     const starters = setupStarters.filter((item) => item.playerId)
@@ -568,196 +455,57 @@ function FieldPage({
       const from = current.indexOf(setupDraggingId)
       const to = current.indexOf(targetId)
       if (from < 0 || to < 0) return current
-        const el = fieldStageRef.current
-        if (!el) return undefined
-        const targetEl = el.querySelector?.('.field-viewport') || el
+      return reorderList(current, from, to)
+    })
+    setSetupDraggingId(null)
+  }
 
-        const pointers = new Map()
-        let localPinch = null
-        let localPan = null
+  const toFieldPoint = useCallback((clientX, clientY) => {
+    if (!fieldStageRef.current || !fieldRect.width || !fieldRect.height) return null
 
-        const getDistance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+    const stageRect = fieldStageRef.current.getBoundingClientRect()
+    const localX = clientX - stageRect.left
+    const localY = clientY - stageRect.top
 
-        const clampOffsets = (nx, ny, z) => {
-          const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
-          const contentWidth = fieldRect.width * z
-          const contentHeight = fieldRect.height * z
-          const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-          const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-          const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-          const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-          const maxX = extraX
-          const maxY = extraY
-          return [Math.max(minX, Math.min(nx, maxX)), Math.max(minY, Math.min(ny, maxY))]
-        }
+    const untransX = (localX - offsetX) / zoom
+    const untransY = (localY - offsetY) / zoom
 
-        const handleWheel = (ev) => {
-          // do not zoom when using pen/pointer tools
-          if (activeTool !== 'mouse') return
-          ev.preventDefault()
-          const stageRect = el.getBoundingClientRect()
-          const mouseX = ev.clientX - stageRect.left
-          const mouseY = ev.clientY - stageRect.top
-          const delta = ev.deltaY < 0 ? 1 : -1
-          const factor = 1 + delta * 0.08
-          const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * factor).toFixed(3))))
+    const fieldX = ((untransX - fieldRect.left) / fieldRect.width) * 100
+    const fieldY = ((untransY - fieldRect.top) / fieldRect.height) * 100
 
-          const contentX = (mouseX - offsetX) / zoom
-          const contentY = (mouseY - offsetY) / zoom
-          const nextOffsetX = mouseX - contentX * newZoom
-          const nextOffsetY = mouseY - contentY * newZoom
-          const [cx, cy] = clampOffsets(nextOffsetX, nextOffsetY, newZoom)
-          requestAnimationFrame(() => {
-            setZoom(newZoom)
-            setOffsetX(cx)
-            setOffsetY(cy)
-          })
-        }
+    if (fieldX < 0 || fieldX > 100 || fieldY < 0 || fieldY > 100) return null
+    return { x: clamp(fieldX, 0, 100), y: clamp(fieldY, 0, 100) }
+  }, [fieldRect, offsetX, offsetY, zoom])
 
-        const onPointerDown = (ev) => {
-          // allow touch pan/pinch handling; only prevent when mouse input and tool isn't mouse
-          if (ev.pointerType === 'mouse' && activeTool !== 'mouse') return
-          if (ev.pointerType === 'touch' && activeTool === 'pen') return
-          pointers.set(ev.pointerId, ev)
-          try { targetEl.setPointerCapture?.(ev.pointerId) } catch (e) {}
+  const toScreenPoint = useCallback((x, y) => ({
+    // Return position in raw pixels inside the field viewport (before camera transform)
+    left: (x / 100) * fieldRect.width,
+    top: (y / 100) * fieldRect.height,
+  }), [fieldRect])
 
-          if (ev.pointerType === 'mouse') {
-            if (ev.button !== 0) return
-            localPan = { type: 'mouse', startX: ev.clientX, startY: ev.clientY, startOffsetX: offsetX, startOffsetY: offsetY }
-            el.classList.add('grabbing')
-            return
-          }
-
-          if (pointers.size === 1) {
-            const p = ev
-            localPan = { type: 'touch', startX: p.clientX, startY: p.clientY, startOffsetX: offsetX, startOffsetY: offsetY }
-          } else if (pointers.size === 2) {
-            const [a, b] = Array.from(pointers.values())
-            localPinch = { startDist: getDistance(a, b), centerX: (a.clientX + b.clientX) / 2, centerY: (a.clientY + b.clientY) / 2, startZoom: zoom, startOffsetX: offsetX, startOffsetY: offsetY }
-            localPan = null
-          }
-        }
-
-        const onPointerMove = (ev) => {
-          if (!pointers.has(ev.pointerId)) return
-          pointers.set(ev.pointerId, ev)
-
-          if (localPinch && pointers.size === 2) {
-            const [a, b] = Array.from(pointers.values())
-            const dist = getDistance(a, b)
-            const factor = dist / localPinch.startDist
-            if (Math.abs(factor - 1) < 0.005) return
-            const newZoom = Math.max(0.5, Math.min(2.5, Number((localPinch.startZoom * factor).toFixed(3))))
-            const stageRect = el.getBoundingClientRect()
-            const mouseX = localPinch.centerX - stageRect.left
-            const mouseY = localPinch.centerY - stageRect.top
-            const contentX = (mouseX - localPinch.startOffsetX) / localPinch.startZoom
-            const contentY = (mouseY - localPinch.startOffsetY) / localPinch.startZoom
-            const nextOffsetX = mouseX - contentX * newZoom
-            const nextOffsetY = mouseY - contentY * newZoom
-            const [cx, cy] = clampOffsets(nextOffsetX, nextOffsetY, newZoom)
-            requestAnimationFrame(() => {
-              setZoom(newZoom)
-              setOffsetX(cx)
-              setOffsetY(cy)
-            })
-            return
-          }
-
-          if (localPan) {
-            const dx = ev.clientX - localPan.startX
-            const dy = ev.clientY - localPan.startY
-            const rawX = localPan.startOffsetX + dx
-            const rawY = localPan.startOffsetY + dy
-            const [cx, cy] = clampOffsets(rawX, rawY, zoom)
-            requestAnimationFrame(() => {
-              setOffsetX(cx)
-              setOffsetY(cy)
-            })
-          }
-        }
-
-        const onPointerUp = (ev) => {
-          pointers.delete(ev.pointerId)
-          try { targetEl.releasePointerCapture?.(ev.pointerId) } catch (e) {}
-          if (ev.pointerType === 'mouse') {
-            localPan = null
-            el.classList.remove('grabbing')
-          }
-          if (pointers.size < 2) localPinch = null
-          if (pointers.size === 0) localPan = null
-        }
-
-        targetEl.addEventListener('wheel', handleWheel, { passive: false })
-        targetEl.addEventListener('pointerdown', onPointerDown)
-        window.addEventListener('pointermove', onPointerMove)
-        window.addEventListener('pointerup', onPointerUp)
-
-        return () => {
-          targetEl.removeEventListener('wheel', handleWheel)
-          targetEl.removeEventListener('pointerdown', onPointerDown)
-          window.removeEventListener('pointermove', onPointerMove)
-          window.removeEventListener('pointerup', onPointerUp)
-        }
-
-    const handlePointerUp = (ev) => {
-      if (isPanningRef.current) {
-        isPanningRef.current = false
-        el.classList.remove('grabbing')
-        el.releasePointerCapture?.(ev.pointerId)
-      }
-    }
-
-    targetEl.addEventListener('wheel', handleWheel, { passive: false })
-    targetEl.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-
-    return () => {
-      targetEl.removeEventListener('wheel', handleWheel)
-      targetEl.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
-
-  // Pointer-based pinch-to-zoom for game field (mobile)
+  // Wheel zoom and pan handlers (camera control)
   useEffect(() => {
     const el = fieldStageRef.current
     if (!el) return undefined
+    const targetEl = el.querySelector?.('.field-viewport') || el
 
-    const pointers = new Map()
-    let pinch = null
-    const getDistance = (p0, p1) => Math.hypot(p0.clientX - p1.clientX, p0.clientY - p1.clientY)
-
-    const onPointerDown = (ev) => {
-      if (ev.pointerType !== 'touch') return
-      pointers.set(ev.pointerId, ev)
-      try { el.setPointerCapture?.(ev.pointerId) } catch (e) {}
-      if (pointers.size === 2) {
-        const [a, b] = Array.from(pointers.values())
-        pinch = { startDist: getDistance(a, b), centerX: (a.clientX + b.clientX) / 2, centerY: (a.clientY + b.clientY) / 2, startZoom: zoom, startOffsetX: offsetX, startOffsetY: offsetY }
-      }
-    }
-
-    const onPointerMove = (ev) => {
-      if (ev.pointerType !== 'touch') return
-      if (!pointers.has(ev.pointerId)) return
-      pointers.set(ev.pointerId, ev)
-      if (!pinch || pointers.size !== 2) return
+    const handleWheel = (ev) => {
+      // do not zoom when using pen/pointer tools
+      if (activeTool !== 'mouse') return
       ev.preventDefault()
-      const [a, b] = Array.from(pointers.values())
-      const dist = getDistance(a, b)
-      const factor = dist / pinch.startDist
-      const newZoom = Math.max(0.5, Math.min(2.5, Number((pinch.startZoom * factor).toFixed(3))))
-
       const stageRect = el.getBoundingClientRect()
-      const mouseX = pinch.centerX - stageRect.left
-      const mouseY = pinch.centerY - stageRect.top
+      const mouseX = ev.clientX - stageRect.left
+      const mouseY = ev.clientY - stageRect.top
 
-      const contentX = (mouseX - pinch.startOffsetX) / pinch.startZoom
-      const contentY = (mouseY - pinch.startOffsetY) / pinch.startZoom
+      const delta = ev.deltaY < 0 ? 1 : -1
+      const factor = 1 + delta * 0.08
+      const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * factor).toFixed(3))))
 
+      // content coord under cursor (pre-zoom)
+      const contentX = (mouseX - offsetX) / zoom
+      const contentY = (mouseY - offsetY) / zoom
+
+      // compute next offset so the same content point stays under the cursor
       const nextOffsetX = mouseX - contentX * newZoom
       const nextOffsetY = mouseY - contentY * newZoom
 
@@ -779,23 +527,60 @@ function FieldPage({
       })
     }
 
-    const onPointerUp = (ev) => {
-      if (ev.pointerType !== 'touch') return
-      pointers.delete(ev.pointerId)
-      try { el.releasePointerCapture?.(ev.pointerId) } catch (e) {}
-      if (pointers.size < 2) pinch = null
+    const handlePointerDown = (ev) => {
+      // only allow panning with mouse tool and left button
+      if (activeTool !== 'mouse') return
+      // only start pan if clicking on background (not on a player marker)
+      const target = ev.target
+      if (target.closest && target.closest('.player-marker')) return
+      if (ev.button !== 0) return
+      isPanningRef.current = true
+      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
+      el.classList.add('grabbing')
+      el.setPointerCapture?.(ev.pointerId)
     }
 
-    el.addEventListener('pointerdown', onPointerDown)
-    el.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('pointerup', onPointerUp)
+    const handlePointerMove = (ev) => {
+      if (!isPanningRef.current) return
+      const dx = ev.clientX - panStartRef.current.x
+      const dy = ev.clientY - panStartRef.current.y
+      requestAnimationFrame(() => {
+        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
+        const contentWidth = fieldRect.width * zoom
+        const contentHeight = fieldRect.height * zoom
+        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
+        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
+        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
+        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
+        const maxX = extraX
+        const maxY = extraY
+        const rawX = panStartRef.current.offsetX + dx
+        const rawY = panStartRef.current.offsetY + dy
+        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
+        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
+      })
+    }
+
+    const handlePointerUp = (ev) => {
+      if (isPanningRef.current) {
+        isPanningRef.current = false
+        el.classList.remove('grabbing')
+        el.releasePointerCapture?.(ev.pointerId)
+      }
+    }
+
+    targetEl.addEventListener('wheel', handleWheel, { passive: false })
+    targetEl.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
 
     return () => {
-      el.removeEventListener('pointerdown', onPointerDown)
-      el.removeEventListener('pointermove', onPointerMove)
-      window.removeEventListener('pointerup', onPointerUp)
+      targetEl.removeEventListener('wheel', handleWheel)
+      targetEl.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
     }
-  }, [fieldStageRef, zoom, offsetX, offsetY, fieldRect])
+  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
 
   useLayoutEffect(() => {
     const updateFieldRect = () => {
@@ -1826,12 +1611,6 @@ function FieldPage({
         setRunnerDrag({ base: drag.base, x: point.x, y: point.y })
       }
 
-      if (drag.type === 'ball') {
-        const point = toFieldPoint(event.clientX, event.clientY)
-        if (!point) return
-        setAnimatedBall({ visible: true, x: point.x, y: point.y })
-      }
-
     }
 
     const onUp = (event) => {
@@ -1968,10 +1747,6 @@ function FieldPage({
         }
       }
 
-      if (drag.type === 'ball') {
-        if (point) setAnimatedBall({ visible: true, x: point.x, y: point.y })
-      }
-
       if (drag.type === 'runner') {
         const sourceBase = drag.base
         const fieldPoint = toFieldPoint(event.clientX, event.clientY)
@@ -2006,11 +1781,6 @@ function FieldPage({
         }
       }
 
-      try {
-        if (dragRef.current && dragRef.current.el && event && event.pointerId != null) {
-          dragRef.current.el.releasePointerCapture?.(event.pointerId)
-        }
-      } catch (e) {}
       dragRef.current = null
       dragStartRef.current = null
       setDragSource(null)
@@ -2654,7 +2424,6 @@ function FieldPage({
       )}
     </section>
   )
-}
 }
 
 export default FieldPage

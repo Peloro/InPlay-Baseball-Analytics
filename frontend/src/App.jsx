@@ -241,30 +241,6 @@ function App() {
     }
   }, [])
 
-  // Keyboard shortcuts for training mode:
-  // 1 = ponteiro, 2 = caneta, 3 = mouse, C = limpar desenhos
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      // ignore when typing in inputs or contenteditable
-      const tag = e.target && e.target.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
-      if (page !== 'training') return
-
-      if (e.key === '1') {
-        setActiveTool('pointer')
-      } else if (e.key === '2') {
-        setActiveTool('pen')
-      } else if (e.key === '3') {
-        setActiveTool('mouse')
-      } else if (e.key.toLowerCase() === 'c') {
-        setClearDrawVersion((current) => current + 1)
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [page])
-
   useEffect(() => {
     if (gameState.isAttacking) {
       if (gameState.currentPitcherId) {
