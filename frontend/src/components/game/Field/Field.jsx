@@ -15,7 +15,6 @@ export default function Field({
   visibleFieldMarkers,
   getPlayerId,
   selectedId,
-  setSelectedId,
   onPlayerClick,
   openEditModal,
   startDragPlayer,
@@ -25,7 +24,6 @@ export default function Field({
   runnerDrag,
   gameState,
   laser,
-  dragRef,
   setRunnerDrag,
   dragSource,
   dropMessage,
@@ -96,7 +94,6 @@ export default function Field({
 
         {visibleFieldMarkers.map((player) => {
         const id = getPlayerId(player)
-        const isSelected = selectedId === id
         const screen = toScreenPoint(player.x, player.y)
         const isOpponent = gameState.isAttacking
 

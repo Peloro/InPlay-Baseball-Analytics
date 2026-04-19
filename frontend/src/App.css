@@ -926,18 +926,27 @@
 .training-ball-marker {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid #f7f7f7;
-  background: #d66a2d;
-  box-shadow: 0 0 0 4px rgba(214, 106, 45, 0.2);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   cursor: grab;
   z-index: 6;
 }
 
 .training-ball-marker:active {
   cursor: grabbing;
+}
+
+.training-ball-marker img.training-ball-image {
+  width: 22px;
+  height: 22px;
+  display: block;
+  pointer-events: none;
 }
 
 .pregame-modal {

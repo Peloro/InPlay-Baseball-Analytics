@@ -99,7 +99,7 @@ function StatsPage({
   const [seasonStats, setSeasonStats] = useState([])
   const [seasonLoading, setSeasonLoading] = useState(false)
   const [sortBy, setSortBy] = useState('date')
-  const [gamesLoading, setGamesLoading] = useState(false)
+  const [, setGamesLoading] = useState(false)
   const [gameStatsLoading, setGameStatsLoading] = useState(false)
   const [playerFilter, setPlayerFilter] = useState('all')
   const [statsTab, setStatsTab] = useState('hitters')

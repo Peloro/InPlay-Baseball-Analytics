@@ -40,7 +40,7 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
   const [ball, setBall] = useState({ x: 50, y: 55 })
   const [strokes, setStrokes] = useState([])
   const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
-  const [showTrainingContainer, setShowTrainingContainer] = useState(true)
+  const showTrainingContainer = true
   const [zoom, setZoom] = useState(0.85)
   const [offsetX, setOffsetX] = useState(0)
   const [offsetY, setOffsetY] = useState(0)
@@ -427,20 +427,26 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
       next[next.length - 1] = [...next[next.length - 1], point]
       return next
     })
-  }, [activeTool, toFieldPoint])
+  }, [activeTool, toFieldPoint, setStrokes])
 
   useEffect(() => {
     const pointerHandler = (event) => {
-      if (activeTool === 'pointer' && fieldStageRef.current) {
-        const rect = fieldStageRef.current.getBoundingClientRect()
-        setLaser({ visible: true, x: event.clientX - rect.left, y: event.clientY - rect.top })
+      if (activeTool === 'pointer') {
+        const el = fieldStageRef.current
+        if (el) {
+          const rect = el.getBoundingClientRect()
+          setLaser({ visible: true, x: event.clientX - rect.left, y: event.clientY - rect.top })
+        } else {
+          setLaser((s) => ({ ...s, visible: false }))
+        }
+      } else if (activeTool === 'pen') {
+        movePenStroke(event)
       }
-
-      if (activeTool === 'pen') movePenStroke(event)
     }
 
     const handlePointerUp = () => {
       if (isDrawingRef.current) isDrawingRef.current = false
+      setLaser((s) => (s.visible ? { ...s, visible: false } : s))
     }
 
     window.addEventListener('pointermove', pointerHandler)
@@ -450,6 +456,8 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
       window.removeEventListener('pointerup', handlePointerUp)
     }
   }, [activeTool, movePenStroke])
+
+  const ballScreen = toScreenPoint(ball.x, ball.y) || { left: 0, top: 0 }
 
   return (
     <>
@@ -513,7 +521,7 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
               id={marker.id}
               isOpponent={false}
               screen={point}
-              className={`training-player training-defense-marker`}
+              className="training-player training-defense-marker"
               startDragPlayer={(event) => {
                 if (activeTool !== 'mouse') return
                 event.preventDefault()
@@ -521,8 +529,7 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
                 dragRef.current = { type: 'player', id: marker.id }
                 setIsDragging(true)
               }}
-              onDragStart={() => {}}
-              getMainPosition={() => marker.label}
+              getMainPosition={(p) => p.label}
             />
           )
         })}
@@ -530,7 +537,7 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
             <button
               type="button"
               className="training-ball-marker"
-              style={{ left: `${toScreenPoint(ball.x, ball.y).left}px`, top: `${toScreenPoint(ball.x, ball.y).top}px` }}
+              style={{ left: `${ballScreen.left}px`, top: `${ballScreen.top}px` }}
               onPointerDown={(event) => {
                 if (activeTool !== 'mouse') return
                 event.preventDefault()
@@ -538,7 +545,9 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
                 dragRef.current = { type: 'ball' }
                 setIsDragging(true)
               }}
-            />
+            >
+              <img src="/bola-de-baseball-008.png" alt="bola de baseball" className="training-ball-image" />
+            </button>
           </div>
 
           {activeTool === 'pointer' && laser.visible && (
@@ -573,9 +582,9 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
           <p className="hud-sub">Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
 
           <div className="hud-actions">
-            <Button type="button" variant={activeTool === 'pointer' ? 'primary' : 'default'} onClick={() => setActiveTool('pointer')}>P</Button>
-            <Button type="button" variant={activeTool === 'pen' ? 'primary' : 'default'} onClick={() => setActiveTool('pen')}>C</Button>
-            <Button type="button" variant={activeTool === 'mouse' ? 'primary' : 'default'} onClick={() => setActiveTool('mouse')}>M</Button>
+            <Button type="button" variant={activeTool === 'pointer' ? 'primary' : 'default'} onClick={() => setActiveTool('pointer')}>Ponteiro</Button>
+            <Button type="button" variant={activeTool === 'pen' ? 'primary' : 'default'} onClick={() => setActiveTool('pen')}>Caneta</Button>
+            <Button type="button" variant={activeTool === 'mouse' ? 'primary' : 'default'} onClick={() => setActiveTool('mouse')}>Mouse</Button>
             <Button type="button" className="clear-btn" onClick={() => {
               if (typeof triggerClearDraw === 'function') triggerClearDraw()
               else setStrokes([])

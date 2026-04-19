@@ -5,12 +5,6 @@ export default function useGameState({ gameState, activeGame }) {
   const [pitcherLiveStat, setPitcherLiveStat] = useState(null)
 
   useEffect(() => {
-    const currentPitcherCount = gameState.currentPitcherId
-      ? (gameState.pitchCounts && Number.isFinite(gameState.pitchCounts[gameState.currentPitcherId])
-        ? gameState.pitchCounts[gameState.currentPitcherId]
-        : (Number.isFinite(gameState.ourPitchCount) ? gameState.ourPitchCount : 0))
-      : null
-
     if (!gameState.currentGameId || !gameState.currentPitcherId || gameState.isAttacking) {
       const timer = window.setTimeout(() => setPitcherLiveStat(null), 0)
       return () => window.clearTimeout(timer)
@@ -26,7 +20,7 @@ export default function useGameState({ gameState, activeGame }) {
     }
 
     load()
-  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, (gameState.pitchCounts || {}), gameState.ourPitchCount, gameState.outs, gameState.homeScore, gameState.awayScore])
+  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, gameState.pitchCounts, gameState.ourPitchCount, gameState.outs, gameState.homeScore, gameState.awayScore])
 
   const livePitching = useMemo(() => pitcherLiveStat?.pitching || {}, [pitcherLiveStat])
 

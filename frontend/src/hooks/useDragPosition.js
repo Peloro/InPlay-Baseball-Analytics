@@ -21,7 +21,7 @@ export default function useDragPosition({ dragRef, toFieldPoint, activeTool, onM
         if (typeof onMove === 'function') onMove(drag, point, ev)
       } catch (err) {
         // swallow errors to avoid breaking global listeners
-        // eslint-disable-next-line no-console
+         
         console.error('useDragPosition onMove error', err)
       }
     }
@@ -33,7 +33,7 @@ export default function useDragPosition({ dragRef, toFieldPoint, activeTool, onM
       try {
         if (drag && typeof onEnd === 'function') onEnd(drag, point, ev)
       } catch (err) {
-        // eslint-disable-next-line no-console
+         
         console.error('useDragPosition onEnd error', err)
       }
 

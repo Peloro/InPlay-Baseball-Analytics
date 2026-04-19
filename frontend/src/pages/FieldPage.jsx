@@ -31,19 +31,11 @@ function makeOpponentMarkers() {
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
 }
-
-function getPlayerId(player) {
-  return player?._id || player?.id
-}
-
 function isInsideRect(clientX, clientY, rect) {
   if (!rect) return false
   return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
 }
 
-function getMainPosition(player) {
-  return player.activePosition || player.positions?.[0] || 'DH'
-}
 
 function getRoleType(player) {
   return Array.isArray(player?.positions) && player.positions.includes('P') ? 'pitcher' : 'hitter'
@@ -176,7 +168,7 @@ function FieldPage({
   const suppressModalUntilRef = useRef(0)
 
   const [selectedId, setSelectedId] = useState(null)
-  const [tooltipId, setTooltipId] = useState(null)
+  const [, setTooltipId] = useState(null)
   const [fieldRect, setFieldRect] = useState({ left: 0, top: 0, width: 0, height: 0 })
   const [strokes, setStrokes] = useState([])
   const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
@@ -207,7 +199,7 @@ function FieldPage({
   const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
   const [undoStack, setUndoStack] = useState([])
   const [invalidFeedback, setInvalidFeedback] = useState('')
-  const [showFieldContainer, setShowFieldContainer] = useState(true)
+  const [showFieldContainer] = useState(true)
   const [showHud, setShowHud] = useState(true)
   const [showScoreboard, setShowScoreboard] = useState(false)
   const touchStartRef = useRef(null)
@@ -346,13 +338,12 @@ function FieldPage({
     playersById,
     fieldPlayers,
     benchPlayers,
-    setupStarterIds,
     setupAvailablePlayers,
     playerCanPlayPosition,
     pitchersOnField: pitchersFromHook,
     getPlayerId,
     getMainPosition,
-    setPlayers: setPlayersFromHook,
+    setPlayers: _setPlayersFromHook,
   } = usePlayers({ players, setPlayers, gameState })
 
   // helper to return base plate positions (separate from fielder positions)
@@ -434,7 +425,7 @@ function FieldPage({
     return () => window.clearTimeout(timer)
   }, [gameState.currentGameId, gameState.preGameConfigured, players])
 
-  const { pitcherLiveStat, livePitching, opponentName } = useGameState({ gameState, activeGame })
+  const { livePitching, opponentName } = useGameState({ gameState, activeGame })
 
   // animate runners briefly when score increases and show scoreboard
   const prevScoreRef = useRef({ home: gameState.homeScore || 0, away: gameState.awayScore || 0 })
@@ -448,9 +439,12 @@ function FieldPage({
     const awayInc = nextAway > prev.away
     if ((homeInc || awayInc) && !gameState.preGameConfigured) {
       // show scoreboard and animate runners
-      setShowScoreboard(true)
-      setAnimateRunners(true)
-      window.setTimeout(() => setAnimateRunners(false), 900)
+      // schedule state changes to avoid synchronous setState inside an effect
+      window.setTimeout(() => {
+        setShowScoreboard(true)
+        setAnimateRunners(true)
+        window.setTimeout(() => setAnimateRunners(false), 900)
+      }, 0)
     }
     prevScoreRef.current = { home: nextHome, away: nextAway }
   }, [gameState.homeScore, gameState.awayScore, gameState.preGameConfigured])
@@ -474,7 +468,7 @@ function FieldPage({
         return { ...player, activePosition: position, x: point.x, y: point.y }
       }),
     )
-  }, [gameState.isAttacking, gameState.onFieldPlayerIds, gameState.lineup, setPlayers])
+  }, [gameState.isAttacking, gameState.onFieldPlayerIds, gameState.lineup, setPlayers, getPlayerId, getMainPosition])
 
   useEffect(() => {
     if (!gameState.currentGameId || !gameState.preGameConfigured || showPreGameSetup) return
@@ -815,7 +809,8 @@ function FieldPage({
         }
       }, 'Conflito de posicao resolvido: jogador anterior enviado ao banco')
     }
-  }, [gameState.onFieldPlayerIds, onUpdateGameState, players, playersById])
+  }, [gameState.onFieldPlayerIds, onUpdateGameState, players, playersById, getPlayerId, getMainPosition])
+  
 
   const advanceRunner = useCallback((base) => {
     const order = ['first', 'second', 'third']
@@ -1183,7 +1178,7 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertCurrentBatterStats, setAnimatedBall, getDefaultFieldPosition, gameState.runners])
+  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertCurrentBatterStats, setAnimatedBall, gameState.runners])
 
   const applyDefensiveHit = useCallback(async (kind) => {
     if (gameState.isAttacking) return
@@ -1241,7 +1236,7 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent, setAnimatedBall, getDefaultFieldPosition, gameState.runners])
+  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent, setAnimatedBall, gameState.runners])
 
   const applyAttackCountAction = useCallback(async (kind) => {
     if (!gameState.isAttacking) return
@@ -2044,7 +2039,7 @@ function FieldPage({
       id: getPlayerId(player),
       label: `${player.name} #${player.number} (${getMainPosition(player)})`,
     }))
-  }, [defensivePlayers])
+  }, [defensivePlayers, getPlayerId, getMainPosition])
   const doublePlayRunnerOptions = useMemo(
     () => ['first', 'second', 'third'].filter((base) => Boolean(gameState.runners?.[base])),
     [gameState.runners],
@@ -2054,7 +2049,7 @@ function FieldPage({
       id: getPlayerId(player),
       label: `${player.name} #${player.number} (${getMainPosition(player)})`,
     })),
-    [defensivePlayers],
+    [defensivePlayers, getPlayerId, getMainPosition],
   )
 
   return (
