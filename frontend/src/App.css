@@ -1695,6 +1695,11 @@ html, body {
   }
 }
 
+/* By default hide the stacked cards; enable them only on small screens */
+.stats-cards {
+  display: none;
+}
+
 /* Tablet improvements: allow horizontal scroll for wide tables and tighten grids */
 @media (min-width: 768px) and (max-width: 1023px) {
   .lineup-picker,
