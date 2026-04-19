@@ -1694,3 +1694,108 @@ html, body {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Tablet improvements: allow horizontal scroll for wide tables and tighten grids */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .lineup-picker,
+  .game-form,
+  .game-card-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .season-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stats-table-wrap {
+    overflow-x: auto;
+  }
+
+  .stats-table {
+    min-width: 640px;
+    font-size: 0.95rem;
+  }
+}
+
+/* Mobile: make tables scrollable and tighten paddings for small screens */
+@media (max-width: 767px) {
+  .stats-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stats-table {
+    min-width: 600px;
+    font-size: 0.9rem;
+    table-layout: auto;
+  }
+
+  .stats-table th,
+  .stats-table td {
+    padding: 6px 8px;
+  }
+
+  /* Reduce KPI count per row on very small screens */
+  .season-kpis {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  /* Keep the important player info visible while allowing horizontal scroll for metrics */
+  .stats-table td:first-child,
+  .stats-table th:first-child {
+    position: sticky;
+    left: 0;
+    background: inherit;
+    z-index: 2;
+  }
+
+  /* Hide wide table and show stacked cards on very small screens */
+  .stats-table {
+    display: none;
+  }
+
+  .stats-cards {
+    display: grid;
+    gap: 10px;
+  }
+
+  .stat-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    background: #202020;
+    display: grid;
+    gap: 8px;
+  }
+
+  .stat-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .stat-card-sub {
+    color: #bfb591;
+    font-size: 0.86rem;
+    margin-top: 4px;
+  }
+
+  .stat-card-body {
+    display: block;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stat-grid > div {
+    background: #161616;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+  }
+}

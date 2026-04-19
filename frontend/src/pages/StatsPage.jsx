@@ -803,6 +803,42 @@ function StatsPage({
               })}
             </tbody>
           </table>
+          <div className="stats-cards">
+            {visibleSeasonRows.map(({ player, entry }) => {
+              const id = getPlayerId(player)
+              return (
+                <article key={`card-${id}`} className={`stat-card ${id === leaders.topHitsId || id === leaders.topAvgId ? 'season-leader-row' : ''}`}>
+                  <div className="stat-card-head">
+                    <div>
+                      <Button type="button" variant="link" onClick={() => openPlayerDetails(id)}>
+                        {player.name}
+                      </Button>
+                      <div className="stat-card-sub">#{player.number} • {getMainPosition(player)}</div>
+                    </div>
+                  </div>
+                  <div className="stat-card-body">
+                    {statsTab === 'hitters' ? (
+                      <div className="stat-grid">
+                        <div><strong>AB</strong><div>{safeNumber(entry.hitting?.atBats)}</div></div>
+                        <div><strong>H</strong><div>{safeNumber(entry.hitting?.hits)}</div></div>
+                        <div><strong>SO</strong><div>{safeNumber(entry.hitting?.strikeouts)}</div></div>
+                        <div><strong>OUT</strong><div>{safeNumber(entry.hitting?.outs)}</div></div>
+                        <div><strong>AVG</strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : getAvg(entry)}</div></div>
+                      </div>
+                    ) : (
+                      <div className="stat-grid">
+                        <div><strong>IP</strong><div>{safeNumber(entry.pitching?.inningsPitched)}</div></div>
+                        <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(3) : getEra(entry)}</div></div>
+                        <div><strong>SO</strong><div>{safeNumber(entry.pitching?.strikeouts)}</div></div>
+                        <div><strong>BB</strong><div>{safeNumber(entry.pitching?.walks)}</div></div>
+                        <div><strong>PC</strong><div>{safeNumber(entry.pitching?.pitchCount)}</div></div>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
         </div>
       </div>
 
