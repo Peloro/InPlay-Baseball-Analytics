@@ -591,29 +591,207 @@
 
 .field-hud {
   position: fixed;
-  left: 16px;
-  top: calc(var(--top-nav-height) + 12px);
-  bottom: 12px;
-  width: min(360px, calc(100vw - 32px));
-  display: grid;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
   gap: 8px;
-  overflow-y: auto;
-  padding-right: 4px;
   z-index: 24;
 }
 
-.training-hud {
-  left: 16px;
-  bottom: 16px;
+/* Game HUD (default) — align boxes to right and stack vertically */
+.field-hud:not(.training-hud) {
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding-right: 18px;
 }
 
-.field-hud-block {
-  border: 1px solid rgba(77, 64, 14, 0.24);
-  background: rgba(26, 26, 26, 0.94);
-  border-radius: 12px;
-  padding: 10px;
-  backdrop-filter: blur(8px);
+.field-hud:not(.training-hud) .field-hud-block {
+  width: min(360px, calc(100% - 32px));
+  max-width: 360px;
+  margin: 0 8px;
+  display: block;
 }
+
+.field-hud:not(.training-hud) .field-hud-block .hud-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.training-hud {
+  left: 0;
+  bottom: 0;
+}
+
+  .field-hud-block {
+    border: 1px solid rgba(77, 64, 14, 0.24);
+    background: rgba(26, 26, 26, 0.94);
+    border-radius: 12px;
+    padding: 10px 12px;
+    backdrop-filter: blur(8px);
+    width: min(1200px, calc(100% - 32px));
+    max-width: 1200px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .hud-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .hud-hide button {
+    padding: 6px 10px;
+    font-size: 0.86rem;
+  }
+
+  .hud-sub {
+    margin: 6px 0 8px 0;
+    color: #bdb5a6;
+  }
+
+  .hud-actions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    justify-content: flex-start;
+    align-items: center;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+  }
+
+  .hud-tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .hud-bases {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+/* Desktop: stack tool rows vertically to avoid cramped/overlapping buttons */
+@media (min-width: 1024px) {
+  /* Desktop: bottom full-width bar, tools to the left, bases centered/right */
+  .field-hud {
+    padding: 12px 20px;
+  }
+
+  .field-hud-block {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .hud-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+  }
+
+  .hud-tools,
+  .hud-bases {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .hud-tools button,
+  .hud-bases button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+}
+
+/* Explicit game HUD rules for the aside with `game-hud` class */
+
+.field-hud.game-hud {
+  /* keep aside as a logical wrapper; visual container handled by .left-hud-panel */
+  position: static !important;
+  width: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.field-hud.game-hud .field-hud-block {
+  width: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Left HUD panel (containerizado como o banco) */
+.field-hud.game-hud .left-hud-panel {
+  position: fixed !important;
+  top: calc(var(--top-nav-height) + 12px) !important;
+  left: 12px !important;
+  bottom: 12px !important;
+  width: 320px !important;
+  max-width: 320px !important;
+  background: rgba(26, 26, 26, 0.95) !important;
+  border: 1px solid #4f4727 !important;
+  border-radius: 14px !important;
+  padding: 14px !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.34) !important;
+  box-sizing: border-box !important;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden !important;
+  z-index: 120 !important;
+}
+
+.field-hud.game-hud .left-hud-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-hud.game-hud .left-hud-body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  /* fill remaining area inside the fixed panel */
+  max-height: calc(100vh - var(--top-nav-height) - 56px) !important;
+  padding-right: 8px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Ensure form controls don't overflow their grid columns */
+.field-hud.game-hud .hud-grid input,
+.field-hud.game-hud .hud-grid select,
+.field-hud.game-hud .hud-grid textarea {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+  .hud-tools .clear-btn {
+    background: #efe4d2;
+    color: #1a1a1a;
+    border-color: #d6c6ad;
+  }
 
 .field-hud-block h3 {
   margin: 0 0 8px;
@@ -703,11 +881,39 @@
   color: var(--ink);
 }
 
-.hud-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
+  .hud-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  /* Training HUD: force single-line equal-width buttons without affecting game HUD */
+  .training-hud .field-hud-block {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .training-hud .hud-actions {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .training-hud .hud-actions > button,
+  .training-hud .hud-actions > .button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 10px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
 
 .hud-actions.attack-actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -811,6 +1017,14 @@
   color: var(--ink);
   font-weight: 700;
   cursor: pointer;
+}
+
+/* when full-width button placed inside the hud-actions, make it behave like other buttons */
+.hud-actions .full-width-btn,
+.hud-actions .reset-btn {
+  width: auto;
+  margin-top: 0;
+  border-radius: 8px;
 }
 
 .hud-actions button,
@@ -1448,6 +1662,177 @@ html, body {
   }
 }
 
+/* Make training HUD a bottom bar on tablet and mobile for better accessibility */
+@media (max-width: 1023px) {
+  .field-hud {
+    left: 0;
+    transform: none;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    max-width: 100vw;
+    --hud-bar-height: 64px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    gap: 6px;
+    border-radius: 0 0 0 0;
+    box-shadow: 0 -8px 22px rgba(0,0,0,0.35);
+  }
+
+  .training-hud {
+    left: 0;
+    transform: none;
+  }
+
+  .field-hud-block {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  /* hide verbose heading/paragraph to save space in compact HUD */
+  .field-hud-block h3,
+  .field-hud-block p {
+    display: none;
+  }
+
+  .hud-actions {
+    display: flex;
+    gap: 6px;
+    overflow-x: visible;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .hud-actions button {
+    white-space: nowrap;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 160px;
+  }
+
+  /* Move reset button out of the bar to avoid crowding (kept accessible via tool-dock) */
+  .field-hud .full-width-btn {
+    display: none;
+  }
+
+  /* Ensure mode toggle does not overlap the bottom HUD */
+  .mode-toggle-btn {
+    right: 12px;
+    bottom: calc(var(--hud-bar-height, 64px) + 12px);
+    top: auto;
+    z-index: 40;
+    display: none; /* hide floating toggle on mobile/tablet */
+  }
+
+  /* show HUD internal hide control on mobile */
+  .hud-hide {
+    display: block;
+  }
+
+
+/* hide the HUD internal hide control on desktop to avoid duplicate buttons */
+.hud-hide {
+  display: none;
+}
+  /* Move tool-dock above the bottom HUD and lay out horizontally on compact screens */
+  .tool-dock {
+    right: 12px;
+    bottom: calc(var(--hud-bar-height, 64px) + 12px);
+    z-index: 42;
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 10px;
+    align-items: center;
+  }
+
+  .tool-dock button {
+    padding: 8px 10px;
+    min-width: 44px;
+    font-size: 0.86rem;
+  }
+
+  /* Compact mode: show only small icons/text initials */
+  .tool-dock button .tool-icon {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.12);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    margin-right: 6px;
+    font-size: 0.9rem;
+  }
+
+  .tool-dock button .tool-label {
+    display: inline-block;
+  }
+
+  @media (max-width: 520px) {
+    .tool-dock button {
+      padding: 6px;
+      min-width: 40px;
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    /* hide full label, keep small icon/initial visible */
+    .tool-dock button .tool-label {
+      display: none;
+    }
+
+    .tool-dock button .tool-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      margin-right: 0;
+      font-size: 0.95rem;
+    }
+  }
+}
+
+@media (max-width: 420px) {
+  /* On very small screens move tool-dock to the left above HUD to avoid crowding */
+  .tool-dock {
+    right: auto;
+    left: 12px;
+    bottom: calc(var(--hud-bar-height, 64px) + 12px);
+  }
+}
+
+/* Avoid overlap: hide the floating mode-toggle on small and tablet devices
+   because the HUD already exposes a show/hide control. Move tool-dock to
+   top-right on compact widths to keep bottom HUD uncluttered. */
+@media (max-width: 1023px) {
+  .mode-toggle-btn {
+    display: none;
+  }
+
+  .tool-dock {
+    top: calc(var(--top-nav-height, 72px) + 8px);
+    bottom: auto;
+    right: 12px;
+    left: auto;
+    z-index: 60;
+  }
+}
+
 .hitting {
   display: grid;
   grid-template-columns: repeat(2, auto);
@@ -1657,6 +2042,38 @@ html, body {
     bottom: 36vh;
     width: min(320px, calc(100vw - 20px));
   }
+
+/* Final override: force game HUD blocks to the right on wide screens */
+@media (min-width: 1024px) {
+  /* Strong override: pin game HUD to top-left column to avoid covering field */
+  .field-hud:not(.training-hud) {
+    position: fixed !important;
+    top: calc(var(--top-nav-height) + 12px) !important;
+    left: 12px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 320px !important;
+    max-width: 320px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 8px !important;
+    z-index: 120 !important;
+  }
+
+  .field-hud:not(.training-hud) .field-hud-block {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .field-hud:not(.training-hud) .field-hud-block + .field-hud-block {
+    margin-top: 12px !important;
+  }
+}
 
   .game-scoreboard {
     min-width: 0;

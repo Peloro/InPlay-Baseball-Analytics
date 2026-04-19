@@ -2135,8 +2135,13 @@ function FieldPage({
       )}
 
       {showHud && (
-        <aside className="field-hud">
-        <div className="field-hud-block">
+        <aside className="field-hud game-hud">
+        <div className="left-hud-panel">
+          <div className="left-hud-head">
+            <h3>Jogo</h3>
+          </div>
+          <div className="left-hud-body">
+          <div className="field-hud-block">
           <h3>Jogo</h3>
           {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
           {gameState.isAttacking && (
@@ -2349,6 +2354,8 @@ function FieldPage({
               <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
               <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
             </div>
+          </div>
+        </div>
           </div>
         </div>
         </aside>

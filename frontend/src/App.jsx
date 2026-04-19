@@ -174,6 +174,7 @@ async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
 function App() {
   const [page, setPage] = useState('stats')
   const [activeTool, setActiveTool] = useState('mouse')
+  const [showTrainingHud, setShowTrainingHud] = useState(true)
   const [clearDrawVersion, setClearDrawVersion] = useState(0)
   const [players, setPlayers] = useState([])
   const [gameState, setGameState] = useState(getSavedGameState)
@@ -853,7 +854,14 @@ function App() {
           onEndGame={handleEndGame}
         />
       ) : page === 'training' ? (
-        <TrainingField activeTool={activeTool} clearDrawVersion={clearDrawVersion} />
+        <TrainingField
+          activeTool={activeTool}
+          setActiveTool={setActiveTool}
+          clearDrawVersion={clearDrawVersion}
+          triggerClearDraw={() => setClearDrawVersion((c) => c + 1)}
+          showHud={showTrainingHud}
+          setShowHud={setShowTrainingHud}
+        />
       ) : (
         <StatsPage
           players={players}
@@ -872,27 +880,7 @@ function App() {
         />
       )}
 
-      {page === 'training' && (
-        <aside className="tool-dock" aria-label="Ferramentas do campo">
-          {TOOLS.map((tool) => (
-            <Button
-              key={tool.id}
-              type="button"
-              className={activeTool === tool.id ? 'active' : ''}
-              onClick={() => setActiveTool(tool.id)}
-            >
-              {tool.label}
-            </Button>
-          ))}
-          <Button
-            type="button"
-            className="clear-btn"
-            onClick={() => setClearDrawVersion((current) => current + 1)}
-          >
-            Limpar desenhos
-          </Button>
-        </aside>
-      )}
+      {/* tool-dock removed: controls moved into bottom HUD for mobile/tablet */}
     </main>
   )
 }
