@@ -143,6 +143,7 @@ function FieldPage({
   onDefensiveEarnedRun,
   activeGame,
   onEndGame,
+  allowPregameWithoutGame = false,
 }) {
   const layoutRef = useRef(null)
   const fieldStageRef = useRef(null)
@@ -178,6 +179,7 @@ function FieldPage({
   const [setupAttacking, setSetupAttacking] = useState(true)
   const [setupStarters, setSetupStarters] = useState([])
   const [setupBattingOrder, setSetupBattingOrder] = useState([])
+  const [pregameForm, setPregameForm] = useState({ date: '', opponentName: '', competition: '', location: '' })
   const [setupDraggingId, setSetupDraggingId] = useState(null)
   const [opponentDefense, setOpponentDefense] = useState(makeOpponentMarkers)
   const [pendingDefenseError, setPendingDefenseError] = useState(false)
@@ -389,7 +391,8 @@ function FieldPage({
   }, [showScoreboard])
 
   useEffect(() => {
-    if (!gameState.currentGameId) {
+    // If there's no current game, only open pregame when explicitly allowed
+    if (!gameState.currentGameId && !allowPregameWithoutGame) {
       const timer = window.setTimeout(() => setShowPreGameSetup(false), 0)
       return () => window.clearTimeout(timer)
     }
@@ -399,9 +402,7 @@ function FieldPage({
       return () => window.clearTimeout(timer)
     }
 
-    const starters = DEFENSIVE_POSITIONS.map((position) => {
-      return { position, playerId: '' }
-    })
+    const starters = DEFENSIVE_POSITIONS.map((position) => ({ position, playerId: '' }))
 
     const timer = window.setTimeout(() => {
       setSetupAttacking(true)
@@ -411,7 +412,7 @@ function FieldPage({
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [gameState.currentGameId, gameState.preGameConfigured, players])
+  }, [gameState.currentGameId, gameState.preGameConfigured, players, allowPregameWithoutGame])
 
   const { livePitching, opponentName } = useGameState({ gameState, activeGame })
 
@@ -525,15 +526,38 @@ function FieldPage({
       inningHalf: current.inningHalf || 'top',
     }), 'Configuracao inicial confirmada')
 
-    try {
-      await gamesApi.update(gameState.currentGameId, {
-        isAttacking: setupAttacking,
-        battingOrder: setupBattingOrder,
-        lineup: starters,
-        bench,
-      })
-    } catch {
-      // Mantem setup local mesmo sem backend.
+    // Ensure a game exists: create if missing, then persist setup to backend
+    let targetGameId = gameState.currentGameId
+    if (!targetGameId) {
+      // require basic info before creating
+      if (!pregameForm.date || !pregameForm.opponentName.trim() || !pregameForm.competition.trim()) return
+      try {
+        const response = await gamesApi.create({
+          date: pregameForm.date,
+          opponent: pregameForm.opponentName.trim(),
+          opponentName: pregameForm.opponentName.trim(),
+          competition: pregameForm.competition.trim(),
+          location: pregameForm.location.trim(),
+        })
+        const created = response.data
+        targetGameId = created && created._id ? created._id : targetGameId
+        onUpdateGameState((current) => ({ ...current, currentGameId: targetGameId }), 'Jogo criado')
+      } catch {
+        // Mantem setup local mesmo sem backend.
+      }
+    }
+
+    if (targetGameId) {
+      try {
+        await gamesApi.update(targetGameId, {
+          isAttacking: setupAttacking,
+          battingOrder: setupBattingOrder,
+          lineup: starters,
+          bench,
+        })
+      } catch {
+        // Mantem setup local mesmo sem backend.
+      }
     }
 
     setShowPreGameSetup(false)
@@ -2358,29 +2382,56 @@ function FieldPage({
       {showPreGameSetup && (
         <Modal title="Configuracao Inicial" onClose={() => setShowPreGameSetup(false)}>
           <div className="pregame-grid">
-            <section className="player-stats-block">
-              <h4>1) Inicio</h4>
-              <div className="pregame-radio-row">
-                <label>
+                <section className="player-stats-block pregame-info">
+                  <h4>0) Informações do jogo</h4>
                   <input
-                    type="radio"
-                    name="setup-start"
-                    checked={setupAttacking}
-                    onChange={() => setSetupAttacking(true)}
+                    type="date"
+                    value={pregameForm.date}
+                    onChange={(e) => setPregameForm((c) => ({ ...c, date: e.target.value }))}
+                    style={{ marginBottom: 8 }}
                   />
-                  Comecar atacando
-                </label>
-                <label>
                   <input
-                    type="radio"
-                    name="setup-start"
-                    checked={!setupAttacking}
-                    onChange={() => setSetupAttacking(false)}
+                    placeholder="Nome do adversario"
+                    value={pregameForm.opponentName}
+                    onChange={(e) => setPregameForm((c) => ({ ...c, opponentName: e.target.value }))}
+                    style={{ marginBottom: 8 }}
                   />
-                  Comecar defendendo
-                </label>
-              </div>
-            </section>
+                  <input
+                    placeholder="Competicao (treino/campeonato)"
+                    value={pregameForm.competition}
+                    onChange={(e) => setPregameForm((c) => ({ ...c, competition: e.target.value }))}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <input
+                    placeholder="Local (opcional)"
+                    value={pregameForm.location}
+                    onChange={(e) => setPregameForm((c) => ({ ...c, location: e.target.value }))}
+                  />
+                </section>
+
+                <section className="player-stats-block">
+                  <h4>1) Inicio</h4>
+                  <div className="pregame-radio-row">
+                    <label>
+                      <input
+                        type="radio"
+                        name="setup-start"
+                        checked={setupAttacking}
+                        onChange={() => setSetupAttacking(true)}
+                      />
+                      Comecar atacando
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="setup-start"
+                        checked={!setupAttacking}
+                        onChange={() => setSetupAttacking(false)}
+                      />
+                      Comecar defendendo
+                    </label>
+                  </div>
+                </section>
 
             <section className="player-stats-block">
               <h4>2) Titulares e posicoes</h4>
@@ -2457,7 +2508,11 @@ function FieldPage({
               type="button"
               variant="primary"
               onClick={confirmPreGameSetup}
-              disabled={setupBattingOrder.length !== 9 || setupStarters.filter((item) => item.playerId).length !== 9}
+              disabled={
+                setupBattingOrder.length !== 9
+                || setupStarters.filter((item) => item.playerId).length !== 9
+                || (!gameState.currentGameId && (!pregameForm.date || !pregameForm.opponentName.trim() || !pregameForm.competition.trim()))
+              }
             >
               Iniciar jogo
             </Button>

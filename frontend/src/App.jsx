@@ -791,12 +791,7 @@ function App() {
           <button
             type="button"
             className={page === 'game' ? 'active' : ''}
-            disabled={!activeGame}
             onClick={() => {
-              if (!activeGame) {
-                setGameAccessNotice('Crie ou carregue um jogo primeiro')
-                return
-              }
               setGameAccessNotice('')
               setPage('game')
             }}
@@ -851,6 +846,7 @@ function App() {
           }}
           activeGame={activeGame}
           onEndGame={handleEndGame}
+          allowPregameWithoutGame={true}
         />
       ) : page === 'training' ? (
         <TrainingField

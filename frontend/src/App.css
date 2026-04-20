@@ -992,6 +992,39 @@
   padding: 6px;
 }
 
+/* Pregame info (general game fields) */
+.pregame-info {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  padding: 12px;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.pregame-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.pregame-info input {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #131313;
+  color: var(--ink);
+}
+
+.pregame-info input[type="date"] {
+  padding-left: 10px;
+}
+
+.pregame-info input::placeholder {
+  color: #8b8b8b;
+}
+
 .pregame-order-list {
   display: grid;
   gap: 6px;

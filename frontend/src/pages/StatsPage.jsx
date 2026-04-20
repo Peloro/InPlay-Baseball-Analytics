@@ -60,7 +60,6 @@ function StatsPage({
   onUpdatePlayer,
 }) {
   const [form, setForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
-  const [gameForm, setGameForm] = useState({ date: '', opponentName: '', competition: '', location: '' })
   const [editingPlayerId, setEditingPlayerId] = useState(null)
   const [editingForm, setEditingForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
   const [games, setGames] = useState([])
@@ -457,28 +456,7 @@ function StatsPage({
     }, 'Participantes da ficha atualizados')
   }
 
-  const handleCreateGame = async (event) => {
-    event.preventDefault()
-
-    if (!gameForm.date || !gameForm.opponentName.trim() || !gameForm.competition.trim()) return
-
-    const response = await gamesApi.create({
-      date: gameForm.date,
-      opponent: gameForm.opponentName.trim(),
-      opponentName: gameForm.opponentName.trim(),
-      competition: gameForm.competition.trim(),
-      location: gameForm.location.trim(),
-    })
-
-    const createdGame = response.data
-    setGameForm({ date: '', opponentName: '', competition: '', location: '' })
-    await loadGames()
-    onSelectGame?.(createdGame)
-
-    setIsStatsLeaving(true)
-    await wait(240)
-    onOpenGame?.(createdGame)
-  }
+  
 
   const handleDeletePlayerItem = async (player) => {
     const playerId = getPlayerId(player)
@@ -821,35 +799,7 @@ function StatsPage({
         <div className="autosave-indicator">
           {saveStatus === 'saving' ? 'Salvando automaticamente...' : saveStatus === 'saved' ? 'Salvo automaticamente' : ''}
         </div>
-        <form className="game-form" onSubmit={handleCreateGame}>
-          <input
-            type="date"
-            value={gameForm.date}
-            onChange={(event) => setGameForm((current) => ({ ...current, date: event.target.value }))}
-          />
-          <input
-            placeholder="Nome do adversario"
-            value={gameForm.opponentName}
-            onChange={(event) =>
-              setGameForm((current) => ({ ...current, opponentName: event.target.value }))
-            }
-          />
-          <input
-            placeholder="Competicao (treino/campeonato)"
-            value={gameForm.competition}
-            onChange={(event) =>
-              setGameForm((current) => ({ ...current, competition: event.target.value }))
-            }
-          />
-          <input
-            placeholder="Local (opcional)"
-            value={gameForm.location}
-            onChange={(event) =>
-              setGameForm((current) => ({ ...current, location: event.target.value }))
-            }
-          />
-          <button type="submit">Criar jogo</button>
-        </form>
+        {/* Game creation moved to Modo Jogo (FieldPage) pre-game setup */}
 
         <div className="season-toolbar">
           <label>
