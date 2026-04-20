@@ -2,6 +2,20 @@ import React from 'react'
 import Player from '../Player/Player'
 import Runner from '../Runner/Runner'
 
+// Tunable field layout constants
+const FIELD_BASE_WIDTH = 980
+const FIELD_MIN_SCALE = 0.45
+const FIELD_MAX_SCALE = 1.6
+const COMBINED_MIN = 0.25
+const COMBINED_MAX = 2.2
+
+// Runner offsets to place runner markers on base plates
+const RUNNER_BASE_OFFSETS = {
+  '1B': { dx: -2, dy: -6 },
+  '2B': { dx: -5.5, dy: 0 },
+  '3B': { dx: 0, dy: 6 },
+}
+
 export default function Field({
   fieldStageRef,
   fieldImageRef,
@@ -39,9 +53,9 @@ export default function Field({
   onTouchMoveMobile,
   onTouchEndMobile,
 }) {
-  const scale = fieldRect && fieldRect.width ? Math.max(0.45, Math.min(1.6, fieldRect.width / 980)) : 1
+  const scale = fieldRect && fieldRect.width ? Math.max(FIELD_MIN_SCALE, Math.min(FIELD_MAX_SCALE, fieldRect.width / FIELD_BASE_WIDTH)) : 1
   // Invert marker scaling vs. camera zoom: when zoom increases markers get smaller
-  const combined = Math.max(0.25, Math.min(2.2, scale * (1 / (zoom || 1))))
+  const combined = Math.max(COMBINED_MIN, Math.min(COMBINED_MAX, scale * (1 / (zoom || 1))))
 
   return (
     <div
@@ -136,20 +150,13 @@ export default function Field({
         )
       })}
 
-      {['first', 'second', 'third'].map((base) => {
+        {['first', 'second', 'third'].map((base) => {
         if (!gameState.runners?.[base]) return null
         const map = { first: '1B', second: '2B', third: '3B' }
         // compute base plate position (separate from fielder position)
         const computeBasePosition = (posName) => {
           const p = getDefaultFieldPosition(posName)
-          // small offsets to place runner ON the base plate and avoid overlap
-          // Use same offsets as TrainingField so runner placement is consistent
-          const offsets = {
-            '1B': { dx: -2, dy: -6 },
-            '2B': { dx: -5.5, dy: 0 },
-            '3B': { dx: 0, dy: 6 },
-          }
-          const off = offsets[posName] || { dx: 0, dy: 0 }
+          const off = RUNNER_BASE_OFFSETS[posName] || { dx: 0, dy: 0 }
           return { x: p.x + off.dx, y: p.y + off.dy }
         }
 

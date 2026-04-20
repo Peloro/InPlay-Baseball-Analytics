@@ -1,9 +1,17 @@
 import { safeNumber } from './number'
 
+function toNum(v) {
+  return safeNumber(v)
+}
+
+function formatFixed(n, digits = 3) {
+  return Number(n || 0).toFixed(digits)
+}
+
 export function avgFromValues(atBats, hits) {
-  const ab = safeNumber(atBats)
+  const ab = toNum(atBats)
   if (!ab) return '0.000'
-  return (safeNumber(hits) / ab).toFixed(3)
+  return (toNum(hits) / ab).toFixed(3)
 }
 
 export function avgFromEntry(entry) {
@@ -14,33 +22,40 @@ export function avgFromHitting(hitting) {
   return avgFromValues(hitting?.atBats, hitting?.hits)
 }
 
-export function eraFromEntry(entry) {
-  const outs = safeNumber(entry?.pitching?.outsPitched)
-  const er = safeNumber(entry?.pitching?.earnedRuns)
-  if (outs) return ((er * 21) / outs).toFixed(3)
+function eraFrom({ outsPitched, inningsPitched, earnedRuns }, digits = 3) {
+  const outs = toNum(outsPitched)
+  const er = toNum(earnedRuns)
+  if (outs) return ((er * 21) / outs).toFixed(digits)
 
-  const ip = safeNumber(entry?.pitching?.inningsPitched)
-  if (!ip) return '0.000'
-  return ((er * 7) / ip).toFixed(3)
+  const ip = toNum(inningsPitched)
+  if (!ip) return formatFixed(0, digits)
+  return ((er * 7) / ip).toFixed(digits)
+}
+
+export function eraFromEntry(entry) {
+  return eraFrom({
+    outsPitched: entry?.pitching?.outsPitched,
+    inningsPitched: entry?.pitching?.inningsPitched,
+    earnedRuns: entry?.pitching?.earnedRuns,
+  })
 }
 
 export function eraFromPitching(pitching) {
-  const outs = safeNumber(pitching?.outsPitched)
-  if (outs) return ((safeNumber(pitching?.earnedRuns) * 21) / outs).toFixed(3)
-
-  const ip = safeNumber(pitching?.inningsPitched)
-  if (!ip) return '0.000'
-  return ((safeNumber(pitching?.earnedRuns) * 7) / ip).toFixed(3)
+  return eraFrom({
+    outsPitched: pitching?.outsPitched,
+    inningsPitched: pitching?.inningsPitched,
+    earnedRuns: pitching?.earnedRuns,
+  })
 }
 
 export function formatEraFromOuts(outsPitched, er, digits = 2, noDataPlaceholder = '--') {
-  const outs = safeNumber(outsPitched)
+  const outs = toNum(outsPitched)
   if (!outs) return noDataPlaceholder
-  return ((safeNumber(er) * 21) / outs).toFixed(digits)
+  return ((toNum(er) * 21) / outs).toFixed(digits)
 }
 
 export function outsToInnings(outs) {
-  const o = safeNumber(outs)
+  const o = toNum(outs)
   return Math.floor(o / 3) + ((o % 3) / 10)
 }
 

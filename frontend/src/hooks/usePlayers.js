@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback } from 'react'
+import { getPlayerId as getPlayerIdUtil, getMainPosition as getMainPositionUtil } from '../utils/player'
 
 export default function usePlayers({ players, setPlayers, gameState }) {
   const [benchSearch, setBenchSearch] = useState('')
 
-  const getPlayerId = useCallback((player) => player?._id || player?.id, [])
+  const getPlayerId = useCallback((player) => getPlayerIdUtil(player), [])
 
   const playersById = useMemo(() => {
     const map = {}
@@ -20,7 +21,7 @@ export default function usePlayers({ players, setPlayers, gameState }) {
     [players, onFieldIds, getPlayerId],
   )
 
-  const getMainPosition = useCallback((player) => player.activePosition || player.positions?.[0] || 'DH', [])
+  const getMainPosition = useCallback((player) => getMainPositionUtil(player), [])
 
   const benchPlayers = useMemo(() => {
     const term = benchSearch.trim().toLowerCase()
@@ -41,7 +42,6 @@ export default function usePlayers({ players, setPlayers, gameState }) {
       })
   }, [players, onFieldIds, benchSearch, getPlayerId, getMainPosition])
 
-  const setupStarterIds = useMemo(() => [], [])
   const setupAvailablePlayers = useMemo(() => players, [players])
 
   const playerCanPlayPosition = useCallback((playerId, position) => {
@@ -61,7 +61,6 @@ export default function usePlayers({ players, setPlayers, gameState }) {
     playersById,
     fieldPlayers,
     benchPlayers,
-    setupStarterIds,
     setupAvailablePlayers,
     playerCanPlayPosition,
     pitchersOnField,

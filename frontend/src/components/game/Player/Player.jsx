@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 
 export default function Player({
   player,
@@ -19,13 +19,22 @@ export default function Player({
 }) {
   const isSelected = selectedId === id
   const opponent = isOpponent
+  const style = useMemo(() => ({ left: `${screen.left}px`, top: `${screen.top}px` }), [screen.left, screen.top])
+  const classes = useMemo(() => [
+    'player-marker',
+    opponent ? 'opponent-marker mode-attack' : 'team-defense-marker mode-defense',
+    isSelected && 'selected',
+    draggingPlayerId === id && 'dragging',
+    recentlyDroppedId === id && 'drop-snap',
+    className,
+  ].filter(Boolean).join(' '), [opponent, isSelected, draggingPlayerId, recentlyDroppedId, className, id])
 
   return (
     <button
       key={id}
       type="button"
-      className={`player-marker ${opponent ? 'opponent-marker mode-attack' : 'team-defense-marker mode-defense'} ${isSelected ? 'selected' : ''} ${draggingPlayerId === id ? 'dragging' : ''} ${recentlyDroppedId === id ? 'drop-snap' : ''} ${className || ''}`}
-      style={{ left: `${screen.left}px`, top: `${screen.top}px` }}
+      className={classes}
+      style={style}
       onClick={() => {
         if (opponent) return
         onPlayerClick?.(id)

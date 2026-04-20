@@ -1,6 +1,7 @@
 import Modal from './ui/Modal'
 import { safeNumber, toFixed3 } from '../utils/number'
 import { avgFromHitting, eraFromPitching } from '../utils/stats'
+import { detectPlayerType } from '../utils/player'
 
 function renderBlock(title, rows) {
   return (
@@ -21,7 +22,7 @@ function renderBlock(title, rows) {
 function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
   if (!player) return null
 
-  const isPitcher = Array.isArray(player.positions) && player.positions.includes('P')
+  const isPitcher = detectPlayerType(player) === 'pitcher'
 
   const seasonHitting = seasonEntry?.hitting || {}
   const seasonPitching = seasonEntry?.pitching || {}
@@ -31,57 +32,45 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
   const gamePitching = gameEntry?.pitching || {}
   const gameDefense = gameEntry?.defense || {}
 
+  const buildHittingRows = (hitting, entry) => [
+    { label: 'AB', value: safeNumber(hitting.atBats) },
+    { label: 'H', value: safeNumber(hitting.hits) },
+    { label: 'SO', value: safeNumber(hitting.strikeouts) },
+    { label: 'OUT', value: safeNumber(hitting.outs) },
+    { label: 'AVG', value: entry?.avg ? toFixed3(entry.avg) : avgFromHitting(hitting) },
+  ]
+
+  const buildPitchingRows = (pitching, entry) => [
+    { label: 'IP', value: safeNumber(pitching.inningsPitched) },
+    { label: 'ER', value: safeNumber(pitching.earnedRuns) },
+    { label: 'SO', value: safeNumber(pitching.strikeouts) },
+    { label: 'BB', value: safeNumber(pitching.walks) },
+    { label: 'ERA', value: entry?.era ? toFixed3(entry.era) : eraFromPitching(pitching) },
+  ]
+
+  const buildDefenseRows = (defense) => [
+    { label: 'E', value: safeNumber(defense.errors) },
+    { label: 'DP', value: safeNumber(defense.doublePlays) },
+    { label: 'FO', value: safeNumber(defense.flyOuts) },
+    { label: 'GO', value: safeNumber(defense.groundOuts) },
+    { label: 'LO', value: safeNumber(defense.lineOuts) },
+  ]
+
   return (
     <Modal title={`${player.name} #${player.number}`} onClose={onClose}>
       <div className="player-stats-two-col">
         <div>
           <h4>Temporada</h4>
-          {renderBlock('Hitting', [
-            { label: 'AB', value: safeNumber(seasonHitting.atBats) },
-            { label: 'H', value: safeNumber(seasonHitting.hits) },
-            { label: 'SO', value: safeNumber(seasonHitting.strikeouts) },
-            { label: 'OUT', value: safeNumber(seasonHitting.outs) },
-            { label: 'AVG', value: seasonEntry?.avg ? toFixed3(seasonEntry.avg) : avgFromHitting(seasonHitting) },
-          ])}
-          {isPitcher && renderBlock('Pitching', [
-            { label: 'IP', value: safeNumber(seasonPitching.inningsPitched) },
-            { label: 'ER', value: safeNumber(seasonPitching.earnedRuns) },
-            { label: 'SO', value: safeNumber(seasonPitching.strikeouts) },
-            { label: 'BB', value: safeNumber(seasonPitching.walks) },
-            { label: 'ERA', value: seasonEntry?.era ? toFixed3(seasonEntry.era) : eraFromPitching(seasonPitching) },
-          ])}
-          {renderBlock('Defense', [
-            { label: 'E', value: safeNumber(seasonDefense.errors) },
-            { label: 'DP', value: safeNumber(seasonDefense.doublePlays) },
-            { label: 'FO', value: safeNumber(seasonDefense.flyOuts) },
-            { label: 'GO', value: safeNumber(seasonDefense.groundOuts) },
-            { label: 'LO', value: safeNumber(seasonDefense.lineOuts) },
-          ])}
+          {renderBlock('Hitting', buildHittingRows(seasonHitting, seasonEntry))}
+          {isPitcher && renderBlock('Pitching', buildPitchingRows(seasonPitching, seasonEntry))}
+          {renderBlock('Defense', buildDefenseRows(seasonDefense))}
         </div>
 
         <div>
           <h4>Jogo Atual</h4>
-          {renderBlock('Hitting', [
-            { label: 'AB', value: safeNumber(gameHitting.atBats) },
-            { label: 'H', value: safeNumber(gameHitting.hits) },
-            { label: 'SO', value: safeNumber(gameHitting.strikeouts) },
-            { label: 'OUT', value: safeNumber(gameHitting.outs) },
-            { label: 'AVG', value: avgFromHitting(gameHitting) },
-          ])}
-          {isPitcher && renderBlock('Pitching', [
-            { label: 'IP', value: safeNumber(gamePitching.inningsPitched) },
-            { label: 'ER', value: safeNumber(gamePitching.earnedRuns) },
-            { label: 'SO', value: safeNumber(gamePitching.strikeouts) },
-            { label: 'BB', value: safeNumber(gamePitching.walks) },
-            { label: 'ERA', value: eraFromPitching(gamePitching) },
-          ])}
-          {renderBlock('Defense', [
-            { label: 'E', value: safeNumber(gameDefense.errors) },
-            { label: 'DP', value: safeNumber(gameDefense.doublePlays) },
-            { label: 'FO', value: safeNumber(gameDefense.flyOuts) },
-            { label: 'GO', value: safeNumber(gameDefense.groundOuts) },
-            { label: 'LO', value: safeNumber(gameDefense.lineOuts) },
-          ])}
+          {renderBlock('Hitting', buildHittingRows(gameHitting, gameEntry))}
+          {isPitcher && renderBlock('Pitching', buildPitchingRows(gamePitching, gameEntry))}
+          {renderBlock('Defense', buildDefenseRows(gameDefense))}
         </div>
       </div>
     </Modal>
