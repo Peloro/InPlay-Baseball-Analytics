@@ -1,0 +1,20 @@
+{
+  "name": "CAASO Baseball Tracker",
+  "short_name": "CAASO",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/Ativo 1Cporcotransparente.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/Ativo 1Cporcotransparente.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
