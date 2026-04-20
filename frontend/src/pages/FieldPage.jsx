@@ -538,6 +538,11 @@ function FieldPage({
           opponentName: pregameForm.opponentName.trim(),
           competition: pregameForm.competition.trim(),
           location: pregameForm.location.trim(),
+          // include pregame setup so backend has lineup and battingOrder immediately
+          lineup: starters,
+          battingOrder: setupBattingOrder,
+          bench,
+          isAttacking: setupAttacking,
         })
         const created = response.data
         targetGameId = created && created._id ? created._id : targetGameId
