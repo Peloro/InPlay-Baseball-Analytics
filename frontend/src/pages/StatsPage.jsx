@@ -5,19 +5,11 @@ import { VALID_POSITIONS } from '../data/positions'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
+import { safeNumber } from '../utils/number'
+import { avgFromEntry, avgFromValues, eraFromEntry } from '../utils/stats'
+import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 
-function getPlayerId(player) {
-  return player?._id || player?.id
-}
 
-function getMainPosition(player) {
-  return player.activePosition || player.positions?.[0] || 'DH'
-}
-
-function formatAverage(atBats, hits) {
-  if (!atBats) return '0.000'
-  return (hits / atBats).toFixed(3)
-}
 
 const EMPTY_GAME_STAT = {
   type: 'hitter',
@@ -26,32 +18,9 @@ const EMPTY_GAME_STAT = {
   defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
 }
 
-function safeNumber(value) {
-  const parsed = Number(value || 0)
-  if (!Number.isFinite(parsed) || parsed < 0) return 0
-  return parsed
-}
 
-function getAvg(entry) {
-  const ab = safeNumber(entry?.hitting?.atBats)
-  const hits = safeNumber(entry?.hitting?.hits)
-  if (!ab) return '0.000'
-  return (hits / ab).toFixed(3)
-}
 
-function getEra(entry) {
-  const outs = safeNumber(entry?.pitching?.outsPitched)
-  const er = safeNumber(entry?.pitching?.earnedRuns)
-  if (outs) return ((er * 21) / outs).toFixed(3)
 
-  const ip = safeNumber(entry?.pitching?.inningsPitched)
-  if (!ip) return '0.000'
-  return ((er * 7) / ip).toFixed(3)
-}
-
-function detectPlayerType(player) {
-  return Array.isArray(player?.positions) && player.positions.includes('P') ? 'pitcher' : 'hitter'
-}
 
 function hasAnyStat(entry) {
   if (!entry) return false
@@ -696,7 +665,7 @@ function StatsPage({
             <>
               <div className="kpi">
                 <strong>AVG geral</strong>
-                <span>{formatAverage(seasonTotals.atBats, seasonTotals.hits)}</span>
+                <span>{avgFromValues(seasonTotals.atBats, seasonTotals.hits)}</span>
               </div>
               <div className="kpi">
                 <strong>Hits</strong>
@@ -781,14 +750,14 @@ function StatsPage({
                         <td>{safeNumber(entry.hitting?.hits)}</td>
                         <td>{safeNumber(entry.hitting?.strikeouts)}</td>
                         <td>{safeNumber(entry.hitting?.outs)}</td>
-                        <td>{entry.avg ? Number(entry.avg).toFixed(3) : getAvg(entry)}</td>
+                        <td>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</td>
                       </>
                     ) : (
                       <>
                         <td>
                           <div className="pitcher-stat-grid">
                             <span>IP: {safeNumber(entry.pitching?.inningsPitched)}</span>
-                            <span>ERA: {entry.era ? Number(entry.era).toFixed(3) : getEra(entry)}</span>
+                            <span>ERA: {entry.era ? Number(entry.era).toFixed(3) : eraFromEntry(entry)}</span>
                             <span>SO: {safeNumber(entry.pitching?.strikeouts)}</span>
                             <span>BB: {safeNumber(entry.pitching?.walks)}</span>
                             <span>PC: {safeNumber(entry.pitching?.pitchCount)}</span>
@@ -823,12 +792,12 @@ function StatsPage({
                         <div><strong>H</strong><div>{safeNumber(entry.hitting?.hits)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.hitting?.strikeouts)}</div></div>
                         <div><strong>OUT</strong><div>{safeNumber(entry.hitting?.outs)}</div></div>
-                        <div><strong>AVG</strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : getAvg(entry)}</div></div>
+                        <div><strong>AVG</strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</div></div>
                       </div>
                     ) : (
                       <div className="stat-grid">
                         <div><strong>IP</strong><div>{safeNumber(entry.pitching?.inningsPitched)}</div></div>
-                        <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(3) : getEra(entry)}</div></div>
+                        <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(3) : eraFromEntry(entry)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.pitching?.strikeouts)}</div></div>
                         <div><strong>BB</strong><div>{safeNumber(entry.pitching?.walks)}</div></div>
                         <div><strong>PC</strong><div>{safeNumber(entry.pitching?.pitchCount)}</div></div>

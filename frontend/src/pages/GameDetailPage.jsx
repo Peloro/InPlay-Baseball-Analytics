@@ -1,34 +1,12 @@
 import { useMemo } from 'react'
 import Button from '../components/ui/Button'
+import { safeNumber } from '../utils/number'
+import { avgFromValues, formatEraFromOuts } from '../utils/stats'
+import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 
-function getPlayerId(player) {
-  return player?._id || player?.id
-}
 
-function getMainPosition(player) {
-  return player.activePosition || player.positions?.[0] || 'DH'
-}
 
-function detectPlayerType(player) {
-  return Array.isArray(player?.positions) && player.positions.includes('P') ? 'pitcher' : 'hitter'
-}
 
-function safeNumber(value) {
-  const parsed = Number(value || 0)
-  if (!Number.isFinite(parsed) || parsed < 0) return 0
-  return parsed
-}
-
-function formatAverage(atBats, hits) {
-  if (!atBats) return '0.000'
-  return (hits / atBats).toFixed(3)
-}
-
-function formatEraFromOuts(outsPitched, er) {
-  const outs = safeNumber(outsPitched)
-  if (!outs) return '--'
-  return ((safeNumber(er) * 21) / outs).toFixed(2)
-}
 
 function PitchingBlock({ row, onQuickEvent }) {
   return (
@@ -217,7 +195,7 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'outs', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'outs', 1)}
               />
-              <div className="pitcher-metric stat-box">AVG: {formatAverage(row.hitting.atBats, row.hitting.hits)}</div>
+              <div className="pitcher-metric stat-box">AVG: {avgFromValues(row.hitting.atBats, row.hitting.hits)}</div>
             </div>
             <div>
               {row.type === 'pitcher' ? <PitchingBlock row={row} onQuickEvent={onQuickEvent} /> : <span>-</span>}

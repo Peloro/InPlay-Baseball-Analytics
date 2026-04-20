@@ -12,6 +12,9 @@ import Field from '../components/game/Field/Field'
 import Bench from '../components/game/Bench/Bench'
 import usePlayers from '../hooks/usePlayers'
 import useGameState from '../hooks/useGameState'
+import { safeNumber } from '../utils/number'
+import { formatEraFromOuts, outsToInnings } from '../utils/stats'
+import { detectPlayerType, getPlayerId, getMainPosition } from '../utils/player'
 
 const LONG_PRESS_MS = 450
 const DEFENSIVE_POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -37,28 +40,13 @@ function isInsideRect(clientX, clientY, rect) {
 }
 
 
-function getRoleType(player) {
-  return Array.isArray(player?.positions) && player.positions.includes('P') ? 'pitcher' : 'hitter'
-}
 
-function safeNumber(value) {
-  const parsed = Number(value || 0)
-  if (!Number.isFinite(parsed) || parsed < 0) return 0
-  return parsed
-}
 
 function formatIpFromOuts(outsPitched) {
   const outs = safeNumber(outsPitched)
   const innings = Math.floor(outs / 3)
   const remainder = outs % 3
   return `${innings}.${remainder}`
-}
-
-function formatEraFromOuts(outsPitched, earnedRuns) {
-  const outs = safeNumber(outsPitched)
-  const runs = safeNumber(earnedRuns)
-  if (!outs) return '--'
-  return ((runs * 21) / outs).toFixed(2)
 }
 
 function reorderList(list, from, to) {
@@ -879,7 +867,7 @@ function FieldPage({
     const current = found.data?.[0]
 
     const payload = {
-      type: getRoleType(playersById[playerId]),
+      type: detectPlayerType(playersById[playerId]),
       hitting: {
         atBats: safeNumber(patch.hitting?.atBats ?? current?.hitting?.atBats),
         hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
@@ -918,7 +906,7 @@ function FieldPage({
     const current = found.data?.[0]
 
     const payload = {
-      type: getRoleType(playersById[playerId]),
+      type: detectPlayerType(playersById[playerId]),
       hitting: {
         atBats: safeNumber(patch.hitting?.atBats ?? current?.hitting?.atBats),
         hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),

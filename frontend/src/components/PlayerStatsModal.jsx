@@ -1,29 +1,6 @@
 import Modal from './ui/Modal'
-
-function toFixed3(value) {
-  return Number(value || 0).toFixed(3)
-}
-
-function safeNumber(value) {
-  return Number(value || 0)
-}
-
-function calculateAvg(hitting) {
-  const ab = safeNumber(hitting?.atBats)
-  const h = safeNumber(hitting?.hits)
-  if (!ab) return '0.000'
-  return (h / ab).toFixed(3)
-}
-
-function calculateEra(pitching) {
-  const outs = safeNumber(pitching?.outsPitched)
-  if (outs) return ((safeNumber(pitching?.earnedRuns) * 21) / outs).toFixed(3)
-
-  const ip = safeNumber(pitching?.inningsPitched)
-  const er = safeNumber(pitching?.earnedRuns)
-  if (!ip) return '0.000'
-  return ((er * 7) / ip).toFixed(3)
-}
+import { safeNumber, toFixed3 } from '../utils/number'
+import { avgFromHitting, eraFromPitching } from '../utils/stats'
 
 function renderBlock(title, rows) {
   return (
@@ -64,14 +41,14 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
             { label: 'H', value: safeNumber(seasonHitting.hits) },
             { label: 'SO', value: safeNumber(seasonHitting.strikeouts) },
             { label: 'OUT', value: safeNumber(seasonHitting.outs) },
-            { label: 'AVG', value: seasonEntry?.avg ? toFixed3(seasonEntry.avg) : calculateAvg(seasonHitting) },
+            { label: 'AVG', value: seasonEntry?.avg ? toFixed3(seasonEntry.avg) : avgFromHitting(seasonHitting) },
           ])}
           {isPitcher && renderBlock('Pitching', [
             { label: 'IP', value: safeNumber(seasonPitching.inningsPitched) },
             { label: 'ER', value: safeNumber(seasonPitching.earnedRuns) },
             { label: 'SO', value: safeNumber(seasonPitching.strikeouts) },
             { label: 'BB', value: safeNumber(seasonPitching.walks) },
-            { label: 'ERA', value: seasonEntry?.era ? toFixed3(seasonEntry.era) : calculateEra(seasonPitching) },
+            { label: 'ERA', value: seasonEntry?.era ? toFixed3(seasonEntry.era) : eraFromPitching(seasonPitching) },
           ])}
           {renderBlock('Defense', [
             { label: 'E', value: safeNumber(seasonDefense.errors) },
@@ -89,14 +66,14 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
             { label: 'H', value: safeNumber(gameHitting.hits) },
             { label: 'SO', value: safeNumber(gameHitting.strikeouts) },
             { label: 'OUT', value: safeNumber(gameHitting.outs) },
-            { label: 'AVG', value: calculateAvg(gameHitting) },
+            { label: 'AVG', value: avgFromHitting(gameHitting) },
           ])}
           {isPitcher && renderBlock('Pitching', [
             { label: 'IP', value: safeNumber(gamePitching.inningsPitched) },
             { label: 'ER', value: safeNumber(gamePitching.earnedRuns) },
             { label: 'SO', value: safeNumber(gamePitching.strikeouts) },
             { label: 'BB', value: safeNumber(gamePitching.walks) },
-            { label: 'ERA', value: calculateEra(gamePitching) },
+            { label: 'ERA', value: eraFromPitching(gamePitching) },
           ])}
           {renderBlock('Defense', [
             { label: 'E', value: safeNumber(gameDefense.errors) },

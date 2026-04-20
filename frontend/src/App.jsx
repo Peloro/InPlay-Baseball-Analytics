@@ -6,6 +6,7 @@ import api, { gameStatsApi, gamesApi } from './services/api'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
 import Button from './components/ui/Button'
+import { getPlayerId } from './utils/player'
 
 const TOOLS = [
   { id: 'pointer', label: 'Ponteiro' },
@@ -41,9 +42,7 @@ const INITIAL_GAME_STATE = {
   preGameConfigured: false,
 }
 
-function getPlayerId(player) {
-  return player?._id || player?.id
-}
+
 
 function normalizePlayer(player) {
   const rawPositions = Array.isArray(player?.positions)
