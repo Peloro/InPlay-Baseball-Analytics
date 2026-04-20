@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import FieldPage from './pages/FieldPage'
 import TrainingField from './pages/TrainingField'
 import StatsPage from './pages/StatsPage'
-import api, { playersApi, gameStatsApi, gamesApi, sync as syncApi } from './services/api'
+import api, { gameStatsApi, gamesApi } from './services/api'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
 import Button from './components/ui/Button'
@@ -182,9 +182,6 @@ function App() {
   const [isClosingGame, setIsClosingGame] = useState(false)
   const [isGameEntering, setIsGameEntering] = useState(false)
   const [isPortraitOnMobile, setIsPortraitOnMobile] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState(null)
-  const [installAvailable, setInstallAvailable] = useState(false)
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
   useEffect(() => {
     window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
@@ -193,7 +190,7 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const playersResponse = await playersApi.list()
+        const playersResponse = await api.get('/players')
 
         const fetchedPlayers = playersResponse.data || []
         const normalizedPlayers = fetchedPlayers.map((player) => normalizePlayer(player))
@@ -253,68 +250,6 @@ function App() {
       if (mq.removeEventListener) mq.removeEventListener('change', handler)
       else if (mq.removeListener) mq.removeListener(handler)
       window.removeEventListener('resize', handler)
-    }
-  }, [])
-
-  useEffect(() => {
-    const onBeforeInstall = (e) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setInstallAvailable(true)
-    }
-
-    const onAppInstalled = () => {
-      setInstallAvailable(false)
-      setDeferredPrompt(null)
-    }
-
-    window.addEventListener('beforeinstallprompt', onBeforeInstall)
-    window.addEventListener('appinstalled', onAppInstalled)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall)
-      window.removeEventListener('appinstalled', onAppInstalled)
-    }
-  }, [])
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return
-    try {
-      deferredPrompt.prompt()
-      const choiceResult = await deferredPrompt.userChoice
-      // hide the install UI regardless of choice
-      setInstallAvailable(false)
-      setDeferredPrompt(null)
-      // optionally handle choiceResult.outcome ('accepted'|'dismissed')
-    } catch (err) {
-      setInstallAvailable(false)
-      setDeferredPrompt(null)
-    }
-  }
-
-  useEffect(() => {
-    const onOnline = async () => {
-      setIsOnline(true)
-      try {
-        await syncApi()
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    const onOffline = () => setIsOnline(false)
-
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    // initial sync when loaded and online
-    if (navigator.onLine) {
-      syncApi().catch(() => {})
-    }
-
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
     }
   }, [])
 
@@ -496,7 +431,7 @@ function App() {
 
   const handleAddPlayer = async (newPlayer) => {
     try {
-      const response = await playersApi.create(newPlayer)
+      const response = await api.post('/players', newPlayer)
       const saved = response.data
 
       setPlayers((current) => [...current, normalizePlayer({ ...saved, x: 50, y: 50 })])
@@ -524,7 +459,7 @@ function App() {
 
   const handleUpdatePlayer = async (playerId, patch) => {
     try {
-      const response = await playersApi.update(playerId, patch)
+      const response = await api.put(`/players/${playerId}`, patch)
       const saved = normalizePlayer(response.data)
       setPlayers((current) =>
         current.map((player) => (getPlayerId(player) === playerId ? { ...player, ...saved } : player)),
@@ -546,7 +481,7 @@ function App() {
     if (!playerId) return
 
     try {
-      await playersApi.remove(playerId)
+      await api.delete(`/players/${playerId}`)
     } catch {
       // Mantem remocao local mesmo se backend indisponivel.
     }
@@ -853,11 +788,6 @@ function App() {
           </div>
         </div>
         <div className="nav-actions">
-          {installAvailable && (
-            <Button type="button" onClick={handleInstallClick}>
-              Instalar app
-            </Button>
-          )}
           <button
             type="button"
             className={page === 'game' ? 'active' : ''}
@@ -887,12 +817,6 @@ function App() {
           </button>
         </div>
       </header>
-
-      {!isOnline && (
-        <div className="offline-indicator" aria-live="polite">
-          Modo offline — usando dados locais
-        </div>
-      )}
 
       {gameAccessNotice && <div className="game-access-warning">{gameAccessNotice}</div>}
 

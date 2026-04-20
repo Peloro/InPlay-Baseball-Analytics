@@ -8,17 +8,3 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
-
-// Register service worker for PWA (basic offline + installable)
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/service-worker.js')
-      .then((reg) => {
-        // registration successful
-      })
-      .catch(() => {
-        // fail silently
-      })
-  })
-}
