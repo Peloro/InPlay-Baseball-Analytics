@@ -70,5 +70,3 @@ Contribuindo
 
 Licença
 - Projeto fornecido sem licença explícita — adicione uma licença se desejar compartilhar publicamente.
-
-Precisa que eu ajuste o README com instruções específicas (ex.: scripts de build, Docker, ou detalhes de deploy)?
