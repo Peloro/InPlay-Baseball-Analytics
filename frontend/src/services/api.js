@@ -70,20 +70,55 @@ async function netWrite(method, url, data) {
   } catch { return null }
 }
 
-function queueSync(method, url, data) {
+function queueSync(method, url, data, localId = null) {
   const q = lfGet(LS.syncQueue)
-  q.push({ method, url, data, _ts: Date.now() })
+  q.push({ method, url, data, _ts: Date.now(), localId })
   lfSet(LS.syncQueue, q)
+}
+
+function replaceIdInStores(postUrl, localId, serverId, serverRecord) {
+  if (postUrl === '/players') {
+    const list = lfGet(LS.players)
+    const idx = list.findIndex(p => p._id === localId)
+    if (idx !== -1) { list[idx] = serverRecord; lfSet(LS.players, list) }
+    lfSet(LS.gameStats, lfGet(LS.gameStats).map(s =>
+      String(s.playerId) === localId ? { ...s, playerId: serverId } : s
+    ))
+  } else if (postUrl === '/games') {
+    const list = lfGet(LS.games)
+    const idx = list.findIndex(g => g._id === localId)
+    if (idx !== -1) { list[idx] = serverRecord; lfSet(LS.games, list) }
+    lfSet(LS.gameStats, lfGet(LS.gameStats).map(s =>
+      s.gameId === localId ? { ...s, gameId: serverId } : s
+    ))
+  } else if (postUrl === '/game-stats') {
+    const list = lfGet(LS.gameStats)
+    const idx = list.findIndex(s => s._id === localId)
+    if (idx !== -1) { list[idx] = serverRecord; lfSet(LS.gameStats, list) }
+  }
 }
 
 export async function flushWriteQueue() {
   const queue = lfGet(LS.syncQueue)
   if (!queue.length) return
   const failed = []
+  const idMap = {}
+
   for (const item of queue) {
-    const ok = await netWrite(item.method, item.url, item.data)
-    if (!ok) failed.push(item)
+    let url = item.url
+    if (item.localId && idMap[item.localId]) {
+      url = url.replace(item.localId, idMap[item.localId])
+    }
+
+    const ok = await netWrite(item.method, url, item.data)
+    if (!ok) {
+      failed.push(item)
+    } else if (item.method === 'post' && item.localId && ok?._id) {
+      idMap[item.localId] = ok._id
+      replaceIdInStores(item.url, item.localId, ok._id, ok)
+    }
   }
+
   lfSet(LS.syncQueue, failed)
 }
 
@@ -115,7 +150,7 @@ export const playersApi = {
       return { data: synced }
     }
 
-    queueSync('post', '/players', payload)
+    queueSync('post', '/players', payload, record._id)
     return { data: record }
   },
 
@@ -125,7 +160,7 @@ export const playersApi = {
     if (idx !== -1) { list[idx] = { ...list[idx], ...patch }; lfSet(LS.players, list) }
 
     const synced = await netWrite('put', `/players/${id}`, patch)
-    if (!synced) queueSync('put', `/players/${id}`, patch)
+    if (!synced) queueSync('put', `/players/${id}`, patch, id)
 
     return { data: idx !== -1 ? list[idx] : { _id: id, ...patch } }
   },
@@ -134,7 +169,7 @@ export const playersApi = {
     lfSet(LS.players, lfGet(LS.players).filter(p => p._id !== id && p.id !== id))
 
     const synced = await netWrite('delete', `/players/${id}`)
-    if (!synced) queueSync('delete', `/players/${id}`)
+    if (!synced) queueSync('delete', `/players/${id}`, null, id)
 
     return { data: {} }
   },
@@ -178,7 +213,7 @@ export const gamesApi = {
       return { data: synced }
     }
 
-    queueSync('post', '/games', payload)
+    queueSync('post', '/games', payload, record._id)
     return { data: record }
   },
 
@@ -188,7 +223,7 @@ export const gamesApi = {
     if (idx !== -1) { list[idx] = { ...list[idx], ...patch }; lfSet(LS.games, list) }
 
     const synced = await netWrite('put', `/games/${id}`, patch)
-    if (!synced) queueSync('put', `/games/${id}`, patch)
+    if (!synced) queueSync('put', `/games/${id}`, patch, id)
 
     return { data: idx !== -1 ? list[idx] : { _id: id, ...patch } }
   },
@@ -198,7 +233,7 @@ export const gamesApi = {
     lfSet(LS.gameStats, lfGet(LS.gameStats).filter(s => s.gameId !== id))
 
     const synced = await netWrite('delete', `/games/${id}`)
-    if (!synced) queueSync('delete', `/games/${id}`)
+    if (!synced) queueSync('delete', `/games/${id}`, null, id)
 
     return { data: {} }
   },
@@ -234,7 +269,7 @@ export const gameStatsApi = {
       return { data: synced }
     }
 
-    queueSync('post', '/game-stats', payload)
+    queueSync('post', '/game-stats', payload, record._id)
     return { data: record }
   },
 
@@ -244,7 +279,7 @@ export const gameStatsApi = {
     if (idx !== -1) { list[idx] = { ...list[idx], ...patch }; lfSet(LS.gameStats, list) }
 
     const synced = await netWrite('put', `/game-stats/${id}`, patch)
-    if (!synced) queueSync('put', `/game-stats/${id}`, patch)
+    if (!synced) queueSync('put', `/game-stats/${id}`, patch, id)
 
     return { data: idx !== -1 ? list[idx] : { _id: id, ...patch } }
   },
