@@ -190,8 +190,8 @@ function FieldPage({
   const [undoStack, setUndoStack] = useState([])
   const [invalidFeedback, setInvalidFeedback] = useState('')
   const [showFieldContainer] = useState(true)
-  const [showHud, setShowHud] = useState(true)
   const [showScoreboard, setShowScoreboard] = useState(false)
+  const [gameSubView, setGameSubView] = useState('campo')
   const touchStartRef = useRef(null)
   const [zoom, setZoom] = useState(0.85)
   const [offsetX, setOffsetX] = useState(0)
@@ -1228,8 +1228,6 @@ function FieldPage({
         ...current,
         balls: 0,
         strikes: 0,
-        // defensive event: increment our counts and per-pitcher mapping
-        pitchCount: Number(current.pitchCount || 0) + 1,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
         pitchCounts: (() => {
           const next = { ...(current.pitchCounts || {}) }
@@ -1344,8 +1342,6 @@ function FieldPage({
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
-        // defensive event: increment our counts and per-pitcher mapping
-        pitchCount: Number(current.pitchCount || 0) + 1,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
         pitchCounts: (() => {
           const next = { ...(current.pitchCounts || {}) }
@@ -1404,8 +1400,6 @@ function FieldPage({
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
-        // defensive double play: increment our counts and per-pitcher mapping
-        pitchCount: Number(current.pitchCount || 0) + 1,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
         pitchCounts: (() => {
           const next = { ...(current.pitchCounts || {}) }
@@ -1495,8 +1489,6 @@ function FieldPage({
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
-        // defensive sac fly: increment our counts and per-pitcher mapping
-        pitchCount: Number(current.pitchCount || 0) + 1,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
         pitchCounts: (() => {
           const next = { ...(current.pitchCounts || {}) }
@@ -1525,7 +1517,7 @@ function FieldPage({
     }
   }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
 
-  const applyDeadBall = useCallback(async () => {
+  const applyHBP = useCallback(async () => {
     await captureUndoSnapshot()
 
     onUpdateGameState((current) => {
@@ -1535,6 +1527,8 @@ function FieldPage({
         return {
           ...current,
           opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
+          balls: 0,
+          strikes: 0,
           currentBatterIndex: getNextBatterIndexFromState(current),
           runners: forced.nextRunners,
           homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
@@ -1544,8 +1538,6 @@ function FieldPage({
 
       return {
         ...current,
-        // defensive dead ball
-        pitchCount: Number(current.pitchCount || 0) + 1,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
         pitchCounts: (() => {
           const next = { ...(current.pitchCounts || {}) }
@@ -1553,12 +1545,14 @@ function FieldPage({
           if (pid) next[pid] = Number(next[pid] || 0) + 1
           return next
         })(),
+        balls: 0,
+        strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
         runners: forced.nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? forced.runs : 0),
       }
-    }, 'Dead ball')
+    }, 'HBP')
 
     try {
       if (!gameState.isAttacking) {
@@ -1594,7 +1588,6 @@ function FieldPage({
 
       return {
         ...current,
-        pitchCount: Number(current.pitchCount || 0) + 1,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
         pitchCounts: (() => {
           const next = { ...(current.pitchCounts || {}) }
@@ -1627,11 +1620,8 @@ function FieldPage({
           })
         }
 
-        if (runsScored > 0) {
-          await syncDefensivePitcherEvent({ earnedRunsDelta: runsScored, pitchCountDelta: 1 })
-        } else {
-          await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
-        }
+        // Runs on errors are unearned — do NOT pass earnedRunsDelta
+        await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
@@ -2071,9 +2061,9 @@ function FieldPage({
 
   return (
       <section className={`field-layout ${showFieldContainer ? '' : 'mode-hidden'}`} ref={layoutRef}>
-        <Scoreboard gameState={gameState} opponentName={opponentName} visible={showScoreboard} />
+        <Scoreboard gameState={gameState} opponentName={opponentName} visible={gameSubView === 'campo' && showScoreboard} />
 
-      <Field
+      {gameSubView === 'campo' && <Field
         fieldStageRef={fieldStageRef}
         fieldImageRef={fieldImageRef}
         drawingRef={drawingRef}
@@ -2122,9 +2112,9 @@ function FieldPage({
         onTouchStartMobile={handleTouchStartMobile}
         onTouchMoveMobile={handleTouchMoveMobile}
         onTouchEndMobile={handleTouchEndMobile}
-      />
+      />}
 
-      {showHud && (
+      {gameSubView === 'campo' && (
       <Bench
         ref={benchRef}
         benchPlayers={benchPlayers}
@@ -2146,47 +2136,56 @@ function FieldPage({
       />
       )}
 
-      {showHud && (
-        <aside className="field-hud game-hud">
-        <div className="left-hud-panel">
-          <div className="left-hud-head">
-            <h3>Jogo</h3>
-          </div>
-          <div className="left-hud-body">
-          <div className="field-hud-block">
-          <h3>Jogo</h3>
-          {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
-          {gameState.isAttacking && (
-            <p>
-              Rebatedor atual:{' '}
-              <strong>{currentBatter ? `${currentBatter.name} #${currentBatter.number}` : 'Sem ordem de rebatedores'}</strong>
-            </p>
-          )}
-          {gameState.isAttacking && (
-            <p>
-              On Deck: <strong>{onDeckBatter ? `${onDeckBatter.name} #${onDeckBatter.number}` : '--'}</strong>
-              {' | '}
-              In the Hole: <strong>{inTheHoleBatter ? `${inTheHoleBatter.name} #${inTheHoleBatter.number}` : '--'}</strong>
-            </p>
-          )}
-          <div className="count-dots-panel">
-            <CountDots label="Balls" value={gameState.balls || 0} max={4} color="#2f9d58" />
-            <CountDots label="Strikes" value={gameState.strikes || 0} max={3} color="#d2a100" />
-            <CountDots label="Outs" value={gameState.outs || 0} max={3} color="#c33b34" />
-          </div>
-          <div className="hud-grid">
-            <label>
-              Pitch Count (Nosso)
-              <input type="number" value={gameState.ourPitchCount || 0} readOnly disabled />
-            </label>
-            <label>
-              Pitch Count (Adversário)
-              <input type="number" value={gameState.opponentPitchCount || 0} readOnly disabled />
-            </label>
+      {gameSubView === 'acoes' && (
+        <div className="acoes-view">
+          <div className="acoes-left">
+            <div className="acoes-score-row">
+              <span className="acoes-score-team">CAASO</span>
+              <span className="acoes-score-num">{gameState.homeScore || 0}</span>
+              <span className="acoes-score-sep">×</span>
+              <span className="acoes-score-num">{gameState.awayScore || 0}</span>
+              <span className="acoes-score-team">{opponentName || 'Adv'}</span>
+            </div>
+
+            <div className="acoes-inning-row">
+              <span>Inning {gameState.inning || 1}</span>
+              <span className="acoes-inning-half">{gameState.inningHalf === 'top' ? '▲' : '▼'}</span>
+            </div>
+
+            <div className="acoes-mode-row">
+              <span className={`hud-mode-badge ${gameState.isAttacking ? 'hud-mode-attack' : 'hud-mode-defense'}`}>
+                {gameState.isAttacking ? 'ATACANDO' : 'DEFENDENDO'}
+              </span>
+              <button
+                type="button"
+                className="hud-mode-toggle-btn"
+                onClick={() => onUpdateGameState((current) => ({
+                  ...current, isAttacking: !current.isAttacking, balls: 0, strikes: 0,
+                }), 'Modo alternado manualmente')}
+              >
+                Trocar
+              </button>
+            </div>
+
+            <div className="acoes-count-row">
+              <CountDots label="B" value={gameState.balls || 0} max={4} color="#2f9d58" />
+              <CountDots label="S" value={gameState.strikes || 0} max={3} color="#d2a100" />
+              <CountDots label="O" value={gameState.outs || 0} max={3} color="#c33b34" />
+            </div>
+
+            {gameState.isAttacking && (
+              <div className="acoes-batter-row">
+                <span className="acoes-label">Rebate</span>
+                <strong>{currentBatter ? `${currentBatter.name} #${currentBatter.number}` : '—'}</strong>
+                {onDeckBatter && <span className="acoes-ondeck">Deck: {onDeckBatter.name}</span>}
+              </div>
+            )}
+
             {!gameState.isAttacking && (
-              <label>
-                Arremessador
+              <div className="acoes-pitcher-row">
+                <span className="acoes-label">Pitcher</span>
                 <select
+                  className="acoes-pitcher-select"
                   value={gameState.currentPitcherId || ''}
                   onChange={(event) => {
                     const nextId = event.target.value || null
@@ -2197,190 +2196,122 @@ function FieldPage({
                     }, 'Arremessador alterado')
                   }}
                 >
-                  {!pitchersOnField.length && <option value="">Sem pitcher em campo</option>}
+                  {!pitchersOnField.length && <option value="">Sem pitcher</option>}
                   {pitchersOnField.map((player) => (
                     <option key={getPlayerId(player)} value={getPlayerId(player)}>
                       {player.name} #{player.number}
                     </option>
                   ))}
                 </select>
-              </label>
+                <span className="acoes-pitcher-pc">
+                  PC: {gameState.currentPitcherId && gameState.pitchCounts && Number.isFinite(gameState.pitchCounts[gameState.currentPitcherId])
+                    ? gameState.pitchCounts[gameState.currentPitcherId]
+                    : 0}
+                </span>
+              </div>
             )}
+
+            <div className="acoes-pc-row">
+              <div className="acoes-pc-item"><span>PC Nós</span><strong>{gameState.ourPitchCount || 0}</strong></div>
+              <div className="acoes-pc-item"><span>PC Adv</span><strong>{gameState.opponentPitchCount || 0}</strong></div>
+              {gameState.isAttacking && (
+                <button type="button" className="acoes-change-pitcher-btn" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
+                  Trocar Pitcher Adv.
+                </button>
+              )}
+            </div>
+
+            <div className="acoes-runners-section">
+              <span className="acoes-label">Corredores</span>
+              <div className="acoes-runners-grid">
+                {['first', 'second', 'third'].map((base) => (
+                  <div key={base} className="acoes-runner-item">
+                    <span className={`acoes-base-badge ${gameState.runners?.[base] ? 'occupied' : ''}`}>
+                      {base === 'first' ? '1ª' : base === 'second' ? '2ª' : '3ª'}
+                    </span>
+                    <button type="button" className="acoes-runner-btn" onClick={() => onUpdateGameState((current) => ({ ...current, runners: { ...current.runners, [base]: true } }), `Corredor em ${base}`)}>+</button>
+                    <button type="button" className="acoes-runner-btn" onClick={() => advanceRunner(base)}>Av</button>
+                    <button type="button" className="acoes-runner-btn" onClick={() => removeRunner(base)}>Out</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
+
+            <div className="acoes-end-row">
+              <button type="button" className="acoes-undo-btn" onClick={() => handleUndo().catch(() => {})}>↩ Desfazer</button>
+              <button type="button" className="acoes-end-btn" onClick={() => onEndGame?.()}>Encerrar jogo</button>
+            </div>
+          </div>
+
+          <div className="acoes-right">
+            <div className="acoes-btns-grid">
+              {gameState.isAttacking ? (
+                <>
+                  <button type="button" className="acoes-btn acoes-strike" onClick={() => applyAttackCountAction('strike')}>STRIKE</button>
+                  <button type="button" className="acoes-btn acoes-ball" onClick={() => applyAttackCountAction('ball')}>BALL</button>
+                  <button type="button" className="acoes-btn acoes-foul" onClick={() => applyAttackCountAction('foul')}>FOUL</button>
+                  <button type="button" className="acoes-btn acoes-out" onClick={() => applyPlateAppearance('out')}>OUT</button>
+                  <button type="button" className="acoes-btn acoes-1b" onClick={() => applyPlateAppearance('single')}>SIMPLES</button>
+                  <button type="button" className="acoes-btn acoes-2b" onClick={() => applyPlateAppearance('double')}>DUPLA</button>
+                  <button type="button" className="acoes-btn acoes-3b" onClick={() => applyPlateAppearance('triple')}>TRIPLA</button>
+                  <button type="button" className="acoes-btn acoes-hr" onClick={() => applyPlateAppearance('homerun')}>HOME RUN</button>
+                  <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
+                  <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
+                  <button type="button" className="acoes-btn acoes-erro" onClick={() => applyErrorEvent('')}>ERRO</button>
+                  <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="acoes-btn acoes-strike" onClick={() => onPitchAction?.('strike')}>STRIKE</button>
+                  <button type="button" className="acoes-btn acoes-ball" onClick={() => onPitchAction?.('ball')}>BALL</button>
+                  <button type="button" className="acoes-btn acoes-foul" onClick={() => onPitchAction?.('foul')}>FOUL</button>
+                  <button type="button" className="acoes-btn acoes-out" onClick={() => applyDefensiveOutEvent('out')}>OUT</button>
+                  <button type="button" className="acoes-btn acoes-1b" onClick={() => applyDefensiveHit('single')}>SINGLE</button>
+                  <button type="button" className="acoes-btn acoes-2b" onClick={() => applyDefensiveHit('double')}>DOUBLE</button>
+                  <button type="button" className="acoes-btn acoes-3b" onClick={() => applyDefensiveHit('triple')}>TRIPLE</button>
+                  <button type="button" className="acoes-btn acoes-hr" onClick={() => applyDefensiveHit('homerun')}>HOME RUN</button>
+                  <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
+                  <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
+                  <button type="button" className="acoes-btn acoes-erro" onClick={() => { setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || ''); setPendingDefenseError(true) }}>ERRO</button>
+                  <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
+                </>
+              )}
+            </div>
+
             {!gameState.isAttacking && (
-              <label>
-                Pitcher PC
-                <input type="number" value={(gameState.currentPitcherId && gameState.pitchCounts && Number.isFinite(gameState.pitchCounts[gameState.currentPitcherId]) ? gameState.pitchCounts[gameState.currentPitcherId] : 0)} readOnly disabled />
-              </label>
-            )}
-            {gameState.isAttacking && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Button type="button" variant="primary" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
-                  Trocar Pitcher Adversário
-                </Button>
-              </div>
-            )}
-          </div>
-          {!gameState.isAttacking && (
-            <div key={`pitching-pulse-${pitchingPulseKey}`} className="player-stats-block stats-pulse" style={{ marginTop: '8px' }}>
-              <strong>Pitcher</strong>
-              <div className="player-stats-grid" style={{ marginTop: '6px' }}>
-                <div className="player-stats-item"><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
-                <div className="player-stats-item"><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
-                <div className="player-stats-item"><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
-                <div className="player-stats-item"><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
-                <div className="player-stats-item"><span>PC</span><strong>{safeNumber(livePitching.pitchCount)}</strong></div>
-              </div>
-            </div>
-          )}
-          {gameState.isAttacking ? (
-            <div className="hud-actions attack-actions" style={{ marginTop: '8px' }}>
-              <button type="button" onClick={() => applyAttackCountAction('strike')}>
-                Strike
-              </button>
-              <button type="button" onClick={() => applyAttackCountAction('ball')}>
-                Ball
-              </button>
-              <button type="button" onClick={() => applyAttackCountAction('foul')}>
-                Foul
-              </button>
-              <button type="button" onClick={() => applyPlateAppearance('out')}>
-                Out
-              </button>
-              <button type="button" onClick={() => applyPlateAppearance('single')}>
-                Hit Simples
-              </button>
-              <button type="button" onClick={() => applyPlateAppearance('double')}>
-                Hit Dupla
-              </button>
-              <button type="button" onClick={() => applyPlateAppearance('triple')}>
-                Hit Tripla
-              </button>
-              <button type="button" onClick={() => applyPlateAppearance('homerun')}>
-                Homerun
-              </button>
-              <button type="button" onClick={handleDoublePlayAction}>
-                Double Play
-              </button>
-              <button type="button" onClick={applySacFly}>
-                Sac Fly
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  applyErrorEvent('')
-                }}
-              >
-                Erro
-              </button>
-              <button type="button" onClick={applyDeadBall}>
-                Dead Ball
-              </button>
-            </div>
-          ) : (
-            <div className="hud-actions defense-actions" style={{ marginTop: '8px' }}>
-              <button type="button" onClick={() => onPitchAction?.('strike')}>
-                Strike
-              </button>
-              <button type="button" onClick={() => onPitchAction?.('ball')}>
-                Ball
-              </button>
-              <button type="button" onClick={() => onPitchAction?.('foul')}>
-                Foul
-              </button>
-              <button type="button" onClick={() => applyDefensiveOutEvent('out')}>
-                Out
-              </button>
-              <button type="button" onClick={() => applyDefensiveHit('single')}>
-                Single
-              </button>
-              <button type="button" onClick={() => applyDefensiveHit('double')}>
-                Double
-              </button>
-              <button type="button" onClick={() => applyDefensiveHit('triple')}>
-                Triple
-              </button>
-              <button type="button" onClick={() => applyDefensiveHit('homerun')}>
-                Homerun
-              </button>
-              <button type="button" onClick={handleDoublePlayAction}>
-                Double Play
-              </button>
-              <button type="button" onClick={applySacFly}>
-                Sac Fly
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || '')
-                  setPendingDefenseError(true)
-                }}
-              >
-                Erro
-              </button>
-              <button type="button" onClick={applyDeadBall}>
-                Dead Ball
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="field-hud-block">
-          <h3>Corredores</h3>
-          <div className="hud-grid">
-            {['first', 'second', 'third'].map((base) => (
-              <label key={base}>
-                {base.toUpperCase()}
-                <div className="hud-actions">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onUpdateGameState((current) => ({
-                        ...current,
-                        runners: { ...current.runners, [base]: true },
-                      }), `Corredor em ${base}`)
-                    }
-                  >
-                    +
-                  </button>
-                  <button type="button" onClick={() => advanceRunner(base)}>
-                    Av
-                  </button>
-                  <button type="button" onClick={() => removeRunner(base)}>
-                    Out
-                  </button>
+              <div key={`pitching-pulse-${pitchingPulseKey}`} className="acoes-pitcher-stats stats-pulse">
+                <div className="acoes-pitcher-stats-grid">
+                  <div><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
+                  <div><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
+                  <div><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
+                  <div><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
+                  <div><span>PC</span><strong>{safeNumber(livePitching.pitchCount)}</strong></div>
                 </div>
-              </label>
-            ))}
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="field-hud-block">
-          <h3>Campo</h3>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-            <button type="button" className="full-width-btn" onClick={() => onEndGame?.()}>
-              Encerrar jogo
-            </button>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</Button>
-              <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
-              <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
-              <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
-            </div>
-          </div>
-        </div>
-          </div>
-        </div>
-        </aside>
       )}
-      {/* Persistent HUD toggle button (always visible) */}
-      <button
-        type="button"
-        className="mode-toggle-btn"
-        onClick={() => setShowHud((s) => !s)}
-        aria-pressed={!showHud}
-      >
-        {showHud ? 'Esconder HUD' : 'Mostrar HUD'}
-      </button>
+
+      {/* Sub-view toggle */}
+      <div className="game-subview-bar">
+        <button
+          type="button"
+          className={gameSubView === 'campo' ? 'active' : ''}
+          onClick={() => setGameSubView('campo')}
+        >
+          Campo
+        </button>
+        <button
+          type="button"
+          className={gameSubView === 'acoes' ? 'active' : ''}
+          onClick={() => setGameSubView('acoes')}
+        >
+          Ações
+        </button>
+      </div>
 
     
 

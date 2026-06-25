@@ -25,11 +25,11 @@ export function avgFromHitting(hitting) {
 function eraFrom({ outsPitched, inningsPitched, earnedRuns }, digits = 3) {
   const outs = toNum(outsPitched)
   const er = toNum(earnedRuns)
-  if (outs) return ((er * 21) / outs).toFixed(digits)
+  if (outs) return ((er * 27) / outs).toFixed(digits)
 
   const ip = toNum(inningsPitched)
   if (!ip) return formatFixed(0, digits)
-  return ((er * 7) / ip).toFixed(digits)
+  return ((er * 9) / ip).toFixed(digits)
 }
 
 export function eraFromEntry(entry) {
@@ -51,7 +51,7 @@ export function eraFromPitching(pitching) {
 export function formatEraFromOuts(outsPitched, er, digits = 2, noDataPlaceholder = '--') {
   const outs = toNum(outsPitched)
   if (!outs) return noDataPlaceholder
-  return ((toNum(er) * 21) / outs).toFixed(digits)
+  return ((toNum(er) * 27) / outs).toFixed(digits)
 }
 
 export function outsToInnings(outs) {

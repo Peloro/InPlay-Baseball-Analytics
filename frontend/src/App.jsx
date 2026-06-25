@@ -2,17 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import FieldPage from './pages/FieldPage'
 import TrainingField from './pages/TrainingField'
 import StatsPage from './pages/StatsPage'
+import JogadoresPage from './pages/JogadoresPage'
 import api, { gameStatsApi, gamesApi } from './services/api'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
 import Button from './components/ui/Button'
 import { getPlayerId } from './utils/player'
-
-const TOOLS = [
-  { id: 'pointer', label: 'Ponteiro' },
-  { id: 'pen', label: 'Caneta' },
-  { id: 'mouse', label: 'Mouse' },
-]
 
 const GAME_STATE_STORAGE_KEY = 'baseball_game_state_v2'
 
@@ -181,7 +176,6 @@ function App() {
   const [gameAccessNotice, setGameAccessNotice] = useState('')
   const [isClosingGame, setIsClosingGame] = useState(false)
   const [isGameEntering, setIsGameEntering] = useState(false)
-  const [isPortraitOnMobile, setIsPortraitOnMobile] = useState(false)
 
   useEffect(() => {
     window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
@@ -228,29 +222,6 @@ function App() {
     }
 
     loadData()
-  }, [])
-
-  useEffect(() => {
-    const isTouchDevice = () => ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
-    const mq = window.matchMedia('(orientation: portrait)')
-    const checkOrientation = () => {
-      const smallScreen = window.innerWidth <= 1024
-      const isPortrait = mq.matches
-      setIsPortraitOnMobile(isTouchDevice() && smallScreen && isPortrait)
-    }
-
-    checkOrientation()
-
-    const handler = () => checkOrientation()
-    if (mq.addEventListener) mq.addEventListener('change', handler)
-    else if (mq.addListener) mq.addListener(handler)
-    window.addEventListener('resize', handler)
-
-    return () => {
-      if (mq.removeEventListener) mq.removeEventListener('change', handler)
-      else if (mq.removeListener) mq.removeListener(handler)
-      window.removeEventListener('resize', handler)
-    }
   }, [])
 
   useEffect(() => {
@@ -770,15 +741,6 @@ function App() {
 
   return (
     <main className={`app-shell ${isClosingGame ? 'app-closing' : ''} ${isGameEntering ? 'app-entering-game' : ''}`}>
-      {isPortraitOnMobile && (
-        <div className="orientation-lock-overlay" role="dialog" aria-modal="true">
-          <div className="orientation-lock-inner">
-            <h2>Por favor, gire seu dispositivo</h2>
-            <p>Use o modo paisagem (horizontal) para continuar.</p>
-            <div className="orientation-icon" aria-hidden>🔁</div>
-          </div>
-        </div>
-      )}
       <header className="top-nav">
         <div className="nav-brand" aria-label="Beisebol CAASO">
           <img className="nav-brand-logo" src="/Ativo 1Cporcotransparente.png" alt="Logo C com porco" />
@@ -796,14 +758,24 @@ function App() {
               setPage('game')
             }}
           >
-            Modo Jogo
+            <span className="nav-label-full">Jogo</span>
+            <span className="nav-label-short">Jogo</span>
           </button>
           <button
             type="button"
             className={page === 'training' ? 'active' : ''}
             onClick={() => setPage('training')}
           >
-            Modo Treino
+            <span className="nav-label-full">Treino</span>
+            <span className="nav-label-short">Treino</span>
+          </button>
+          <button
+            type="button"
+            className={page === 'jogadores' ? 'active' : ''}
+            onClick={() => setPage('jogadores')}
+          >
+            <span className="nav-label-full">Jogadores</span>
+            <span className="nav-label-short">Jogadores</span>
           </button>
           <button
             type="button"
@@ -813,7 +785,8 @@ function App() {
               setPage('stats')
             }}
           >
-            Estatisticas
+            <span className="nav-label-full">Stats</span>
+            <span className="nav-label-short">Stats</span>
           </button>
         </div>
       </header>
@@ -857,11 +830,18 @@ function App() {
           showHud={showTrainingHud}
           setShowHud={setShowTrainingHud}
         />
-      ) : (
-        <StatsPage
+      ) : page === 'jogadores' ? (
+        <JogadoresPage
           players={players}
           onAddPlayer={handleAddPlayer}
           onDeletePlayer={handleDeletePlayer}
+          onUpdatePlayer={handleUpdatePlayer}
+          gameState={gameState}
+          onUpdateGameState={updateGameState}
+        />
+      ) : (
+        <StatsPage
+          players={players}
           onDeleteGame={handleDeleteGame}
           onOpenGame={openGameFromStats}
           onSelectGame={(game) => {
@@ -871,7 +851,6 @@ function App() {
           gameState={gameState}
           onUpdateGameState={updateGameState}
           onGoField={() => setPage('game')}
-          onUpdatePlayer={handleUpdatePlayer}
         />
       )}
 

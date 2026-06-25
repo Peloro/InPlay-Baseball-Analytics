@@ -102,7 +102,14 @@
   padding: 8px 14px;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
   transition: transform 120ms ease, opacity 120ms ease, background-color 120ms ease;
+}
+
+.nav-label-short {
+  display: none;
 }
 
 .nav-actions button:hover:not(:disabled) {
@@ -1211,7 +1218,8 @@
   padding: 20px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 16px;
+  align-content: start;
 }
 
 /* Prevent horizontal scroll globally */
@@ -2040,82 +2048,33 @@ html, body {
   color: #1a1a1a;
 }
 
-@media (max-width: 760px) {
-  .top-nav {
-    min-height: 74px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+/* Mobile: compact horizontal nav (never column-stacked) */
+@media (max-width: 767px) {
+  :root {
+    --top-nav-height: 52px;
   }
 
-  .nav-brand {
-    justify-content: center;
+  .top-nav {
+    padding: 6px 12px;
   }
 
   .nav-brand-logo {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
   }
 
-  .nav-brand-text {
-    justify-items: center;
+  .nav-actions {
+    gap: 5px;
   }
 
-  .app-shell {
-    padding-top: 74px;
-  }
-
-  .field-layout,
-  .training-layout {
-    height: calc(100vh - 74px);
+  .nav-actions button {
+    padding: 6px 10px;
+    font-size: 0.82rem;
   }
 
   .bench-panel {
-    right: 10px;
-    left: 10px;
-    top: auto;
-    bottom: 10px;
-    width: auto;
-    max-height: 34vh;
+    max-height: 36vh;
   }
-
-  .field-hud {
-    left: 10px;
-    bottom: 36vh;
-    width: min(320px, calc(100vw - 20px));
-  }
-
-/* Final override: force game HUD blocks to the right on wide screens */
-@media (min-width: 1024px) {
-  /* Strong override: pin game HUD to top-left column to avoid covering field */
-  .field-hud:not(.training-hud) {
-    position: fixed !important;
-    top: calc(var(--top-nav-height) + 12px) !important;
-    left: 12px !important;
-    right: auto !important;
-    bottom: auto !important;
-    width: 320px !important;
-    max-width: 320px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
-    align-items: stretch !important;
-    gap: 12px !important;
-    padding: 8px !important;
-    z-index: 120 !important;
-  }
-
-  .field-hud:not(.training-hud) .field-hud-block {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    display: block !important;
-  }
-
-  .field-hud:not(.training-hud) .field-hud-block + .field-hud-block {
-    margin-top: 12px !important;
-  }
-}
 
   .game-scoreboard {
     min-width: 0;
@@ -2151,6 +2110,69 @@ html, body {
 
   .season-kpis {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Medium phones / tablets: tighten nav button padding */
+@media (max-width: 900px) {
+  .nav-actions button {
+    padding: 7px 10px;
+    font-size: 0.82rem;
+  }
+}
+
+/* Very small phones: hide brand text and abbreviate nav labels */
+@media (max-width: 480px) {
+  .nav-brand-text {
+    display: none;
+  }
+
+  .nav-actions {
+    gap: 4px;
+  }
+
+  .nav-actions button {
+    padding: 6px 8px;
+    font-size: 0.78rem;
+  }
+
+  .nav-label-full {
+    display: none;
+  }
+
+  .nav-label-short {
+    display: inline;
+  }
+}
+
+/* Desktop: pin game HUD to top-left column to avoid covering field */
+@media (min-width: 1024px) {
+  .field-hud:not(.training-hud) {
+    position: fixed !important;
+    top: calc(var(--top-nav-height) + 12px) !important;
+    left: 12px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 320px !important;
+    max-width: 320px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 8px !important;
+    z-index: 120 !important;
+  }
+
+  .field-hud:not(.training-hud) .field-hud-block {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .field-hud:not(.training-hud) .field-hud-block + .field-hud-block {
+    margin-top: 12px !important;
   }
 }
 
@@ -2261,5 +2283,681 @@ html, body {
     border-radius: 8px;
     padding: 8px;
     text-align: center;
+  }
+}
+
+/* ── Stats page layout: sidebar + main ─────────────────────────── */
+
+.stats-sidebar,
+.stats-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+/* Tablet: two-column layout (legacy sidebar layout, not used by stats-page-full) */
+@media (min-width: 768px) {
+  .stats-page:not(.stats-page-full) {
+    grid-template-columns: 280px 1fr;
+    padding: 20px 20px 20px 20px;
+    gap: 18px;
+  }
+  .stats-page.stats-page-full {
+    padding: 20px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .stats-page:not(.stats-page-full) {
+    grid-template-columns: 340px 1fr;
+    padding: 28px;
+    gap: 22px;
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .stats-page.stats-page-full {
+    padding: 28px;
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Large desktop: even wider sidebar */
+@media (min-width: 1400px) {
+  .stats-page:not(.stats-page-full) {
+    grid-template-columns: 380px 1fr;
+  }
+}
+
+/* ── Global smooth scroll ───────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Card entrance animation ────────────────────────────────────── */
+.card {
+  animation: cardFadeIn 220ms ease both;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger sidebar cards slightly for a polished cascade */
+.stats-sidebar .card:nth-child(2) { animation-delay: 40ms; }
+.stats-main .card:nth-child(1)    { animation-delay: 60ms; }
+.stats-main .card:nth-child(2)    { animation-delay: 100ms; }
+
+/* ── Responsive pregame modal ───────────────────────────────────── */
+@media (max-width: 767px) {
+  .pregame-modal {
+    width: min(98vw, 600px);
+  }
+
+  .pregame-lineup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Fluid nav brand title ──────────────────────────────────────── */
+.top-nav h1 {
+  font-size: clamp(0.85rem, 2vw, 1.05rem);
+}
+
+/* ── Touch target minimum on mobile ────────────────────────────── */
+@media (max-width: 767px) {
+  .hud-actions button,
+  .detail-actions button,
+  .game-list button,
+  .game-card-actions button {
+    min-height: 44px;
+  }
+}
+
+/* ── Tablet bench panel sizing ─────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .bench-panel {
+    width: 260px;
+  }
+
+  .field-hud.game-hud .left-hud-panel {
+    width: 270px !important;
+    max-width: 270px !important;
+  }
+}
+
+/* ── Responsive player stats modal ─────────────────────────────── */
+@media (max-width: 767px) {
+  .player-stats-modal {
+    width: min(98vw, 600px);
+    padding: 10px;
+  }
+
+  .player-stats-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Transition for page switches ───────────────────────────────── */
+.stats-page,
+.field-layout,
+.training-layout {
+  transition: opacity 200ms ease;
+}
+
+/* ── Game HUD: mode badge + manual toggle ───────────────────────── */
+
+.hud-mode-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.hud-mode-attack {
+  background: rgba(245, 212, 0, 0.14);
+  border: 1px solid rgba(245, 212, 0, 0.45);
+  color: var(--accent);
+}
+
+.hud-mode-defense {
+  background: rgba(36, 92, 196, 0.18);
+  border: 1px solid rgba(80, 130, 220, 0.45);
+  color: #80b4f5;
+}
+
+.hud-mode-toggle-btn {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 12px;
+  background: #2a2a2a;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 100ms ease;
+}
+
+.hud-mode-toggle-btn:active {
+  transform: scale(0.95);
+  background: #333;
+}
+
+/* ── Training HUD: 2-row layout ─────────────────────────────────── */
+
+.training-hud-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.training-tool-row,
+.training-runner-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.training-tool-row > *,
+.training-runner-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 4px !important;
+  font-size: 0.84rem !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Bench panel header ─────────────────────────────────────────── */
+
+.bench-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bench-head-row h3 {
+  margin: 0;
+}
+
+.bench-field-count {
+  font-size: 0.8rem;
+  color: #c2b98f;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+}
+
+/* ── Game sub-view toggle (Campo | Ações) ───────────────────────── */
+
+.game-subview-bar {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 200;
+  display: flex;
+  gap: 2px;
+  background: rgba(18, 18, 18, 0.94);
+  border: 1px solid #444;
+  border-radius: 999px;
+  padding: 3px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+.game-subview-bar button {
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  color: #888;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.game-subview-bar button.active {
+  background: var(--accent, #f5d400);
+  color: #1b1b1b;
+}
+
+/* ── Ações view ─────────────────────────────────────────────────── */
+
+.acoes-view {
+  position: fixed;
+  top: var(--top-nav-height, 64px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0f0f0f;
+  z-index: 150;
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+}
+
+.acoes-left {
+  width: 36%;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border-right: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.acoes-right {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.acoes-score-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #222;
+}
+
+.acoes-score-team {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.acoes-score-num {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #f5d400;
+  line-height: 1;
+  min-width: 28px;
+  text-align: center;
+}
+
+.acoes-score-sep {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.acoes-inning-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #aaa;
+  font-weight: 600;
+}
+
+.acoes-inning-half {
+  font-size: 0.85rem;
+  color: #f5d400;
+}
+
+.acoes-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.acoes-count-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.acoes-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.acoes-batter-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  padding: 5px 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.acoes-batter-row strong {
+  font-size: 0.85rem;
+  color: #f5f5f5;
+}
+
+.acoes-ondeck {
+  font-size: 0.65rem;
+  color: #888;
+}
+
+.acoes-pitcher-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  padding: 5px 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.acoes-pitcher-select {
+  font-size: 0.78rem;
+  background: #1a1a1a;
+  color: #f5f5f5;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 3px 6px;
+  width: 100%;
+}
+
+.acoes-pitcher-pc {
+  font-size: 0.72rem;
+  color: #aaa;
+  font-weight: 600;
+}
+
+.acoes-pc-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.acoes-pc-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  padding: 4px 8px;
+  border: 1px solid #2a2a2a;
+  flex: 1;
+}
+
+.acoes-pc-item span {
+  font-size: 0.6rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.acoes-pc-item strong {
+  font-size: 1rem;
+  color: #f5d400;
+  font-weight: 900;
+}
+
+.acoes-change-pitcher-btn {
+  font-size: 0.65rem;
+  padding: 4px 8px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #aaa;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.acoes-runners-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.acoes-runners-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.acoes-runner-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.acoes-base-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #222;
+  color: #777;
+  border: 1px solid #333;
+}
+
+.acoes-base-badge.occupied {
+  background: #d2a100;
+  color: #1b1b1b;
+  border-color: #e8b800;
+}
+
+.acoes-runner-btn {
+  font-size: 0.65rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #ccc;
+  min-width: 30px;
+  transition: background-color 0.1s;
+}
+
+.acoes-runner-btn:active {
+  background: #333;
+}
+
+.acoes-end-row {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid #1a1a1a;
+}
+
+.acoes-undo-btn {
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.acoes-end-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid #8a3030;
+  border-radius: 6px;
+  background: rgba(150, 40, 40, 0.25);
+  color: #f08080;
+  cursor: pointer;
+}
+
+.acoes-btns-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  flex: 1;
+}
+
+.acoes-btn {
+  padding: 0;
+  min-height: 52px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: opacity 0.12s, transform 0.08s;
+  text-transform: uppercase;
+}
+
+.acoes-btn:active {
+  opacity: 0.72;
+  transform: scale(0.96);
+}
+
+.acoes-strike { background: #c8960a; color: #1b1b1b; }
+.acoes-ball   { background: #2f9d58; color: #fff; }
+.acoes-foul   { background: #5a5000; color: #f5d400; border: 1px solid #7a7000; }
+.acoes-out    { background: #b83030; color: #fff; }
+.acoes-1b     { background: #1a6fa0; color: #fff; }
+.acoes-2b     { background: #145e8a; color: #fff; }
+.acoes-3b     { background: #0e4c72; color: #fff; }
+.acoes-hr     { background: #6c2ec4; color: #fff; }
+.acoes-dp     { background: #3a3a3a; color: #ddd; }
+.acoes-sf     { background: #2e2e2e; color: #ccc; }
+.acoes-erro   { background: #7a2020; color: #fbb; }
+.acoes-hbp    { background: #2a2a2a; color: #bbb; border: 1px solid #444; }
+
+.acoes-pitcher-stats {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid #222;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.acoes-pitcher-stats-grid {
+  display: flex;
+  gap: 10px;
+  justify-content: space-around;
+  flex-wrap: wrap;
+}
+
+.acoes-pitcher-stats-grid > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.acoes-pitcher-stats-grid span {
+  font-size: 0.6rem;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.acoes-pitcher-stats-grid strong {
+  font-size: 0.9rem;
+  color: #f5f5f5;
+  font-weight: 700;
+}
+
+/* ── Jogadores page ─────────────────────────────────────────────── */
+
+.jogadores-page {
+  min-height: calc(100vh - var(--top-nav-height));
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.jogadores-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.jogadores-hint {
+  font-size: 0.82rem;
+  color: #888;
+  margin: 0 0 8px;
+}
+
+.managed-player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.managed-player-info strong {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.managed-player-pos {
+  font-size: 0.72rem;
+  color: #888;
+}
+
+.managed-player-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.empty-state {
+  color: #666;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* ── Stats page full-width layout ───────────────────────────────── */
+
+.stats-page-full {
+  grid-template-columns: 1fr !important;
+}
+
+@media (min-width: 768px) {
+  .stats-page-full {
+    grid-template-columns: 1fr !important;
   }
 }

@@ -576,28 +576,27 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
       {showHud && (
         <aside className="field-hud training-hud">
         <div className="field-hud-block">
-          <div className="hud-top-row">
-            <h3>Modo Treino</h3>
-          </div>
-          <p className="hud-sub">Mova jogadores e corredores, desenhe jogadas e limpe quando quiser.</p>
-
-          <div className="hud-actions">
-            <Button type="button" variant={activeTool === 'pointer' ? 'primary' : 'default'} onClick={() => setActiveTool('pointer')}>Ponteiro</Button>
-            <Button type="button" variant={activeTool === 'pen' ? 'primary' : 'default'} onClick={() => setActiveTool('pen')}>Caneta</Button>
-            <Button type="button" variant={activeTool === 'mouse' ? 'primary' : 'default'} onClick={() => setActiveTool('mouse')}>Mouse</Button>
-            <Button type="button" className="clear-btn" onClick={() => {
-              if (typeof triggerClearDraw === 'function') triggerClearDraw()
-              else setStrokes([])
-            }}>Limpar desenhos</Button>
-            <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, ...computeBasePosition('1B'), visible: true } }))}>+ 1B</Button>
-            <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, ...computeBasePosition('2B'), visible: true } }))}>+ 2B</Button>
-            <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, ...computeBasePosition('3B'), visible: true } }))}>+ 3B</Button>
-            <Button type="button" className="full-width-btn reset-btn" onClick={() => {
-              setPlayers(INITIAL_PLAYERS)
-              setRunners(INITIAL_RUNNERS)
-              setBall({ x: 50, y: 55 })
-              setStrokes([])
-            }}>Resetar treino</Button>
+          <div className="training-hud-rows">
+            <div className="training-tool-row">
+              <Button type="button" variant={activeTool === 'pointer' ? 'primary' : 'default'} onClick={() => setActiveTool('pointer')}>Ponteiro</Button>
+              <Button type="button" variant={activeTool === 'pen' ? 'primary' : 'default'} onClick={() => setActiveTool('pen')}>Caneta</Button>
+              <Button type="button" variant={activeTool === 'mouse' ? 'primary' : 'default'} onClick={() => setActiveTool('mouse')}>Mover</Button>
+              <Button type="button" className="clear-btn" onClick={() => {
+                if (typeof triggerClearDraw === 'function') triggerClearDraw()
+                else setStrokes([])
+              }}>Limpar</Button>
+            </div>
+            <div className="training-runner-row">
+              <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, first: { ...current.first, ...computeBasePosition('1B'), visible: true } }))}>+ 1ª</Button>
+              <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, second: { ...current.second, ...computeBasePosition('2B'), visible: true } }))}>+ 2ª</Button>
+              <Button type="button" variant="primary" onClick={() => setRunners((current) => ({ ...current, third: { ...current.third, ...computeBasePosition('3B'), visible: true } }))}>+ 3ª</Button>
+              <Button type="button" className="reset-btn" onClick={() => {
+                setPlayers(INITIAL_PLAYERS)
+                setRunners(INITIAL_RUNNERS)
+                setBall({ x: 50, y: 55 })
+                setStrokes([])
+              }}>Resetar</Button>
+            </div>
           </div>
         </div>
         </aside>

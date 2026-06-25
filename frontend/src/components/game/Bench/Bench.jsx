@@ -27,8 +27,10 @@ const Bench = React.forwardRef(function Bench({
       aria-label="Banco de reservas"
     >
       <div className="bench-head">
-        <h3>Campo: {Object.keys(playersById || {}).length}</h3>
-        <h3>Banco</h3>
+        <div className="bench-head-row">
+          <h3>Banco</h3>
+          <span className="bench-field-count">{Object.keys(playersById || {}).length} em campo</span>
+        </div>
         <Input
           placeholder="Buscar jogador"
           value={benchSearch}

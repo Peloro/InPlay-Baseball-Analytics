@@ -1,5 +1,13 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html,
@@ -14,4 +22,6 @@ body {
   min-width: 320px;
   font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
   color: #10231a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
