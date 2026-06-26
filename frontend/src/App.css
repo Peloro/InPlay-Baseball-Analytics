@@ -16,7 +16,7 @@
   padding-top: calc(var(--top-nav-height));
   color: var(--ink);
   background: linear-gradient(145deg, #0f0f0f 0%, #121212 100%);
-  transition: opacity 260ms ease;
+  transition: opacity 260ms ease, padding-top 220ms ease;
 }
 
 .app-shell.app-entering-game {
@@ -52,6 +52,68 @@
   align-items: center;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(8px);
+  transition: transform 220ms ease;
+}
+
+.top-nav.nav-hidden {
+  transform: translateY(-100%);
+}
+
+.app-shell.nav-collapsed {
+  padding-top: 0;
+}
+
+.nav-collapsed .acoes-view {
+  top: 0;
+  transition: top 220ms ease;
+}
+
+.nav-collapsed .game-scoreboard {
+  top: 8px;
+}
+
+.nav-collapsed .bench-panel {
+  top: 10px;
+}
+
+.nav-collapsed .mode-toggle-btn {
+  top: 10px;
+}
+
+.nav-toggle-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.nav-toggle-btn:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.nav-restore-btn {
+  position: fixed;
+  top: 4px;
+  right: 8px;
+  z-index: 10000;
+  background: rgba(20, 20, 20, 0.88);
+  border: 1px solid #444;
+  border-radius: 20px;
+  color: #ccc;
+  font-size: 0.7rem;
+  padding: 3px 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s;
+}
+
+.nav-restore-btn:hover {
+  background: rgba(50, 50, 50, 0.95);
 }
 
 .top-nav h1 {
@@ -151,8 +213,13 @@
 .training-layout {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - var(--top-nav-height));
   overflow: hidden;
+}
+
+.nav-collapsed .field-layout,
+.nav-collapsed .training-layout {
+  height: 100vh;
 }
 
 .game-scoreboard {
@@ -2561,6 +2628,7 @@ html {
   width: 36%;
   min-width: 200px;
   max-width: 280px;
+  min-height: 0;
   padding: 8px 10px;
   overflow-y: auto;
   border-right: 1px solid #2a2a2a;
@@ -2572,7 +2640,9 @@ html {
 
 .acoes-right {
   flex: 1;
+  min-height: 0;
   padding: 8px;
+  padding-bottom: 52px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2740,6 +2810,14 @@ html {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.acoes-diamond-svg {
+  width: 76px;
+  height: 76px;
+  display: block;
+  margin: 0 auto 2px;
+  flex-shrink: 0;
 }
 
 .acoes-runners-grid {

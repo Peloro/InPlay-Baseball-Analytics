@@ -2222,7 +2222,20 @@ function FieldPage({
             </div>
 
             <div className="acoes-runners-section">
-              <span className="acoes-label">Corredores</span>
+              <svg viewBox="0 0 100 100" className="acoes-diamond-svg" aria-hidden="true">
+                <line x1="50" y1="16" x2="84" y2="50" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="84" y1="50" x2="50" y2="84" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="50" y1="84" x2="16" y2="50" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="16" y1="50" x2="50" y2="16" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                <rect x="43" y="9" width="14" height="14" transform="rotate(45 50 16)"
+                  fill={gameState.runners?.second ? '#d2a100' : '#1e1e1e'} stroke={gameState.runners?.second ? '#e8b800' : '#484848'} strokeWidth="1.5"/>
+                <rect x="77" y="43" width="14" height="14" transform="rotate(45 84 50)"
+                  fill={gameState.runners?.first ? '#d2a100' : '#1e1e1e'} stroke={gameState.runners?.first ? '#e8b800' : '#484848'} strokeWidth="1.5"/>
+                <rect x="9" y="43" width="14" height="14" transform="rotate(45 16 50)"
+                  fill={gameState.runners?.third ? '#d2a100' : '#1e1e1e'} stroke={gameState.runners?.third ? '#e8b800' : '#484848'} strokeWidth="1.5"/>
+                <polygon points="44,78 56,78 59,84 50,89 41,84"
+                  fill="#1e1e1e" stroke="#484848" strokeWidth="1.5"/>
+              </svg>
               <div className="acoes-runners-grid">
                 {['first', 'second', 'third'].map((base) => (
                   <div key={base} className="acoes-runner-item">

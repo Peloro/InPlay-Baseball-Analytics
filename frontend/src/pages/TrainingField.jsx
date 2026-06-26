@@ -556,20 +556,10 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
         </div>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button
-            type="button"
-            className="mode-toggle-btn"
-            onClick={() => setShowHud((s) => !s)}
-            aria-pressed={!showHud}
-          >
-            {showHud ? 'Esconder HUD' : 'Mostrar HUD'}
-          </button>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</Button>
-            <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
-            <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
-            <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
-          </div>
+          <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}>-</Button>
+          <div style={{ minWidth: 48, textAlign: 'center' }}>{(zoom * 100).toFixed(0)}%</div>
+          <Button type="button" variant="primary" onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}>+</Button>
+          <Button type="button" variant="primary" onClick={() => setZoom(1)}>Reset</Button>
         </div>
       </section>
 
@@ -601,6 +591,12 @@ function TrainingField({ activeTool, setActiveTool, clearDrawVersion, triggerCle
         </div>
         </aside>
       )}
+
+      <div className="game-subview-bar">
+        <button type="button" className={showHud ? 'active' : ''} onClick={() => setShowHud((s) => !s)}>
+          {showHud ? 'Ocultar' : 'Comandos'}
+        </button>
+      </div>
     </>
   )
 }

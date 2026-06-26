@@ -176,6 +176,7 @@ function App() {
   const [gameAccessNotice, setGameAccessNotice] = useState('')
   const [isClosingGame, setIsClosingGame] = useState(false)
   const [isGameEntering, setIsGameEntering] = useState(false)
+  const [navCollapsed, setNavCollapsed] = useState(false)
 
   useEffect(() => {
     window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
@@ -740,8 +741,11 @@ function App() {
   }, [])
 
   return (
-    <main className={`app-shell ${isClosingGame ? 'app-closing' : ''} ${isGameEntering ? 'app-entering-game' : ''}`}>
-      <header className="top-nav">
+    <main className={`app-shell ${isClosingGame ? 'app-closing' : ''} ${isGameEntering ? 'app-entering-game' : ''} ${navCollapsed ? 'nav-collapsed' : ''}`}>
+      {navCollapsed && (
+        <button type="button" className="nav-restore-btn" onClick={() => setNavCollapsed(false)} aria-label="Mostrar navegação">▼</button>
+      )}
+      <header className={`top-nav${navCollapsed ? ' nav-hidden' : ''}`}>
         <div className="nav-brand" aria-label="Beisebol CAASO">
           <img className="nav-brand-logo" src="/Ativo 1Cporcotransparente.png" alt="Logo C com porco" />
           <div className="nav-brand-text">
@@ -789,6 +793,7 @@ function App() {
             <span className="nav-label-short">Stats</span>
           </button>
         </div>
+        <button type="button" className="nav-toggle-btn" onClick={() => setNavCollapsed(true)} aria-label="Ocultar navegação">▲</button>
       </header>
 
       {gameAccessNotice && <div className="game-access-warning">{gameAccessNotice}</div>}

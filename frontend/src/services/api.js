@@ -49,7 +49,7 @@ function safeN(v) {
 const BACKEND = import.meta.env.VITE_API_URL
 
 const http = (BACKEND && !BACKEND.includes('YOUR_BACKEND'))
-  ? axios.create({ baseURL: BACKEND, timeout: 8000 })
+  ? axios.create({ baseURL: BACKEND, timeout: 35000 })
   : null
 
 async function netGet(url, params) {
@@ -129,11 +129,13 @@ if (typeof window !== 'undefined' && http) {
 // ── Players ───────────────────────────────────────────────────────
 
 export const playersApi = {
-  list() {
+  async list() {
     if (http) {
-      netGet('/players').then(data => {
-        if (Array.isArray(data) && data.length) lfSet(LS.players, data)
-      })
+      const data = await netGet('/players')
+      if (Array.isArray(data) && data.length) {
+        lfSet(LS.players, data)
+        return { data }
+      }
     }
     return { data: lfGet(LS.players) }
   },
@@ -178,11 +180,13 @@ export const playersApi = {
 // ── Games ─────────────────────────────────────────────────────────
 
 export const gamesApi = {
-  list() {
+  async list() {
     if (http) {
-      netGet('/games').then(data => {
-        if (Array.isArray(data) && data.length) lfSet(LS.games, data)
-      })
+      const data = await netGet('/games')
+      if (Array.isArray(data) && data.length) {
+        lfSet(LS.games, data)
+        return { data }
+      }
     }
     return { data: lfGet(LS.games) }
   },
