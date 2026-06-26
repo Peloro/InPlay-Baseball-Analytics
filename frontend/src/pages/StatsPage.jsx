@@ -55,7 +55,7 @@ function StatsPage({
   const [gameStatsLoading, setGameStatsLoading] = useState(false)
   const [playerFilter, setPlayerFilter] = useState('all')
   const [statsTab, setStatsTab] = useState('hitters')
-  const [seasonSortBy, setSeasonSortBy] = useState('hits')
+  const [colSort, setColSort] = useState({ col: null, dir: 'desc' })
   const [focusedPlayerId, setFocusedPlayerId] = useState(null)
   const [saveStatus, setSaveStatus] = useState('idle')
   const [pendingDeleteGame, setPendingDeleteGame] = useState(null)
@@ -186,28 +186,41 @@ function StatsPage({
   )
 
   const visibleSeasonRows = useMemo(() => {
-    let rows = seasonRows.filter(({ player }) => {
-      if (statsTab === 'hitters') return true
-      return detectPlayerType(player) === 'pitcher'
+    // Hitters tab: all players. Pitchers tab: pitchers only.
+    const rows = seasonRows.filter(({ player }) =>
+      statsTab === 'hitters' ? true : detectPlayerType(player) === 'pitcher'
+    )
+
+    if (!colSort.col) return rows
+
+    const hitterMetrics = {
+      atBats:      (e) => safeNumber(e.hitting?.atBats),
+      hits:        (e) => safeNumber(e.hitting?.hits),
+      walks:       (e) => safeNumber(e.hitting?.walks),
+      strikeouts:  (e) => safeNumber(e.hitting?.strikeouts),
+      outs:        (e) => safeNumber(e.hitting?.outs),
+      avg:         (e) => { const ab = safeNumber(e.hitting?.atBats); return ab ? safeNumber(e.hitting?.hits) / ab : 0 },
+    }
+    const pitcherMetrics = {
+      inningsPitched: (e) => safeNumber(e.pitching?.inningsPitched),
+      era:            (e) => safeNumber(e.era),
+      strikeouts_p:   (e) => safeNumber(e.pitching?.strikeouts),
+      walks_p:        (e) => safeNumber(e.pitching?.walks),
+      pitchCount:     (e) => safeNumber(e.pitching?.pitchCount),
+      strikes:        (e) => safeNumber(e.pitching?.strikes),
+      balls:          (e) => safeNumber(e.pitching?.balls),
+    }
+
+    const metrics = statsTab === 'hitters' ? hitterMetrics : pitcherMetrics
+    const metricFn = metrics[colSort.col]
+    if (!metricFn) return rows
+
+    return [...rows].sort((a, b) => {
+      const va = metricFn(a.entry)
+      const vb = metricFn(b.entry)
+      return colSort.dir === 'desc' ? vb - va : va - vb
     })
-
-    if (playerFilter === 'all') {
-      rows = rows.filter(({ entry }) => hasAnyStat(entry))
-    }
-
-    const byMetric = {
-      hits: (entry) => safeNumber(entry.hitting?.hits),
-      avg: (entry) => {
-        const ab = safeNumber(entry.hitting?.atBats)
-        if (!ab) return 0
-        return safeNumber(entry.hitting?.hits) / ab
-      },
-      strikeouts: (entry) => safeNumber(entry.hitting?.strikeouts),
-    }
-
-    const metricFn = byMetric[seasonSortBy] || byMetric.hits
-    return [...rows].sort((a, b) => metricFn(b.entry) - metricFn(a.entry))
-  }, [seasonRows, statsTab, seasonSortBy, playerFilter])
+  }, [seasonRows, statsTab, colSort])
 
   const leaders = useMemo(() => {
     if (!visibleSeasonRows.length) {
@@ -278,6 +291,18 @@ function StatsPage({
     setFocusedPlayerId(null)
     window.requestAnimationFrame(() => setFocusedPlayerId(playerId))
   }, [])
+
+  const handleColSort = useCallback((col) => {
+    setColSort((prev) => {
+      if (prev.col !== col) return { col, dir: 'desc' }
+      if (prev.dir === 'desc') return { col, dir: 'asc' }
+      return { col: null, dir: 'desc' }
+    })
+  }, [])
+
+  useEffect(() => {
+    setColSort({ col: null, dir: 'desc' })
+  }, [statsTab])
 
   const upsertGameStat = async (playerId, patch = {}) => {
     const found = gameStats.find((item) => {
@@ -428,16 +453,6 @@ function StatsPage({
             Atualizar
           </Button>
         </div>
-        <div className="season-toolbar inline-tools">
-          <label>
-            Ordenar por
-            <select value={seasonSortBy} onChange={(event) => setSeasonSortBy(event.target.value)}>
-              <option value="hits">Hits</option>
-              <option value="avg">AVG</option>
-              <option value="strikeouts">Strikeouts</option>
-            </select>
-          </label>
-        </div>
         <div className="stats-tabs">
           <button
             type="button"
@@ -529,22 +544,19 @@ function StatsPage({
                 <th>Posicao</th>
                 {statsTab === 'hitters' ? (
                   <>
-                    <th>AB</th>
-                    <th>H</th>
-                    <th>BB</th>
-                    <th>SO</th>
-                    <th>OUT</th>
-                    <th>AVG</th>
+                    {[['atBats','AB'],['hits','H'],['walks','BB'],['strikeouts','SO'],['outs','OUT'],['avg','AVG']].map(([col, label]) => (
+                      <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
+                        {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
+                      </th>
+                    ))}
                   </>
                 ) : (
                   <>
-                    <th>IP</th>
-                    <th>ERA</th>
-                    <th>SO</th>
-                    <th>BB</th>
-                    <th>PC</th>
-                    <th>STR</th>
-                    <th>BAL</th>
+                    {[['inningsPitched','IP'],['era','ERA'],['strikeouts_p','SO'],['walks_p','BB'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
+                      <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
+                        {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
+                      </th>
+                    ))}
                   </>
                 )}
               </tr>
@@ -553,7 +565,7 @@ function StatsPage({
               {!seasonLoading && !visibleSeasonRows.length && (
                 <tr>
                   <td colSpan={statsTab === 'hitters' ? hitterColCount : pitcherColCount} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                    Nenhuma estatística registrada ainda.
+                    {statsTab === 'hitters' ? 'Nenhum jogador cadastrado.' : 'Nenhum pitcher cadastrado.'}
                   </td>
                 </tr>
               )}

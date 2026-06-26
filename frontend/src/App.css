@@ -1616,6 +1616,21 @@ html, body {
   background: rgba(198, 87, 47, 0.08);
 }
 
+.stats-table .sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.stats-table .sortable-th:hover {
+  color: var(--accent);
+}
+
+.stats-table .sortable-th.sort-active {
+  color: var(--accent);
+  font-weight: 800;
+}
+
 .game-list {
   list-style: none;
   margin: 0;
