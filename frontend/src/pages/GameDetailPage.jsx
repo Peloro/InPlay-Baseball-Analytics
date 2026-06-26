@@ -195,6 +195,12 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'outs', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'outs', 1)}
               />
+              <Stepper
+                label="BB"
+                value={row.hitting.walks || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'walks', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'walks', 1)}
+              />
               <div className="pitcher-metric stat-box">AVG: {avgFromValues(row.hitting.atBats, row.hitting.hits)}</div>
             </div>
             <div>

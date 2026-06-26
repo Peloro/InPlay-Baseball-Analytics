@@ -3,6 +3,7 @@ import useDragPosition from '../hooks/useDragPosition'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import CountDots from '../components/CountDots'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
@@ -144,6 +145,7 @@ function FieldPage({
   activeGame,
   onEndGame,
   allowPregameWithoutGame = false,
+  onCancelPreGame = null,
 }) {
   const layoutRef = useRef(null)
   const fieldStageRef = useRef(null)
@@ -179,9 +181,15 @@ function FieldPage({
   const [setupAttacking, setSetupAttacking] = useState(true)
   const [setupStarters, setSetupStarters] = useState([])
   const [setupBattingOrder, setSetupBattingOrder] = useState([])
-  const [pregameForm, setPregameForm] = useState({ date: '', opponentName: '', competition: '', location: '' })
+  const [pregameForm, setPregameForm] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return { date: today, opponentName: '', competition: '', location: '' }
+  })
   const [setupDraggingId, setSetupDraggingId] = useState(null)
   const [opponentDefense, setOpponentDefense] = useState(makeOpponentMarkers)
+  const [modePendingConfirm, setModePendingConfirm] = useState(false)
+  const modePendingTimerRef = useRef(null)
+  const [pendingSubstitution, setPendingSubstitution] = useState(null)
   const [pendingDefenseError, setPendingDefenseError] = useState(false)
   const [selectedErrorDefenderId, setSelectedErrorDefenderId] = useState('')
   const [pendingDoublePlaySelect, setPendingDoublePlaySelect] = useState(false)
@@ -189,6 +197,7 @@ function FieldPage({
   const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
   const [undoStack, setUndoStack] = useState([])
   const [invalidFeedback, setInvalidFeedback] = useState('')
+  const [pendingEndGame, setPendingEndGame] = useState(false)
   const [showFieldContainer] = useState(true)
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [gameSubView, setGameSubView] = useState('campo')
@@ -391,20 +400,24 @@ function FieldPage({
   }, [showScoreboard])
 
   useEffect(() => {
-    // If there's no current game, only open pregame when explicitly allowed
+    // No game and not allowed to create one here → close modal
     if (!gameState.currentGameId && !allowPregameWithoutGame) {
       const timer = window.setTimeout(() => setShowPreGameSetup(false), 0)
       return () => window.clearTimeout(timer)
     }
 
-    if (gameState.preGameConfigured) {
+    // Game exists and is fully configured → close modal
+    if (gameState.currentGameId && gameState.preGameConfigured) {
       const timer = window.setTimeout(() => setShowPreGameSetup(false), 0)
       return () => window.clearTimeout(timer)
     }
 
+    // Either: no game (need to create one) OR game exists but not yet configured → open modal
     const starters = DEFENSIVE_POSITIONS.map((position) => ({ position, playerId: '' }))
 
     const timer = window.setTimeout(() => {
+      const today = new Date().toISOString().split('T')[0]
+      setPregameForm((current) => ({ ...current, date: current.date || today }))
       setSetupAttacking(true)
       setSetupStarters(starters)
       setSetupBattingOrder([])
@@ -902,9 +915,11 @@ function FieldPage({
         hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
         strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
         outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
+        walks: safeNumber(patch.hitting?.walks ?? current?.hitting?.walks),
       },
       pitching: {
         inningsPitched: safeNumber(current?.pitching?.inningsPitched),
+        outsPitched: safeNumber(current?.pitching?.outsPitched),
         earnedRuns: safeNumber(current?.pitching?.earnedRuns),
         strikeouts: safeNumber(current?.pitching?.strikeouts),
         walks: safeNumber(current?.pitching?.walks),
@@ -1258,6 +1273,19 @@ function FieldPage({
 
     await captureUndoSnapshot()
 
+    // Pre-compute outcome before state update so we can record batter stats
+    const preStrikes = Number(gameState.strikes || 0)
+    const preBalls = Number(gameState.balls || 0)
+    const preNextStrikes = kind === 'strike' ? preStrikes + 1 : kind === 'foul' ? Math.min(2, preStrikes + 1) : preStrikes
+    const preNextBalls = kind === 'ball' ? preBalls + 1 : preBalls
+    const didStrikeout = preNextStrikes >= 3
+    const didWalk = !didStrikeout && preNextBalls >= 4
+
+    // Capture current batter id BEFORE state advances the index
+    const preOrder = gameState.battingOrder || []
+    const preBatterIndex = Math.min(gameState.currentBatterIndex || 0, Math.max(0, preOrder.length - 1))
+    const batterId = preOrder[preBatterIndex] || null
+
     onUpdateGameState((current) => {
       if (!current.isAttacking) return current
 
@@ -1270,8 +1298,8 @@ function FieldPage({
           : beforeStrikes
       const nextBallsRaw = kind === 'ball' ? beforeBalls + 1 : beforeBalls
 
-      const didStrikeout = nextStrikesRaw >= 3
-      const didWalk = !didStrikeout && nextBallsRaw >= 4
+      const cDidStrikeout = nextStrikesRaw >= 3
+      const cDidWalk = !cDidStrikeout && nextBallsRaw >= 4
       const order = current.battingOrder || []
 
       let nextOuts = Number(current.outs || 0)
@@ -1281,7 +1309,7 @@ function FieldPage({
       let nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
       let scoredRuns = 0
 
-      if (didStrikeout) {
+      if (cDidStrikeout) {
         nextOuts += 1
 
         if (nextOuts >= 3) {
@@ -1293,13 +1321,13 @@ function FieldPage({
         }
       }
 
-      if (didWalk) {
+      if (cDidWalk) {
         const forced = forceAdvanceToFirst(nextRunners)
         nextRunners = forced.nextRunners
         scoredRuns = forced.runs
       }
 
-      const shouldAdvanceBatter = order.length > 0 && (didStrikeout || didWalk)
+      const shouldAdvanceBatter = order.length > 0 && (cDidStrikeout || cDidWalk)
       const nextBatterIndex = shouldAdvanceBatter
         ? getNextBatterIndexFromState(current)
         : Number(current.currentBatterIndex || 0)
@@ -1308,8 +1336,8 @@ function FieldPage({
         ...current,
         // attack-side increment goes to opponentPitchCount only
         opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
-        strikes: didStrikeout || didWalk ? 0 : nextStrikesRaw,
-        balls: didStrikeout || didWalk ? 0 : nextBallsRaw,
+        strikes: cDidStrikeout || cDidWalk ? 0 : nextStrikesRaw,
+        balls: cDidStrikeout || cDidWalk ? 0 : nextBallsRaw,
         currentBatterIndex: nextBatterIndex,
         outs: nextOuts,
         inning: nextInning,
@@ -1320,7 +1348,26 @@ function FieldPage({
         awayScore: Number(current.awayScore || 0),
       }
     }, `Contagem no ataque: ${kind}`)
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState])
+
+    // Auto-record batter stats when count produces K or BB
+    if ((didStrikeout || didWalk) && batterId && gameState.currentGameId) {
+      try {
+        const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
+        const cur = found.data?.[0]
+        await upsertCurrentBatterStats(batterId, {
+          hitting: {
+            atBats: safeNumber(cur?.hitting?.atBats) + (didStrikeout ? 1 : 0),
+            hits: safeNumber(cur?.hitting?.hits),
+            strikeouts: safeNumber(cur?.hitting?.strikeouts) + (didStrikeout ? 1 : 0),
+            outs: safeNumber(cur?.hitting?.outs) + (didStrikeout ? 1 : 0),
+            walks: safeNumber(cur?.hitting?.walks) + (didWalk ? 1 : 0),
+          },
+        })
+      } catch {
+        // Mantem fluxo local mesmo sem backend.
+      }
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.strikes, gameState.balls, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, upsertCurrentBatterStats])
 
   const applyDefensiveOutEvent = useCallback(async (kind = 'out') => {
     if (gameState.isAttacking) return
@@ -1873,67 +1920,75 @@ function FieldPage({
             return existing && getMainPosition(existing) === getMainPosition(player)
           })
 
-          if (duplicateId) {
-            const replaced = playersById[duplicateId]
-            const confirmed = window.confirm(`Confirmar substituicao: ${player?.name || 'Jogador'} entra e ${replaced?.name || 'jogador'} vai para o banco?`)
-            if (!confirmed) {
-              setDragPreview(null)
-              setDropTarget(null)
-              setDropMessage('')
-              return
-            }
+          const executeSubstitution = (incomingPlayer, replacedId, onField) => {
+            const nextOnField = replacedId
+              ? [...onField.filter((id) => id !== replacedId), drag.playerId]
+              : [...onField, drag.playerId]
+
+            setPlayers((current) =>
+              current.map((item) =>
+                getPlayerId(item) === drag.playerId
+                  ? { ...item, x: defaultPosition.x, y: defaultPosition.y }
+                  : item,
+              ),
+            )
+
+            onUpdateGameState((current) => {
+              const battingOrder = [...(current.battingOrder || [])]
+              if (replacedId) {
+                const replacedIndex = battingOrder.findIndex((id) => id === replacedId)
+                if (replacedIndex >= 0) battingOrder[replacedIndex] = drag.playerId
+              } else if (!battingOrder.includes(drag.playerId) && battingOrder.length < 9) {
+                battingOrder.push(drag.playerId)
+              }
+
+              const lineup = (current.lineup || []).filter((item) => nextOnField.includes(item.playerId))
+              const usedPositions = new Set(lineup.map((item) => item.position))
+
+              const enteringPosition = getMainPosition(incomingPlayer)
+              const positionToUse = !usedPositions.has(enteringPosition)
+                ? enteringPosition
+                : DEFENSIVE_POSITIONS.find((position) => !usedPositions.has(position)) || enteringPosition
+
+              const lineupWithoutDuplicate = replacedId
+                ? lineup.filter((item) => item.playerId !== replacedId)
+                : lineup
+
+              const nextLineup = [...lineupWithoutDuplicate, { playerId: drag.playerId, position: positionToUse }]
+              const bench = players
+                .map((item) => getPlayerId(item))
+                .filter((id) => !nextOnField.includes(id))
+
+              return {
+                ...current,
+                onFieldPlayerIds: Array.from(new Set(nextOnField)),
+                battingOrder,
+                lineup: nextLineup,
+                bench,
+                participantPlayerIds: [...nextOnField, ...bench],
+                preGameConfigured: current.preGameConfigured || nextOnField.length === 9,
+              }
+            }, replacedId
+              ? `${incomingPlayer?.name || 'Jogador'} substituiu jogador em ${getMainPosition(incomingPlayer)}`
+              : `${incomingPlayer?.name || 'Jogador'} entrou em campo`)
           }
 
-          const nextOnField = duplicateId
-            ? [...currentOnField.filter((id) => id !== duplicateId), drag.playerId]
-            : [...currentOnField, drag.playerId]
+          if (duplicateId) {
+            const replaced = playersById[duplicateId]
+            setPendingSubstitution({
+              player,
+              replaced,
+              duplicateId,
+              currentOnField,
+              execute: () => executeSubstitution(player, duplicateId, currentOnField),
+            })
+            setDragPreview(null)
+            setDropTarget(null)
+            setDropMessage('')
+            return
+          }
 
-          setPlayers((current) =>
-            current.map((item) =>
-              getPlayerId(item) === drag.playerId
-                ? { ...item, x: defaultPosition.x, y: defaultPosition.y }
-                : item,
-            ),
-          )
-
-          onUpdateGameState((current) => {
-            const battingOrder = [...(current.battingOrder || [])]
-            if (duplicateId) {
-              const replacedIndex = battingOrder.findIndex((id) => id === duplicateId)
-              if (replacedIndex >= 0) battingOrder[replacedIndex] = drag.playerId
-            } else if (!battingOrder.includes(drag.playerId) && battingOrder.length < 9) {
-              battingOrder.push(drag.playerId)
-            }
-
-            const lineup = (current.lineup || []).filter((item) => nextOnField.includes(item.playerId))
-            const usedPositions = new Set(lineup.map((item) => item.position))
-
-            const enteringPosition = getMainPosition(player)
-            const positionToUse = !usedPositions.has(enteringPosition)
-              ? enteringPosition
-              : DEFENSIVE_POSITIONS.find((position) => !usedPositions.has(position)) || enteringPosition
-
-            const lineupWithoutDuplicate = duplicateId
-              ? lineup.filter((item) => item.playerId !== duplicateId)
-              : lineup
-
-            const nextLineup = [...lineupWithoutDuplicate, { playerId: drag.playerId, position: positionToUse }]
-            const bench = players
-              .map((item) => getPlayerId(item))
-              .filter((id) => !nextOnField.includes(id))
-
-            return {
-              ...current,
-              onFieldPlayerIds: Array.from(new Set(nextOnField)),
-              battingOrder,
-              lineup: nextLineup,
-              bench,
-              participantPlayerIds: [...nextOnField, ...bench],
-              preGameConfigured: current.preGameConfigured || nextOnField.length === 9,
-            }
-          }, duplicateId
-            ? `${player?.name || 'Jogador'} substituiu jogador em ${getMainPosition(player)}`
-            : `${player?.name || 'Jogador'} entrou em campo`)
+          executeSubstitution(player, null, currentOnField)
         }
 
         if (drag.source === 'field' && inBench) {
@@ -2061,6 +2116,14 @@ function FieldPage({
 
   return (
       <section className={`field-layout ${showFieldContainer ? '' : 'mode-hidden'}`} ref={layoutRef}>
+        <div
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {`Inning ${gameState.inning || 1} ${gameState.inningHalf === 'top' ? 'topo' : 'parte baixa'}, ${gameState.outs || 0} out${(gameState.outs || 0) !== 1 ? 's' : ''}, CAASO ${gameState.homeScore || 0} x ${gameState.awayScore || 0} ${opponentName || 'Adversário'}`}
+        </div>
         <Scoreboard gameState={gameState} opponentName={opponentName} visible={gameSubView === 'campo' && showScoreboard} />
 
       {gameSubView === 'campo' && <Field
@@ -2158,12 +2221,22 @@ function FieldPage({
               </span>
               <button
                 type="button"
-                className="hud-mode-toggle-btn"
-                onClick={() => onUpdateGameState((current) => ({
-                  ...current, isAttacking: !current.isAttacking, balls: 0, strikes: 0,
-                }), 'Modo alternado manualmente')}
+                className={`hud-mode-toggle-btn${modePendingConfirm ? ' hud-mode-toggle-pending' : ''}`}
+                onClick={() => {
+                  if (!modePendingConfirm) {
+                    setModePendingConfirm(true)
+                    if (modePendingTimerRef.current) clearTimeout(modePendingTimerRef.current)
+                    modePendingTimerRef.current = window.setTimeout(() => setModePendingConfirm(false), 2000)
+                    return
+                  }
+                  clearTimeout(modePendingTimerRef.current)
+                  setModePendingConfirm(false)
+                  onUpdateGameState((current) => ({
+                    ...current, isAttacking: !current.isAttacking, balls: 0, strikes: 0,
+                  }), 'Modo alternado manualmente')
+                }}
               >
-                Trocar
+                {modePendingConfirm ? 'Confirmar?' : 'Trocar'}
               </button>
             </div>
 
@@ -2254,7 +2327,7 @@ function FieldPage({
 
             <div className="acoes-end-row">
               <button type="button" className="acoes-undo-btn" onClick={() => handleUndo().catch(() => {})}>↩ Desfazer</button>
-              <button type="button" className="acoes-end-btn" onClick={() => onEndGame?.()}>Encerrar jogo</button>
+              <button type="button" className="acoes-end-btn" onClick={() => setPendingEndGame(true)}>Encerrar jogo</button>
             </div>
           </div>
 
@@ -2309,9 +2382,11 @@ function FieldPage({
       )}
 
       {/* Sub-view toggle */}
-      <div className="game-subview-bar">
+      <div className="game-subview-bar" role="tablist" aria-label="Visão do jogo">
         <button
           type="button"
+          role="tab"
+          aria-selected={gameSubView === 'campo'}
           className={gameSubView === 'campo' ? 'active' : ''}
           onClick={() => setGameSubView('campo')}
         >
@@ -2319,6 +2394,8 @@ function FieldPage({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={gameSubView === 'acoes'}
           className={gameSubView === 'acoes' ? 'active' : ''}
           onClick={() => setGameSubView('acoes')}
         >
@@ -2329,29 +2406,40 @@ function FieldPage({
     
 
       {showPreGameSetup && (
-        <Modal title="Configuracao Inicial" onClose={() => setShowPreGameSetup(false)}>
+        <Modal
+          title="Configuracao Inicial"
+          onClose={gameState.currentGameId ? () => setShowPreGameSetup(false) : onCancelPreGame ?? undefined}
+        >
           <div className="pregame-grid">
                 <section className="player-stats-block pregame-info">
                   <h4>0) Informações do jogo</h4>
+                  <label htmlFor="pregame-date" className="field-label">Data</label>
                   <input
+                    id="pregame-date"
                     type="date"
                     value={pregameForm.date}
                     onChange={(e) => setPregameForm((c) => ({ ...c, date: e.target.value }))}
                     style={{ marginBottom: 8 }}
                   />
+                  <label htmlFor="pregame-opponent" className="field-label">Adversário</label>
                   <input
+                    id="pregame-opponent"
                     placeholder="Nome do adversario"
                     value={pregameForm.opponentName}
                     onChange={(e) => setPregameForm((c) => ({ ...c, opponentName: e.target.value }))}
                     style={{ marginBottom: 8 }}
                   />
+                  <label htmlFor="pregame-competition" className="field-label">Competição</label>
                   <input
+                    id="pregame-competition"
                     placeholder="Competicao (treino/campeonato)"
                     value={pregameForm.competition}
                     onChange={(e) => setPregameForm((c) => ({ ...c, competition: e.target.value }))}
                     style={{ marginBottom: 8 }}
                   />
+                  <label htmlFor="pregame-location" className="field-label">Local (opcional)</label>
                   <input
+                    id="pregame-location"
                     placeholder="Local (opcional)"
                     value={pregameForm.location}
                     onChange={(e) => setPregameForm((c) => ({ ...c, location: e.target.value }))}
@@ -2453,6 +2541,11 @@ function FieldPage({
           </div>
 
           <div className="detail-actions">
+            {!gameState.currentGameId && onCancelPreGame && (
+              <Button type="button" variant="secondary" onClick={onCancelPreGame}>
+                Cancelar
+              </Button>
+            )}
             <Button
               type="button"
               variant="primary"
@@ -2467,6 +2560,16 @@ function FieldPage({
             </Button>
           </div>
         </Modal>
+      )}
+
+      {pendingEndGame && (
+        <ConfirmModal
+          message="Encerrar o jogo? Esta ação é irreversível."
+          confirmLabel="Encerrar"
+          danger
+          onConfirm={() => { setPendingEndGame(false); onEndGame?.() }}
+          onCancel={() => setPendingEndGame(false)}
+        />
       )}
 
       {pendingDoublePlaySelect && (
@@ -2534,6 +2637,18 @@ function FieldPage({
             </div>
           </div>
         </Modal>
+      )}
+
+      {pendingSubstitution && (
+        <ConfirmModal
+          message={`${pendingSubstitution.player?.name || 'Jogador'} entra e ${pendingSubstitution.replaced?.name || 'jogador'} vai para o banco?`}
+          confirmLabel="Confirmar substituição"
+          onConfirm={() => {
+            pendingSubstitution.execute()
+            setPendingSubstitution(null)
+          }}
+          onCancel={() => setPendingSubstitution(null)}
+        />
       )}
 
       {pendingDefenseError && (

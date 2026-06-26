@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 
@@ -20,6 +20,15 @@ const Bench = React.forwardRef(function Bench({
   gameState,
   onUpdateGameState,
 }, ref) {
+  const [localSearch, setLocalSearch] = useState(benchSearch)
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = window.setTimeout(() => setBenchSearch(localSearch), 200)
+    return () => clearTimeout(debounceRef.current)
+  }, [localSearch, setBenchSearch])
+
   return (
     <aside
       ref={ref}
@@ -33,8 +42,9 @@ const Bench = React.forwardRef(function Bench({
         </div>
         <Input
           placeholder="Buscar jogador"
-          value={benchSearch}
-          onChange={(event) => setBenchSearch(event.target.value)}
+          value={localSearch}
+          onChange={(event) => setLocalSearch(event.target.value)}
+          aria-label="Buscar jogador no banco"
         />
       </div>
 

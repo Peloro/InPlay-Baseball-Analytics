@@ -302,7 +302,7 @@ export const seasonStatsApi = {
       if (!byPlayer[pid]) {
         byPlayer[pid] = {
           playerId: pid,
-          hitting:  { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+          hitting:  { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
           pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
           defense:  { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
           roleSummary: { hitterGames: 0, pitcherGames: 0 },
@@ -314,6 +314,7 @@ export const seasonStatsApi = {
       agg.hitting.hits       += safeN(h.hits)
       agg.hitting.strikeouts += safeN(h.strikeouts)
       agg.hitting.outs       += safeN(h.outs)
+      agg.hitting.walks      += safeN(h.walks)
       const p = stat.pitching || {}
       agg.pitching.outsPitched  += safeN(p.outsPitched)
       agg.pitching.earnedRuns   += safeN(p.earnedRuns)

@@ -3,6 +3,7 @@ import GameDetailPage from './GameDetailPage'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import { safeNumber } from '../utils/number'
 import { avgFromEntry, avgFromValues, eraFromEntry } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
@@ -11,11 +12,10 @@ import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 
 const EMPTY_GAME_STAT = {
   type: 'hitter',
-  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
   pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
   defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
 }
-
 
 
 
@@ -31,7 +31,7 @@ function hasAnyStat(entry) {
   const d = entry.defense || {}
 
   const fields = [
-    h.atBats, h.hits, h.strikeouts, h.outs,
+    h.atBats, h.hits, h.strikeouts, h.outs, h.walks,
     p.inningsPitched, p.outsPitched, p.earnedRuns, p.strikeouts, p.walks, p.pitchCount,
     d.errors, d.doublePlays, d.flyOuts, d.groundOuts, d.lineOuts,
   ]
@@ -39,19 +39,11 @@ function hasAnyStat(entry) {
   return fields.some((v) => safeNumber(v) > 0)
 }
 
-function wait(ms) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
-}
-
 function StatsPage({
   players,
   onDeleteGame,
   onOpenGame,
-  onSelectGame,
   gameState,
-  onUpdateGameState,
   onGoField,
 }) {
   const [games, setGames] = useState([])
@@ -66,19 +58,15 @@ function StatsPage({
   const [seasonSortBy, setSeasonSortBy] = useState('hits')
   const [focusedPlayerId, setFocusedPlayerId] = useState(null)
   const [saveStatus, setSaveStatus] = useState('idle')
-  const [isStatsLeaving, setIsStatsLeaving] = useState(false)
+  const [pendingDeleteGame, setPendingDeleteGame] = useState(null)
+  const [pendingResetGame, setPendingResetGame] = useState(false)
+
+  // viewingGameId: which game is currently displayed in the detail panel.
+  // Completely independent from gameState.currentGameId (the active/live game).
+  const [viewingGameId, setViewingGameId] = useState(() => gameState.currentGameId)
+  const [showGameDetail, setShowGameDetail] = useState(() => Boolean(gameState.currentGameId))
+
   const gameDetailsRef = useRef(null)
-
-  const selectedGameId = gameState.currentGameId
-  const participantIds = useMemo(
-    () => gameState.participantPlayerIds || [],
-    [gameState.participantPlayerIds],
-  )
-
-  const rosterPlayers = useMemo(() => {
-    const ids = participantIds.length ? new Set(participantIds) : null
-    return players.filter((player) => (ids ? ids.has(getPlayerId(player)) : true))
-  }, [players, participantIds])
 
   const loadGames = useCallback(async () => {
     setGamesLoading(true)
@@ -115,6 +103,7 @@ function StatsPage({
     }
   }, [])
 
+  // Bootstrap: load games and season stats on mount
   useEffect(() => {
     const bootstrap = async () => {
       try {
@@ -127,6 +116,7 @@ function StatsPage({
     bootstrap()
   }, [loadGames, loadSeasonStats])
 
+  // Reload season stats when playerFilter changes
   useEffect(() => {
     const timer = window.setTimeout(() => {
       loadSeasonStats().catch(() => {})
@@ -134,12 +124,39 @@ function StatsPage({
     return () => window.clearTimeout(timer)
   }, [loadSeasonStats])
 
+  // Reload game stats when viewingGameId changes
   useEffect(() => {
+    if (!viewingGameId) {
+      setGameStats([])
+      return
+    }
     const timer = window.setTimeout(() => {
-      loadGameStats(selectedGameId).catch(() => {})
+      loadGameStats(viewingGameId).catch(() => {})
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [loadGameStats, selectedGameId])
+  }, [loadGameStats, viewingGameId])
+
+  const viewingGame = useMemo(
+    () => games.find((g) => g._id === viewingGameId) || null,
+    [games, viewingGameId],
+  )
+
+  // Players shown in the game detail: use the viewed game's own lineup/bench,
+  // OR live participants when viewing the active game.
+  const detailRosterPlayers = useMemo(() => {
+    if (!viewingGame) return []
+    if (viewingGameId === gameState.currentGameId) {
+      const ids = new Set(gameState.participantPlayerIds || [])
+      return ids.size ? players.filter((p) => ids.has(getPlayerId(p))) : players
+    }
+    const gameParticipantIds = new Set([
+      ...(viewingGame.lineup || []).map((item) => item.playerId),
+      ...(viewingGame.bench || []),
+    ])
+    return gameParticipantIds.size
+      ? players.filter((p) => gameParticipantIds.has(getPlayerId(p)))
+      : players
+  }, [viewingGame, viewingGameId, gameState.currentGameId, gameState.participantPlayerIds, players])
 
   const seasonMap = useMemo(() => {
     const map = {}
@@ -155,7 +172,7 @@ function StatsPage({
         .map((player) => {
           const id = getPlayerId(player)
           const entry = seasonMap[id] || {
-            hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+            hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
             pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
             defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
             roleSummary: { hitterGames: 0, pitcherGames: 0 },
@@ -198,9 +215,9 @@ function StatsPage({
     }
 
     let topHitsId = null
-    let topHitsValue = -1
+    let topHitsValue = 0
     let topAvgId = null
-    let topAvgValue = -1
+    let topAvgValue = 0
 
     for (const row of visibleSeasonRows) {
       const id = getPlayerId(row.player)
@@ -208,11 +225,11 @@ function StatsPage({
       const ab = safeNumber(row.entry.hitting?.atBats)
       const avg = ab ? hits / ab : 0
 
+      // Only crown a leader if they actually have meaningful stats (>0)
       if (hits > topHitsValue) {
         topHitsValue = hits
         topHitsId = id
       }
-
       if (avg > topAvgValue) {
         topAvgValue = avg
         topAvgId = id
@@ -228,19 +245,21 @@ function StatsPage({
         atBats: acc.atBats + safeNumber(item.entry.hitting?.atBats),
         hits: acc.hits + safeNumber(item.entry.hitting?.hits),
         hittingStrikeouts: acc.hittingStrikeouts + safeNumber(item.entry.hitting?.strikeouts),
+        walks: acc.walks + safeNumber(item.entry.hitting?.walks),
         inningsPitched: acc.inningsPitched + safeNumber(item.entry.pitching?.inningsPitched),
         earnedRuns: acc.earnedRuns + safeNumber(item.entry.pitching?.earnedRuns),
         pitchingStrikeouts: acc.pitchingStrikeouts + safeNumber(item.entry.pitching?.strikeouts),
-        walks: acc.walks + safeNumber(item.entry.pitching?.walks),
+        pitchingWalks: acc.pitchingWalks + safeNumber(item.entry.pitching?.walks),
       }
     }, {
       atBats: 0,
       hits: 0,
       hittingStrikeouts: 0,
+      walks: 0,
       inningsPitched: 0,
       earnedRuns: 0,
       pitchingStrikeouts: 0,
-      walks: 0,
+      pitchingWalks: 0,
     })
   }, [visibleSeasonRows])
 
@@ -255,11 +274,6 @@ function StatsPage({
     return list
   }, [games, sortBy])
 
-  const selectedGame = useMemo(
-    () => games.find((game) => game._id === selectedGameId) || null,
-    [games, selectedGameId],
-  )
-
   const openPlayerDetails = useCallback((playerId) => {
     setFocusedPlayerId(null)
     window.requestAnimationFrame(() => setFocusedPlayerId(playerId))
@@ -273,8 +287,7 @@ function StatsPage({
 
     const fallback = found || {
       _id: null,
-      gameId: selectedGameId,
-      playerId,
+      gameId: viewingGameId,
       ...EMPTY_GAME_STAT,
     }
 
@@ -288,6 +301,7 @@ function StatsPage({
         hits: safeNumber(patch.hitting?.hits ?? fallback.hitting?.hits),
         strikeouts: safeNumber(patch.hitting?.strikeouts ?? fallback.hitting?.strikeouts),
         outs: safeNumber(patch.hitting?.outs ?? fallback.hitting?.outs),
+        walks: safeNumber(patch.hitting?.walks ?? fallback.hitting?.walks),
       },
       pitching: {
         inningsPitched: safeNumber(
@@ -318,7 +332,7 @@ function StatsPage({
       response = await gameStatsApi.update(found._id, payload)
     } else {
       response = await gameStatsApi.create({
-        gameId: selectedGameId,
+        gameId: viewingGameId,
         playerId,
         ...payload,
       })
@@ -338,44 +352,49 @@ function StatsPage({
   }
 
   const resetCurrentGameStats = async () => {
-    if (!selectedGameId) return
+    if (!viewingGameId) return
 
     setSaveStatus('saving')
-    for (const player of rosterPlayers) {
+    for (const player of detailRosterPlayers) {
       const playerId = getPlayerId(player)
       await upsertGameStat(playerId, {
-        hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+        hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
         pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
         defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
       })
     }
 
-    await loadGameStats(selectedGameId)
+    await loadGameStats(viewingGameId)
     setSaveStatus('saved')
     window.setTimeout(() => setSaveStatus('idle'), 900)
   }
 
-  const handleDeleteGameItem = async (game) => {
+  const handleDeleteGameItem = (game) => {
     if (!game?._id) return
+    setPendingDeleteGame(game)
+  }
 
-    const confirmed = window.confirm(
-      `Apagar jogo ${new Date(game.date).toLocaleDateString('pt-BR')} vs ${game.opponentName || game.opponent}?`,
-    )
-    if (!confirmed) return
+  const confirmDeleteGame = async () => {
+    const game = pendingDeleteGame
+    setPendingDeleteGame(null)
+    if (!game?._id) return
 
     await onDeleteGame?.(game._id)
     await loadGames()
     await loadSeasonStats()
 
-    if (selectedGameId === game._id) {
+    if (viewingGameId === game._id) {
+      setViewingGameId(null)
+      setShowGameDetail(false)
       setGameStats([])
-    } else if (selectedGameId) {
-      await loadGameStats(selectedGameId)
+    } else if (viewingGameId) {
+      await loadGameStats(viewingGameId)
     }
   }
 
   const handleSelectGameCard = (game) => {
-    onSelectGame?.(game)
+    setViewingGameId(game._id)
+    setShowGameDetail(true)
   }
 
   const handleOpenGame = (game) => {
@@ -383,17 +402,32 @@ function StatsPage({
   }
 
   const handleViewGameStats = (game) => {
-    onSelectGame?.(game)
+    setViewingGameId(game._id)
+    setShowGameDetail(true)
     window.setTimeout(() => {
       gameDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 20)
   }
 
+  const handleRefresh = async () => {
+    await loadGames()
+    await loadSeasonStats()
+    if (viewingGameId) await loadGameStats(viewingGameId)
+  }
+
+  const hitterColCount = 9  // Jogador, N, Pos, AB, H, BB, SO, OUT, AVG
+  const pitcherColCount = 10 // Jogador, N, Pos, IP, ERA, SO, BB, PC, STR, BAL
+
   return (
-    <section className={`stats-page stats-page-full ${isStatsLeaving ? 'stats-page-leaving' : ''}`}>
+    <section className="stats-page stats-page-full">
       <div className="stats-main">
       <div className="card">
-        <h2>Estatisticas da temporada</h2>
+        <div className="stats-page-header">
+          <h2>Estatisticas da temporada</h2>
+          <Button type="button" variant="secondary" onClick={handleRefresh} title="Recarregar dados">
+            Atualizar
+          </Button>
+        </div>
         <div className="season-toolbar inline-tools">
           <label>
             Ordenar por
@@ -452,6 +486,10 @@ function StatsPage({
                 <span>{seasonTotals.atBats}</span>
               </div>
               <div className="kpi">
+                <strong>BB</strong>
+                <span>{seasonTotals.walks}</span>
+              </div>
+              <div className="kpi">
                 <strong>SO</strong>
                 <span>{seasonTotals.hittingStrikeouts}</span>
               </div>
@@ -476,7 +514,7 @@ function StatsPage({
               </div>
               <div className="kpi">
                 <strong>BB</strong>
-                <span>{seasonTotals.walks}</span>
+                <span>{seasonTotals.pitchingWalks}</span>
               </div>
             </>
           )}
@@ -493,18 +531,32 @@ function StatsPage({
                   <>
                     <th>AB</th>
                     <th>H</th>
+                    <th>BB</th>
                     <th>SO</th>
                     <th>OUT</th>
                     <th>AVG</th>
                   </>
                 ) : (
                   <>
-                    <th>Pitching</th>
+                    <th>IP</th>
+                    <th>ERA</th>
+                    <th>SO</th>
+                    <th>BB</th>
+                    <th>PC</th>
+                    <th>STR</th>
+                    <th>BAL</th>
                   </>
                 )}
               </tr>
             </thead>
             <tbody>
+              {!seasonLoading && !visibleSeasonRows.length && (
+                <tr>
+                  <td colSpan={statsTab === 'hitters' ? hitterColCount : pitcherColCount} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                    Nenhuma estatística registrada ainda.
+                  </td>
+                </tr>
+              )}
               {visibleSeasonRows.map(({ player, entry }) => {
                 const id = getPlayerId(player)
 
@@ -524,23 +576,20 @@ function StatsPage({
                       <>
                         <td>{safeNumber(entry.hitting?.atBats)}</td>
                         <td>{safeNumber(entry.hitting?.hits)}</td>
+                        <td>{safeNumber(entry.hitting?.walks)}</td>
                         <td>{safeNumber(entry.hitting?.strikeouts)}</td>
                         <td>{safeNumber(entry.hitting?.outs)}</td>
                         <td>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</td>
                       </>
                     ) : (
                       <>
-                        <td>
-                          <div className="pitcher-stat-grid">
-                            <span>IP: {safeNumber(entry.pitching?.inningsPitched)}</span>
-                            <span>ERA: {entry.era ? Number(entry.era).toFixed(3) : eraFromEntry(entry)}</span>
-                            <span>SO: {safeNumber(entry.pitching?.strikeouts)}</span>
-                            <span>BB: {safeNumber(entry.pitching?.walks)}</span>
-                            <span>PC: {safeNumber(entry.pitching?.pitchCount)}</span>
-                            <span>STR: {safeNumber(entry.pitching?.strikes)}</span>
-                            <span>BAL: {safeNumber(entry.pitching?.balls)}</span>
-                          </div>
-                        </td>
+                        <td>{safeNumber(entry.pitching?.inningsPitched)}</td>
+                        <td>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</td>
+                        <td>{safeNumber(entry.pitching?.strikeouts)}</td>
+                        <td>{safeNumber(entry.pitching?.walks)}</td>
+                        <td>{safeNumber(entry.pitching?.pitchCount)}</td>
+                        <td>{safeNumber(entry.pitching?.strikes)}</td>
+                        <td>{safeNumber(entry.pitching?.balls)}</td>
                       </>
                     )}
                   </tr>
@@ -566,6 +615,7 @@ function StatsPage({
                       <div className="stat-grid">
                         <div><strong>AB</strong><div>{safeNumber(entry.hitting?.atBats)}</div></div>
                         <div><strong>H</strong><div>{safeNumber(entry.hitting?.hits)}</div></div>
+                        <div><strong>BB</strong><div>{safeNumber(entry.hitting?.walks)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.hitting?.strikeouts)}</div></div>
                         <div><strong>OUT</strong><div>{safeNumber(entry.hitting?.outs)}</div></div>
                         <div><strong>AVG</strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</div></div>
@@ -573,7 +623,7 @@ function StatsPage({
                     ) : (
                       <div className="stat-grid">
                         <div><strong>IP</strong><div>{safeNumber(entry.pitching?.inningsPitched)}</div></div>
-                        <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(3) : eraFromEntry(entry)}</div></div>
+                        <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.pitching?.strikeouts)}</div></div>
                         <div><strong>BB</strong><div>{safeNumber(entry.pitching?.walks)}</div></div>
                         <div><strong>PC</strong><div>{safeNumber(entry.pitching?.pitchCount)}</div></div>
@@ -590,14 +640,13 @@ function StatsPage({
       <div className="card">
         <h2>Jogos individuais</h2>
         <div className="game-state-indicator">
-          {selectedGame
-            ? `Jogo selecionado: ${new Date(selectedGame.date).toLocaleDateString('pt-BR')} - ${selectedGame.opponentName || selectedGame.opponent}`
+          {viewingGame
+            ? `Jogo selecionado: ${new Date(viewingGame.date).toLocaleDateString('pt-BR')} - ${viewingGame.opponentName || viewingGame.opponent}`
             : 'Nenhum jogo selecionado'}
         </div>
         <div className="autosave-indicator">
           {saveStatus === 'saving' ? 'Salvando automaticamente...' : saveStatus === 'saved' ? 'Salvo automaticamente' : ''}
         </div>
-        {/* Game creation moved to Modo Jogo (FieldPage) pre-game setup */}
 
         <div className="season-toolbar">
           <label>
@@ -609,21 +658,35 @@ function StatsPage({
           </label>
         </div>
 
+        {!sortedGames.length && (
+          <div className="empty-state-card">
+            <div className="empty-state-icon">⚾</div>
+            <p>Nenhum jogo registrado ainda.</p>
+            <p className="empty-state-hint">Vá para <strong>Jogo</strong> para iniciar uma partida.</p>
+          </div>
+        )}
         <ul className="game-list">
           {sortedGames.map((game) => {
-            const score = game?.gameState
-              ? `${Number(game.gameState.homeScore || 0)} x ${Number(game.gameState.awayScore || 0)}`
-              : '-- x --'
+            const isLive = game._id === gameState.currentGameId
+            // For the active game show live score; for historical games show stored score
+            const score = isLive
+              ? `${Number(gameState.homeScore || 0)} x ${Number(gameState.awayScore || 0)}`
+              : game?.gameState
+                ? `${Number(game.gameState.homeScore || 0)} x ${Number(game.gameState.awayScore || 0)}`
+                : '-- x --'
 
             return (
               <li key={game._id}>
                 <article
-                  className={`game-card ${selectedGameId === game._id ? 'selected' : ''}`}
+                  className={`game-card ${viewingGameId === game._id ? 'selected' : ''}`}
                   onClick={() => handleSelectGameCard(game)}
                 >
                   <div className="game-card-head">
                     <strong>{game.opponentName || game.opponent}</strong>
-                    <span>{new Date(game.date).toLocaleDateString('pt-BR')}</span>
+                    <div className="game-card-head-right">
+                      {isLive && <span className="live-badge">AO VIVO</span>}
+                      <span>{new Date(game.date).toLocaleDateString('pt-BR')}</span>
+                    </div>
                   </div>
                   <div className="game-card-meta">
                     <span>{game.competition}</span>
@@ -667,25 +730,25 @@ function StatsPage({
           })}
         </ul>
 
-        {selectedGame && (
+        {viewingGame && showGameDetail && (
           <div ref={gameDetailsRef}>
             {gameStatsLoading && <div className="stats-loading">Carregando estatísticas do jogo...</div>}
             <div className="detail-actions">
-              <Button type="button" variant="primary" onClick={() => handleOpenGame(selectedGame)}>
+              <Button type="button" variant="primary" onClick={() => handleOpenGame(viewingGame)}>
                 Abrir jogo
               </Button>
               <Button type="button" variant="primary" onClick={onGoField}>
                 Ir para campo
               </Button>
-              <Button type="button" variant="primary" onClick={resetCurrentGameStats}>
+              <Button type="button" variant="danger" onClick={() => setPendingResetGame(true)}>
                 Resetar stats do jogo
               </Button>
             </div>
             <GameDetailPage
-              game={selectedGame}
-              players={rosterPlayers}
+              game={viewingGame}
+              players={detailRosterPlayers}
               gameStats={gameStats}
-              onClose={() => onUpdateGameState({ currentGameId: null }, 'Detalhe do jogo fechado')}
+              onClose={() => setShowGameDetail(false)}
               onOpenPlayer={openPlayerDetails}
               onQuickEvent={async (playerId, category, fieldKey, delta) => {
                 const current = gameStats.find((entry) => {
@@ -716,6 +779,26 @@ function StatsPage({
         )}
       </div>
       </div>{/* /stats-main */}
+
+      {pendingDeleteGame && (
+        <ConfirmModal
+          message={`Apagar jogo ${new Date(pendingDeleteGame.date).toLocaleDateString('pt-BR')} vs ${pendingDeleteGame.opponentName || pendingDeleteGame.opponent}?`}
+          confirmLabel="Apagar"
+          danger
+          onConfirm={confirmDeleteGame}
+          onCancel={() => setPendingDeleteGame(null)}
+        />
+      )}
+
+      {pendingResetGame && (
+        <ConfirmModal
+          message="Isso apagará todos os stats do jogo selecionado. Continuar?"
+          confirmLabel="Resetar"
+          danger
+          onConfirm={async () => { setPendingResetGame(false); await resetCurrentGameStats() }}
+          onCancel={() => setPendingResetGame(false)}
+        />
+      )}
 
       <PlayerStatsModal
         player={players.find((player) => getPlayerId(player) === focusedPlayerId) || null}

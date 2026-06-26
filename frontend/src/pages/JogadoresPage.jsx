@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Modal from '../components/ui/Modal'
+import ConfirmModal from '../components/ui/ConfirmModal'
 import Button from '../components/ui/Button'
 import { gameStatsApi, seasonStatsApi } from '../services/api'
 import { VALID_POSITIONS } from '../data/positions'
@@ -11,6 +12,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
   const [editingPlayerId, setEditingPlayerId] = useState(null)
   const [editingForm, setEditingForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
   const [focusedPlayerId, setFocusedPlayerId] = useState(null)
+  const [pendingDeletePlayer, setPendingDeletePlayer] = useState(null)
   const [focusedSeasonEntry, setFocusedSeasonEntry] = useState(null)
   const [focusedGameEntry, setFocusedGameEntry] = useState(null)
 
@@ -100,11 +102,16 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
     setEditingPlayerId(null)
   }
 
-  const handleDeletePlayerItem = async (player) => {
+  const handleDeletePlayerItem = (player) => {
+    if (!getPlayerId(player)) return
+    setPendingDeletePlayer(player)
+  }
+
+  const confirmDeletePlayer = async () => {
+    const player = pendingDeletePlayer
+    setPendingDeletePlayer(null)
+    if (!player) return
     const playerId = getPlayerId(player)
-    if (!playerId) return
-    const confirmed = window.confirm(`Apagar jogador ${player.name} #${player.number}?`)
-    if (!confirmed) return
     if (focusedPlayerId === playerId) setFocusedPlayerId(null)
     await onDeletePlayer?.(playerId)
   }
@@ -130,12 +137,16 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
         <div className="card">
           <h2>Adicionar jogador</h2>
           <form className="player-form" onSubmit={handleAddPlayer}>
+            <label htmlFor="add-player-name" className="field-label">Nome</label>
             <input
+              id="add-player-name"
               placeholder="Nome"
               value={form.name}
               onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
             />
+            <label htmlFor="add-player-number" className="field-label">Número</label>
             <input
+              id="add-player-number"
               placeholder="Numero"
               type="number"
               value={form.number}
@@ -217,6 +228,16 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
         </div>
       </div>
 
+      {pendingDeletePlayer && (
+        <ConfirmModal
+          message={`Apagar jogador ${pendingDeletePlayer.name} #${pendingDeletePlayer.number}?`}
+          confirmLabel="Apagar"
+          danger
+          onConfirm={confirmDeletePlayer}
+          onCancel={() => setPendingDeletePlayer(null)}
+        />
+      )}
+
       <PlayerStatsModal
         player={focusedPlayerId ? players.find((p) => getPlayerId(p) === focusedPlayerId) || null : null}
         seasonEntry={focusedSeasonEntry}
@@ -227,12 +248,16 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       {editingPlayerId && (
         <Modal title="Editar jogador" onClose={() => setEditingPlayerId(null)}>
           <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit() }}>
+            <label htmlFor="edit-player-name" className="field-label">Nome</label>
             <input
+              id="edit-player-name"
               placeholder="Nome"
               value={editingForm.name}
               onChange={(e) => setEditingForm((c) => ({ ...c, name: e.target.value }))}
             />
+            <label htmlFor="edit-player-number" className="field-label">Número</label>
             <input
+              id="edit-player-number"
               placeholder="Numero"
               value={editingForm.number}
               onChange={(e) => setEditingForm((c) => ({ ...c, number: e.target.value }))}

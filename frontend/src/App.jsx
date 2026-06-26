@@ -70,6 +70,10 @@ function getSavedGameState() {
     if (!raw) return INITIAL_GAME_STATE
 
     const parsed = JSON.parse(raw)
+
+    // No active game → discard any stale progress fields entirely
+    if (!parsed?.currentGameId) return INITIAL_GAME_STATE
+
     return {
       ...INITIAL_GAME_STATE,
       ...parsed,
@@ -174,9 +178,20 @@ function App() {
   const [gameState, setGameState] = useState(getSavedGameState)
   const [activeGame, setActiveGame] = useState(null)
   const [gameAccessNotice, setGameAccessNotice] = useState('')
-  const [isClosingGame, setIsClosingGame] = useState(false)
   const [isGameEntering, setIsGameEntering] = useState(false)
   const [navCollapsed, setNavCollapsed] = useState(false)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false)
+    const onOffline = () => setIsOffline(true)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
 
   useEffect(() => {
     window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
@@ -677,53 +692,43 @@ function App() {
     }
   }, [gameState, syncPitchToPitcher, updateGameState])
 
-  const handleEndGame = useCallback(() => {
+  const handleEndGame = useCallback(async () => {
     const currentGameId = gameState.currentGameId
     if (!currentGameId) return
 
-    setIsClosingGame(true)
+    try {
+      await gamesApi.update(currentGameId, {
+        isFinished: true,
+        finishedAt: new Date().toISOString(),
+      })
+    } catch {
+      // Segue fluxo local mesmo sem backend.
+    }
 
-    window.setTimeout(async () => {
-      try {
-        await gamesApi.update(currentGameId, {
-          isFinished: true,
-          finishedAt: new Date().toISOString(),
-        })
-      } catch {
-        // Segue fluxo local mesmo sem backend.
-      }
-
-      setActiveGame(null)
-      setGameAccessNotice('')
-      setPage('stats')
-
-      updateGameState(
-        (current) => ({
-          ...current,
-          currentGameId: null,
-          inning: 1,
-          inningHalf: 'top',
-          outs: 0,
-          balls: 0,
-          strikes: 0,
-          pitchCount: 0,
-          ourPitchCount: 0,
-          opponentPitchCount: 0,
-          pitchCounts: {},
-          homeScore: 0,
-          awayScore: 0,
-          isAttacking: true,
-          lineup: [],
-          bench: [],
-          preGameConfigured: false,
-          currentBatterIndex: 0,
-          runners: { first: false, second: false, third: false },
-        }),
-        'Jogo encerrado',
-      )
-
-      window.setTimeout(() => setIsClosingGame(false), 40)
-    }, 260)
+    setActiveGame(null)
+    setGameAccessNotice('')
+    setPage('stats')
+    updateGameState((current) => ({
+      ...current,
+      currentGameId: null,
+      inning: 1,
+      inningHalf: 'top',
+      outs: 0,
+      balls: 0,
+      strikes: 0,
+      pitchCount: 0,
+      ourPitchCount: 0,
+      opponentPitchCount: 0,
+      pitchCounts: {},
+      homeScore: 0,
+      awayScore: 0,
+      isAttacking: true,
+      lineup: [],
+      bench: [],
+      preGameConfigured: false,
+      currentBatterIndex: 0,
+      runners: { first: false, second: false, third: false },
+    }))
   }, [gameState.currentGameId, updateGameState])
 
   const openGameFromStats = useCallback((game) => {
@@ -741,7 +746,7 @@ function App() {
   }, [])
 
   return (
-    <main className={`app-shell ${isClosingGame ? 'app-closing' : ''} ${isGameEntering ? 'app-entering-game' : ''} ${navCollapsed ? 'nav-collapsed' : ''}`}>
+    <main className={`app-shell ${isGameEntering ? 'app-entering-game' : ''} ${navCollapsed ? 'nav-collapsed' : ''}`}>
       {navCollapsed && (
         <button type="button" className="nav-restore-btn" onClick={() => setNavCollapsed(false)} aria-label="Mostrar navegação">▼</button>
       )}
@@ -753,21 +758,23 @@ function App() {
             <span>RAÇA CAASO</span>
           </div>
         </div>
-        <div className="nav-actions">
+        <nav className="nav-actions" role="navigation" aria-label="Navegação principal">
           <button
             type="button"
-            className={page === 'game' ? 'active' : ''}
+            className={`${page === 'game' ? 'active' : ''} ${!gameState.currentGameId ? 'nav-no-game' : ''}`}
+            aria-selected={page === 'game'}
             onClick={() => {
               setGameAccessNotice('')
               setPage('game')
             }}
           >
-            <span className="nav-label-full">Jogo</span>
-            <span className="nav-label-short">Jogo</span>
+            <span className="nav-label-full">{gameState.currentGameId ? 'Jogo' : 'Novo Jogo'}</span>
+            <span className="nav-label-short">{gameState.currentGameId ? 'Jogo' : 'Novo'}</span>
           </button>
           <button
             type="button"
             className={page === 'training' ? 'active' : ''}
+            aria-selected={page === 'training'}
             onClick={() => setPage('training')}
           >
             <span className="nav-label-full">Treino</span>
@@ -776,6 +783,7 @@ function App() {
           <button
             type="button"
             className={page === 'jogadores' ? 'active' : ''}
+            aria-selected={page === 'jogadores'}
             onClick={() => setPage('jogadores')}
           >
             <span className="nav-label-full">Jogadores</span>
@@ -784,6 +792,7 @@ function App() {
           <button
             type="button"
             className={page === 'stats' ? 'active' : ''}
+            aria-selected={page === 'stats'}
             onClick={() => {
               setGameAccessNotice('')
               setPage('stats')
@@ -792,10 +801,15 @@ function App() {
             <span className="nav-label-full">Stats</span>
             <span className="nav-label-short">Stats</span>
           </button>
-        </div>
+        </nav>
         <button type="button" className="nav-toggle-btn" onClick={() => setNavCollapsed(true)} aria-label="Ocultar navegação">▲</button>
       </header>
 
+      {isOffline && (
+        <div className="offline-banner" role="status" aria-live="polite">
+          Sem conexão — dados salvos localmente
+        </div>
+      )}
       {gameAccessNotice && <div className="game-access-warning">{gameAccessNotice}</div>}
 
       {page === 'game' ? (
@@ -825,6 +839,7 @@ function App() {
           activeGame={activeGame}
           onEndGame={handleEndGame}
           allowPregameWithoutGame={true}
+          onCancelPreGame={() => setPage('stats')}
         />
       ) : page === 'training' ? (
         <TrainingField
@@ -849,12 +864,7 @@ function App() {
           players={players}
           onDeleteGame={handleDeleteGame}
           onOpenGame={openGameFromStats}
-          onSelectGame={(game) => {
-            if (!game?._id) return
-            updateGameState({ currentGameId: game._id }, 'Jogo selecionado na lista')
-          }}
           gameState={gameState}
-          onUpdateGameState={updateGameState}
           onGoField={() => setPage('game')}
         />
       )}
