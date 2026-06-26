@@ -241,6 +241,13 @@ export const gamesApi = {
 
     return { data: {} }
   },
+
+  clearSeason() {
+    lfSet(LS.games, [])
+    lfSet(LS.gameStats, [])
+    lfSet(LS.syncQueue, [])
+    return { data: [] }
+  },
 }
 
 // ── Game stats ────────────────────────────────────────────────────

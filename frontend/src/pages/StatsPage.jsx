@@ -60,6 +60,7 @@ function StatsPage({
   const [saveStatus, setSaveStatus] = useState('idle')
   const [pendingDeleteGame, setPendingDeleteGame] = useState(null)
   const [pendingResetGame, setPendingResetGame] = useState(false)
+  const [pendingResetSeason, setPendingResetSeason] = useState(false)
 
   // viewingGameId: which game is currently displayed in the detail panel.
   // Completely independent from gameState.currentGameId (the active/live game).
@@ -456,6 +457,16 @@ function StatsPage({
     if (viewingGameId) await loadGameStats(viewingGameId)
   }
 
+  const confirmResetSeason = async () => {
+    setPendingResetSeason(false)
+    gamesApi.clearSeason()
+    setGames([])
+    setGameStats([])
+    setSeasonStats([])
+    setViewingGameId(null)
+    setShowGameDetail(false)
+  }
+
   const hitterColCount = 13  // Jogador, N, Pos, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
   const pitcherColCount = 11 // Jogador, N, Pos, IP, ERA, SO, BB, H, PC, STR, BAL
 
@@ -465,9 +476,14 @@ function StatsPage({
       <div className="card">
         <div className="stats-page-header">
           <h2>Estatisticas da temporada</h2>
-          <Button type="button" variant="secondary" onClick={handleRefresh} title="Recarregar dados">
-            Atualizar
-          </Button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button type="button" variant="secondary" onClick={handleRefresh} title="Recarregar dados">
+              Atualizar
+            </Button>
+            <Button type="button" variant="danger" onClick={() => setPendingResetSeason(true)}>
+              Resetar temporada
+            </Button>
+          </div>
         </div>
         <div className="stats-tabs">
           <button
@@ -865,6 +881,16 @@ function StatsPage({
           danger
           onConfirm={async () => { setPendingResetGame(false); await resetCurrentGameStats() }}
           onCancel={() => setPendingResetGame(false)}
+        />
+      )}
+
+      {pendingResetSeason && (
+        <ConfirmModal
+          message="Isso apagará TODOS os jogos e estatísticas da temporada. Esta ação não pode ser desfeita. Continuar?"
+          confirmLabel="Resetar temporada"
+          danger
+          onConfirm={confirmResetSeason}
+          onCancel={() => setPendingResetSeason(false)}
         />
       )}
 
