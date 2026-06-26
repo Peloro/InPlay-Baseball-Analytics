@@ -251,39 +251,40 @@ export const gameStatsApi = {
     const filtered = all.filter(s =>
       s.gameId === gameId && (!playerId || s.playerId === playerId)
     )
-    if (http && gameId) {
-      netGet(`/game-stats/${gameId}`, playerId ? { playerId } : undefined).then(data => {
-        if (!Array.isArray(data)) return
-        const rest = lfGet(LS.gameStats).filter(s => s.gameId !== gameId)
-        lfSet(LS.gameStats, [...rest, ...data])
-      })
-    }
+    // No background server fetch here: it would overwrite fresh local writes
+    // with stale server data before the write queue has had a chance to sync.
+    // Reads are always from localStorage (local-first). Server sync is write-only.
     return { data: filtered }
   },
 
-  async create(payload) {
+  create(payload) {
     const record = { ...payload, _id: uid() }
     lfSet(LS.gameStats, [...lfGet(LS.gameStats), record])
 
-    const synced = await netWrite('post', '/game-stats', payload)
-    if (synced?._id) {
-      const list = lfGet(LS.gameStats)
-      const idx = list.findIndex(s => s._id === record._id)
-      if (idx !== -1) { list[idx] = synced; lfSet(LS.gameStats, list) }
-      return { data: synced }
-    }
+    // Fire network sync in background — do NOT await it so callers see
+    // the local write immediately and the HUD can refresh without delay.
+    netWrite('post', '/game-stats', payload).then(synced => {
+      if (synced?._id) {
+        const list = lfGet(LS.gameStats)
+        const idx = list.findIndex(s => s._id === record._id)
+        if (idx !== -1) { list[idx] = synced; lfSet(LS.gameStats, list) }
+      } else {
+        queueSync('post', '/game-stats', payload, record._id)
+      }
+    }).catch(() => queueSync('post', '/game-stats', payload, record._id))
 
-    queueSync('post', '/game-stats', payload, record._id)
     return { data: record }
   },
 
-  async update(id, patch) {
+  update(id, patch) {
     const list = lfGet(LS.gameStats)
     const idx = list.findIndex(s => s._id === id || s.id === id)
     if (idx !== -1) { list[idx] = { ...list[idx], ...patch }; lfSet(LS.gameStats, list) }
 
-    const synced = await netWrite('put', `/game-stats/${id}`, patch)
-    if (!synced) queueSync('put', `/game-stats/${id}`, patch, id)
+    // Fire network sync in background — same rationale as create above.
+    netWrite('put', `/game-stats/${id}`, patch).then(synced => {
+      if (!synced) queueSync('put', `/game-stats/${id}`, patch, id)
+    }).catch(() => queueSync('put', `/game-stats/${id}`, patch, id))
 
     return { data: idx !== -1 ? list[idx] : { _id: id, ...patch } }
   },
@@ -302,8 +303,8 @@ export const seasonStatsApi = {
       if (!byPlayer[pid]) {
         byPlayer[pid] = {
           playerId: pid,
-          hitting:  { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
-          pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
+          hitting:  { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
+          pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
           defense:  { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
           roleSummary: { hitterGames: 0, pitcherGames: 0 },
         }
@@ -315,6 +316,9 @@ export const seasonStatsApi = {
       agg.hitting.strikeouts += safeN(h.strikeouts)
       agg.hitting.outs       += safeN(h.outs)
       agg.hitting.walks      += safeN(h.walks)
+      agg.hitting.runs       += safeN(h.runs)
+      agg.hitting.rbi        += safeN(h.rbi)
+      agg.hitting.homeRuns   += safeN(h.homeRuns)
       const p = stat.pitching || {}
       agg.pitching.outsPitched  += safeN(p.outsPitched)
       agg.pitching.earnedRuns   += safeN(p.earnedRuns)
@@ -323,6 +327,7 @@ export const seasonStatsApi = {
       agg.pitching.strikes      += safeN(p.strikes)
       agg.pitching.balls        += safeN(p.balls)
       agg.pitching.pitchCount   += safeN(p.pitchCount)
+      agg.pitching.hitsAllowed  += safeN(p.hitsAllowed)
       const d = stat.defense || {}
       agg.defense.errors      += safeN(d.errors)
       agg.defense.doublePlays += safeN(d.doublePlays)

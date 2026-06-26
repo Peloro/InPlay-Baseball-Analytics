@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import Button from '../components/ui/Button'
 import { safeNumber } from '../utils/number'
-import { avgFromValues, formatEraFromOuts } from '../utils/stats'
+import { avgFromValues, formatEraFromOuts, formatIpFromOuts } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 
 
@@ -12,16 +12,24 @@ function PitchingBlock({ row, onQuickEvent }) {
   return (
     <div className="pitching">
       <Stepper
-        label="IP"
-        value={row.pitching.inningsPitched}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'inningsPitched', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'inningsPitched', 1)}
+        label="Outs"
+        value={row.pitching.outsPitched}
+        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'outsPitched', -1)}
+        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'outsPitched', 1)}
       />
+      <div className="pitcher-metric stat-box">IP: {formatIpFromOuts(row.pitching.outsPitched)}</div>
       <Stepper
         label="ER"
         value={row.pitching.earnedRuns}
         onMinus={() => onQuickEvent(row.playerId, 'pitching', 'earnedRuns', -1)}
         onPlus={() => onQuickEvent(row.playerId, 'pitching', 'earnedRuns', 1)}
+      />
+      <div className="pitcher-metric stat-box">ERA: {formatEraFromOuts(row.pitching.outsPitched, row.pitching.earnedRuns)}</div>
+      <Stepper
+        label="H"
+        value={row.pitching.hitsAllowed}
+        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'hitsAllowed', -1)}
+        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'hitsAllowed', 1)}
       />
       <Stepper
         label="SO"
@@ -35,7 +43,6 @@ function PitchingBlock({ row, onQuickEvent }) {
         onMinus={() => onQuickEvent(row.playerId, 'pitching', 'walks', -1)}
         onPlus={() => onQuickEvent(row.playerId, 'pitching', 'walks', 1)}
       />
-      <div className="pitcher-metric stat-box">ERA: {formatEraFromOuts(row.pitching.outsPitched, row.pitching.earnedRuns)}</div>
       <Stepper
         label="PC"
         value={row.pitching.pitchCount}
@@ -122,8 +129,8 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
       const stat = byPlayer[playerId] || {
         _id: null,
         playerId,
-        hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
-        pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
+        hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
+        pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
         defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
       }
 
@@ -131,8 +138,8 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
         player,
         playerId,
         type: detectPlayerType(player),
-        hitting: stat.hitting || { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
-        pitching: stat.pitching || { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
+        hitting: stat.hitting || { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
+        pitching: stat.pitching || { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
         defense: stat.defense || { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
       }
     })
@@ -184,6 +191,30 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'hits', 1)}
               />
               <Stepper
+                label="HR"
+                value={row.hitting.homeRuns || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'homeRuns', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'homeRuns', 1)}
+              />
+              <Stepper
+                label="R"
+                value={row.hitting.runs || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'runs', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'runs', 1)}
+              />
+              <Stepper
+                label="RBI"
+                value={row.hitting.rbi || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'rbi', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'rbi', 1)}
+              />
+              <Stepper
+                label="BB"
+                value={row.hitting.walks || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'walks', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'walks', 1)}
+              />
+              <Stepper
                 label="SO"
                 value={row.hitting.strikeouts}
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'strikeouts', -1)}
@@ -194,12 +225,6 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
                 value={row.hitting.outs}
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'outs', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'outs', 1)}
-              />
-              <Stepper
-                label="BB"
-                value={row.hitting.walks || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'walks', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'walks', 1)}
               />
               <div className="pitcher-metric stat-box">AVG: {avgFromValues(row.hitting.atBats, row.hitting.hits)}</div>
             </div>

@@ -14,7 +14,7 @@ import Bench from '../components/game/Bench/Bench'
 import usePlayers from '../hooks/usePlayers'
 import useGameState from '../hooks/useGameState'
 import { safeNumber } from '../utils/number'
-import { formatEraFromOuts, outsToInnings } from '../utils/stats'
+import { formatEraFromOuts, formatIpFromOuts, outsToInnings } from '../utils/stats'
 import { detectPlayerType, getPlayerId, getMainPosition } from '../utils/player'
 
 const LONG_PRESS_MS = 450
@@ -42,13 +42,6 @@ function isInsideRect(clientX, clientY, rect) {
 
 
 
-
-function formatIpFromOuts(outsPitched) {
-  const outs = safeNumber(outsPitched)
-  const innings = Math.floor(outs / 3)
-  const remainder = outs % 3
-  return `${innings}.${remainder}`
-}
 
 function reorderList(list, from, to) {
   const safe = [...list]
@@ -146,6 +139,8 @@ function FieldPage({
   onEndGame,
   allowPregameWithoutGame = false,
   onCancelPreGame = null,
+  statsRefreshKey = 0,
+  onStatsUpdated = null,
 }) {
   const layoutRef = useRef(null)
   const fieldStageRef = useRef(null)
@@ -427,7 +422,7 @@ function FieldPage({
     return () => window.clearTimeout(timer)
   }, [gameState.currentGameId, gameState.preGameConfigured, players, allowPregameWithoutGame])
 
-  const { livePitching, opponentName } = useGameState({ gameState, activeGame })
+  const { livePitching, opponentName } = useGameState({ gameState, activeGame, refreshKey: statsRefreshKey })
 
   // animate runners briefly when score increases and show scoreboard
   const prevScoreRef = useRef({ home: gameState.homeScore || 0, away: gameState.awayScore || 0 })
@@ -1006,7 +1001,8 @@ function FieldPage({
     }
 
     await upsertPlayerStat(pitcherId, patch)
-  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, upsertPlayerStat])
+    onStatsUpdated?.()
+  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, upsertPlayerStat, onStatsUpdated])
 
   const showInvalidAction = useCallback((message) => {
     setInvalidFeedback(message)
@@ -1053,6 +1049,11 @@ function FieldPage({
     const stateSnapshot = JSON.parse(JSON.stringify(gameState))
     setUndoStack((current) => [...current, { stateSnapshot, statsSnapshot }].slice(-80))
   }, [gameState])
+
+  const handleDefensivePitch = useCallback(async (kind) => {
+    await captureUndoSnapshot()
+    onPitchAction?.(kind)
+  }, [captureUndoSnapshot, onPitchAction])
 
   const handleUndo = useCallback(async () => {
     const latest = undoStack[undoStack.length - 1]
@@ -2085,6 +2086,8 @@ function FieldPage({
     safeNumber(livePitching.strikeouts),
     safeNumber(livePitching.walks),
     safeNumber(livePitching.pitchCount),
+    safeNumber(livePitching.strikes),
+    safeNumber(livePitching.balls),
   ].join('|'), [livePitching])
   
   const opponentMarkers = useMemo(() => opponentDefense, [opponentDefense])
@@ -2350,9 +2353,9 @@ function FieldPage({
                 </>
               ) : (
                 <>
-                  <button type="button" className="acoes-btn acoes-strike" onClick={() => onPitchAction?.('strike')}>STRIKE</button>
-                  <button type="button" className="acoes-btn acoes-ball" onClick={() => onPitchAction?.('ball')}>BALL</button>
-                  <button type="button" className="acoes-btn acoes-foul" onClick={() => onPitchAction?.('foul')}>FOUL</button>
+                  <button type="button" className="acoes-btn acoes-strike" onClick={() => handleDefensivePitch('strike')}>STRIKE</button>
+                  <button type="button" className="acoes-btn acoes-ball" onClick={() => handleDefensivePitch('ball')}>BALL</button>
+                  <button type="button" className="acoes-btn acoes-foul" onClick={() => handleDefensivePitch('foul')}>FOUL</button>
                   <button type="button" className="acoes-btn acoes-out" onClick={() => applyDefensiveOutEvent('out')}>OUT</button>
                   <button type="button" className="acoes-btn acoes-1b" onClick={() => applyDefensiveHit('single')}>SINGLE</button>
                   <button type="button" className="acoes-btn acoes-2b" onClick={() => applyDefensiveHit('double')}>DOUBLE</button>
@@ -2373,7 +2376,9 @@ function FieldPage({
                   <div><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
                   <div><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
                   <div><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
-                  <div><span>PC</span><strong>{safeNumber(livePitching.pitchCount)}</strong></div>
+                  <div><span>PC</span><strong>{gameState.currentPitcherId && gameState.pitchCounts ? (gameState.pitchCounts[gameState.currentPitcherId] ?? 0) : 0}</strong></div>
+                  <div><span>STR</span><strong>{safeNumber(livePitching.strikes)}</strong></div>
+                  <div><span>BAL</span><strong>{safeNumber(livePitching.balls)}</strong></div>
                 </div>
               </div>
             )}

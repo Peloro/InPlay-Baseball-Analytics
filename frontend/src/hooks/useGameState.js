@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { gameStatsApi } from '../services/api'
 
-export default function useGameState({ gameState, activeGame }) {
+export default function useGameState({ gameState, activeGame, refreshKey = 0 }) {
   const [pitcherLiveStat, setPitcherLiveStat] = useState(null)
 
   useEffect(() => {
@@ -28,7 +28,8 @@ export default function useGameState({ gameState, activeGame }) {
 
     load()
     return () => { mounted = false }
-  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking])
+  // refreshKey forces a re-fetch after any pitch stat write completes
+  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, refreshKey])
 
   const livePitching = useMemo(() => pitcherLiveStat?.pitching || {}, [pitcherLiveStat])
 

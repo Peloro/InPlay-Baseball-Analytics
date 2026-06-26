@@ -5,15 +5,15 @@ import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import { safeNumber } from '../utils/number'
-import { avgFromEntry, avgFromValues, eraFromEntry } from '../utils/stats'
+import { avgFromEntry, avgFromValues, eraFromEntry, formatIpFromOuts, obpFromHitting, whipFromPitching, k9FromPitching } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 
 
 
 const EMPTY_GAME_STAT = {
   type: 'hitter',
-  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
-  pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
+  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
+  pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
   defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
 }
 
@@ -172,8 +172,8 @@ function StatsPage({
         .map((player) => {
           const id = getPlayerId(player)
           const entry = seasonMap[id] || {
-            hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
-            pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
+            hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
+            pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
             defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
             roleSummary: { hitterGames: 0, pitcherGames: 0 },
             avg: 0,
@@ -196,16 +196,21 @@ function StatsPage({
     const hitterMetrics = {
       atBats:      (e) => safeNumber(e.hitting?.atBats),
       hits:        (e) => safeNumber(e.hitting?.hits),
+      homeRuns:    (e) => safeNumber(e.hitting?.homeRuns),
+      runs:        (e) => safeNumber(e.hitting?.runs),
+      rbi:         (e) => safeNumber(e.hitting?.rbi),
       walks:       (e) => safeNumber(e.hitting?.walks),
       strikeouts:  (e) => safeNumber(e.hitting?.strikeouts),
       outs:        (e) => safeNumber(e.hitting?.outs),
       avg:         (e) => { const ab = safeNumber(e.hitting?.atBats); return ab ? safeNumber(e.hitting?.hits) / ab : 0 },
+      obp:         (e) => { const ab = safeNumber(e.hitting?.atBats); const bb = safeNumber(e.hitting?.walks); const h = safeNumber(e.hitting?.hits); return (ab + bb) ? (h + bb) / (ab + bb) : 0 },
     }
     const pitcherMetrics = {
       inningsPitched: (e) => safeNumber(e.pitching?.inningsPitched),
       era:            (e) => safeNumber(e.era),
       strikeouts_p:   (e) => safeNumber(e.pitching?.strikeouts),
       walks_p:        (e) => safeNumber(e.pitching?.walks),
+      hitsAllowed:    (e) => safeNumber(e.pitching?.hitsAllowed),
       pitchCount:     (e) => safeNumber(e.pitching?.pitchCount),
       strikes:        (e) => safeNumber(e.pitching?.strikes),
       balls:          (e) => safeNumber(e.pitching?.balls),
@@ -253,24 +258,31 @@ function StatsPage({
   }, [visibleSeasonRows])
 
   const seasonTotals = useMemo(() => {
-    return visibleSeasonRows.reduce((acc, item) => {
-      return {
-        atBats: acc.atBats + safeNumber(item.entry.hitting?.atBats),
-        hits: acc.hits + safeNumber(item.entry.hitting?.hits),
-        hittingStrikeouts: acc.hittingStrikeouts + safeNumber(item.entry.hitting?.strikeouts),
-        walks: acc.walks + safeNumber(item.entry.hitting?.walks),
-        inningsPitched: acc.inningsPitched + safeNumber(item.entry.pitching?.inningsPitched),
-        earnedRuns: acc.earnedRuns + safeNumber(item.entry.pitching?.earnedRuns),
-        pitchingStrikeouts: acc.pitchingStrikeouts + safeNumber(item.entry.pitching?.strikeouts),
-        pitchingWalks: acc.pitchingWalks + safeNumber(item.entry.pitching?.walks),
-      }
-    }, {
+    return visibleSeasonRows.reduce((acc, item) => ({
+      atBats: acc.atBats + safeNumber(item.entry.hitting?.atBats),
+      hits: acc.hits + safeNumber(item.entry.hitting?.hits),
+      homeRuns: acc.homeRuns + safeNumber(item.entry.hitting?.homeRuns),
+      runs: acc.runs + safeNumber(item.entry.hitting?.runs),
+      rbi: acc.rbi + safeNumber(item.entry.hitting?.rbi),
+      hittingStrikeouts: acc.hittingStrikeouts + safeNumber(item.entry.hitting?.strikeouts),
+      walks: acc.walks + safeNumber(item.entry.hitting?.walks),
+      // Sum raw outs so IP is computed correctly (decimal IP values can't be added directly)
+      outsPitched: acc.outsPitched + safeNumber(item.entry.pitching?.outsPitched),
+      earnedRuns: acc.earnedRuns + safeNumber(item.entry.pitching?.earnedRuns),
+      hitsAllowed: acc.hitsAllowed + safeNumber(item.entry.pitching?.hitsAllowed),
+      pitchingStrikeouts: acc.pitchingStrikeouts + safeNumber(item.entry.pitching?.strikeouts),
+      pitchingWalks: acc.pitchingWalks + safeNumber(item.entry.pitching?.walks),
+    }), {
       atBats: 0,
       hits: 0,
+      homeRuns: 0,
+      runs: 0,
+      rbi: 0,
       hittingStrikeouts: 0,
       walks: 0,
-      inningsPitched: 0,
+      outsPitched: 0,
       earnedRuns: 0,
+      hitsAllowed: 0,
       pitchingStrikeouts: 0,
       pitchingWalks: 0,
     })
@@ -327,6 +339,9 @@ function StatsPage({
         strikeouts: safeNumber(patch.hitting?.strikeouts ?? fallback.hitting?.strikeouts),
         outs: safeNumber(patch.hitting?.outs ?? fallback.hitting?.outs),
         walks: safeNumber(patch.hitting?.walks ?? fallback.hitting?.walks),
+        runs: safeNumber(patch.hitting?.runs ?? fallback.hitting?.runs),
+        rbi: safeNumber(patch.hitting?.rbi ?? fallback.hitting?.rbi),
+        homeRuns: safeNumber(patch.hitting?.homeRuns ?? fallback.hitting?.homeRuns),
       },
       pitching: {
         inningsPitched: safeNumber(
@@ -339,6 +354,7 @@ function StatsPage({
         strikes: safeNumber(patch.pitching?.strikes ?? fallback.pitching?.strikes),
         balls: safeNumber(patch.pitching?.balls ?? fallback.pitching?.balls),
         pitchCount: safeNumber(patch.pitching?.pitchCount ?? fallback.pitching?.pitchCount),
+        hitsAllowed: safeNumber(patch.pitching?.hitsAllowed ?? fallback.pitching?.hitsAllowed),
       },
       defense: {
         errors: safeNumber(patch.defense?.errors ?? fallback.defense?.errors),
@@ -440,8 +456,8 @@ function StatsPage({
     if (viewingGameId) await loadGameStats(viewingGameId)
   }
 
-  const hitterColCount = 9  // Jogador, N, Pos, AB, H, BB, SO, OUT, AVG
-  const pitcherColCount = 10 // Jogador, N, Pos, IP, ERA, SO, BB, PC, STR, BAL
+  const hitterColCount = 13  // Jogador, N, Pos, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
+  const pitcherColCount = 11 // Jogador, N, Pos, IP, ERA, SO, BB, H, PC, STR, BAL
 
   return (
     <section className="stats-page stats-page-full">
@@ -489,16 +505,28 @@ function StatsPage({
           {statsTab === 'hitters' ? (
             <>
               <div className="kpi">
-                <strong>AVG geral</strong>
+                <strong>AVG</strong>
                 <span>{avgFromValues(seasonTotals.atBats, seasonTotals.hits)}</span>
               </div>
               <div className="kpi">
-                <strong>Hits</strong>
+                <strong>OBP</strong>
+                <span>{(seasonTotals.atBats + seasonTotals.walks) ? (((seasonTotals.hits + seasonTotals.walks) / (seasonTotals.atBats + seasonTotals.walks)).toFixed(3)) : '---'}</span>
+              </div>
+              <div className="kpi">
+                <strong>H</strong>
                 <span>{seasonTotals.hits}</span>
               </div>
               <div className="kpi">
-                <strong>AB</strong>
-                <span>{seasonTotals.atBats}</span>
+                <strong>HR</strong>
+                <span>{seasonTotals.homeRuns}</span>
+              </div>
+              <div className="kpi">
+                <strong>R</strong>
+                <span>{seasonTotals.runs}</span>
+              </div>
+              <div className="kpi">
+                <strong>RBI</strong>
+                <span>{seasonTotals.rbi}</span>
               </div>
               <div className="kpi">
                 <strong>BB</strong>
@@ -508,20 +536,24 @@ function StatsPage({
                 <strong>SO</strong>
                 <span>{seasonTotals.hittingStrikeouts}</span>
               </div>
-              <div className="kpi">
-                <strong>OUT</strong>
-                <span>{visibleSeasonRows.reduce((acc, item) => acc + safeNumber(item.entry.hitting?.outs), 0)}</span>
-              </div>
             </>
           ) : (
             <>
               <div className="kpi">
                 <strong>IP</strong>
-                <span>{seasonTotals.inningsPitched}</span>
+                <span>{formatIpFromOuts(seasonTotals.outsPitched)}</span>
               </div>
               <div className="kpi">
-                <strong>ER</strong>
-                <span>{seasonTotals.earnedRuns}</span>
+                <strong>ERA</strong>
+                <span>{seasonTotals.outsPitched ? ((seasonTotals.earnedRuns * 27) / seasonTotals.outsPitched).toFixed(2) : '--'}</span>
+              </div>
+              <div className="kpi">
+                <strong>WHIP</strong>
+                <span>{seasonTotals.outsPitched ? (((seasonTotals.pitchingWalks + seasonTotals.hitsAllowed) / (seasonTotals.outsPitched / 3)).toFixed(2)) : '--'}</span>
+              </div>
+              <div className="kpi">
+                <strong>K/9</strong>
+                <span>{seasonTotals.outsPitched ? (((seasonTotals.pitchingStrikeouts * 9) / (seasonTotals.outsPitched / 3)).toFixed(1)) : '--'}</span>
               </div>
               <div className="kpi">
                 <strong>SO</strong>
@@ -530,6 +562,10 @@ function StatsPage({
               <div className="kpi">
                 <strong>BB</strong>
                 <span>{seasonTotals.pitchingWalks}</span>
+              </div>
+              <div className="kpi">
+                <strong>ER</strong>
+                <span>{seasonTotals.earnedRuns}</span>
               </div>
             </>
           )}
@@ -544,7 +580,7 @@ function StatsPage({
                 <th>Posicao</th>
                 {statsTab === 'hitters' ? (
                   <>
-                    {[['atBats','AB'],['hits','H'],['walks','BB'],['strikeouts','SO'],['outs','OUT'],['avg','AVG']].map(([col, label]) => (
+                    {[['atBats','AB'],['hits','H'],['homeRuns','HR'],['runs','R'],['rbi','RBI'],['walks','BB'],['strikeouts','SO'],['outs','OUT'],['avg','AVG'],['obp','OBP']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
                         {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
@@ -552,7 +588,7 @@ function StatsPage({
                   </>
                 ) : (
                   <>
-                    {[['inningsPitched','IP'],['era','ERA'],['strikeouts_p','SO'],['walks_p','BB'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
+                    {[['inningsPitched','IP'],['era','ERA'],['strikeouts_p','SO'],['walks_p','BB'],['hitsAllowed','H'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
                         {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
@@ -588,17 +624,22 @@ function StatsPage({
                       <>
                         <td>{safeNumber(entry.hitting?.atBats)}</td>
                         <td>{safeNumber(entry.hitting?.hits)}</td>
+                        <td>{safeNumber(entry.hitting?.homeRuns)}</td>
+                        <td>{safeNumber(entry.hitting?.runs)}</td>
+                        <td>{safeNumber(entry.hitting?.rbi)}</td>
                         <td>{safeNumber(entry.hitting?.walks)}</td>
                         <td>{safeNumber(entry.hitting?.strikeouts)}</td>
                         <td>{safeNumber(entry.hitting?.outs)}</td>
                         <td>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</td>
+                        <td>{obpFromHitting(entry.hitting)}</td>
                       </>
                     ) : (
                       <>
-                        <td>{safeNumber(entry.pitching?.inningsPitched)}</td>
+                        <td>{formatIpFromOuts(entry.pitching?.outsPitched)}</td>
                         <td>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</td>
                         <td>{safeNumber(entry.pitching?.strikeouts)}</td>
                         <td>{safeNumber(entry.pitching?.walks)}</td>
+                        <td>{safeNumber(entry.pitching?.hitsAllowed)}</td>
                         <td>{safeNumber(entry.pitching?.pitchCount)}</td>
                         <td>{safeNumber(entry.pitching?.strikes)}</td>
                         <td>{safeNumber(entry.pitching?.balls)}</td>
@@ -627,18 +668,27 @@ function StatsPage({
                       <div className="stat-grid">
                         <div><strong>AB</strong><div>{safeNumber(entry.hitting?.atBats)}</div></div>
                         <div><strong>H</strong><div>{safeNumber(entry.hitting?.hits)}</div></div>
+                        <div><strong>HR</strong><div>{safeNumber(entry.hitting?.homeRuns)}</div></div>
+                        <div><strong>R</strong><div>{safeNumber(entry.hitting?.runs)}</div></div>
+                        <div><strong>RBI</strong><div>{safeNumber(entry.hitting?.rbi)}</div></div>
                         <div><strong>BB</strong><div>{safeNumber(entry.hitting?.walks)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.hitting?.strikeouts)}</div></div>
                         <div><strong>OUT</strong><div>{safeNumber(entry.hitting?.outs)}</div></div>
                         <div><strong>AVG</strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</div></div>
+                        <div><strong>OBP</strong><div>{obpFromHitting(entry.hitting)}</div></div>
                       </div>
                     ) : (
                       <div className="stat-grid">
-                        <div><strong>IP</strong><div>{safeNumber(entry.pitching?.inningsPitched)}</div></div>
+                        <div><strong>IP</strong><div>{formatIpFromOuts(entry.pitching?.outsPitched)}</div></div>
                         <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</div></div>
+                        <div><strong>WHIP</strong><div>{whipFromPitching(entry.pitching)}</div></div>
+                        <div><strong>K/9</strong><div>{k9FromPitching(entry.pitching)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.pitching?.strikeouts)}</div></div>
                         <div><strong>BB</strong><div>{safeNumber(entry.pitching?.walks)}</div></div>
+                        <div><strong>H</strong><div>{safeNumber(entry.pitching?.hitsAllowed)}</div></div>
                         <div><strong>PC</strong><div>{safeNumber(entry.pitching?.pitchCount)}</div></div>
+                        <div><strong>STR</strong><div>{safeNumber(entry.pitching?.strikes)}</div></div>
+                        <div><strong>BAL</strong><div>{safeNumber(entry.pitching?.balls)}</div></div>
                       </div>
                     )}
                   </div>
@@ -770,19 +820,25 @@ function StatsPage({
 
                 const currentCategory = current?.[category] || EMPTY_GAME_STAT[category]
                 const currentValue = safeNumber(currentCategory?.[fieldKey])
+                const newValue = Math.max(0, currentValue + delta)
+
+                const updatedCategory = {
+                  ...currentCategory,
+                  [fieldKey]: newValue,
+                }
+
+                // Auto-recompute inningsPitched from outsPitched so they stay in sync
+                if (category === 'pitching' && fieldKey === 'outsPitched') {
+                  updatedCategory.inningsPitched = Math.floor(newValue / 3) + ((newValue % 3) / 10)
+                }
 
                 await upsertGameStat(
                   playerId,
                   {
                     hitting: current.hitting || EMPTY_GAME_STAT.hitting,
                     pitching: current.pitching || EMPTY_GAME_STAT.pitching,
-                    defense: {
-                      ...(current.defense || EMPTY_GAME_STAT.defense),
-                    },
-                    [category]: {
-                      ...currentCategory,
-                      [fieldKey]: Math.max(0, currentValue + delta),
-                    },
+                    defense: { ...(current.defense || EMPTY_GAME_STAT.defense) },
+                    [category]: updatedCategory,
                   },
                 )
               }}

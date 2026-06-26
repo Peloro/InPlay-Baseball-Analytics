@@ -59,9 +59,37 @@ export function outsToInnings(outs) {
   return Math.floor(o / 3) + ((o % 3) / 10)
 }
 
+export function formatIpFromOuts(outsPitched) {
+  const o = toNum(outsPitched)
+  return `${Math.floor(o / 3)}.${o % 3}`
+}
+
 export function inningsToOuts(innings) {
   const n = Number(innings) || 0
   const whole = Math.floor(n)
   const fraction = Math.round((n - whole) * 10)
   return whole * 3 + fraction
+}
+
+export function obpFromHitting(hitting) {
+  const h = toNum(hitting?.hits)
+  const bb = toNum(hitting?.walks)
+  const ab = toNum(hitting?.atBats)
+  const denom = ab + bb
+  if (!denom) return '---'
+  return ((h + bb) / denom).toFixed(3)
+}
+
+export function whipFromPitching(pitching) {
+  const outs = toNum(pitching?.outsPitched)
+  if (!outs) return '---'
+  const bb = toNum(pitching?.walks)
+  const h = toNum(pitching?.hitsAllowed)
+  return ((bb + h) / (outs / 3)).toFixed(2)
+}
+
+export function k9FromPitching(pitching) {
+  const outs = toNum(pitching?.outsPitched)
+  if (!outs) return '---'
+  return ((toNum(pitching?.strikeouts) * 9) / (outs / 3)).toFixed(1)
 }

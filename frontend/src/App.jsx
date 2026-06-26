@@ -181,6 +181,9 @@ function App() {
   const [isGameEntering, setIsGameEntering] = useState(false)
   const [navCollapsed, setNavCollapsed] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  // Incremented after each pitcher stat write so useGameState re-fetches the live HUD
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0)
+  const notifyStatsUpdated = useCallback(() => setStatsRefreshKey((k) => k + 1), [])
 
   useEffect(() => {
     const onOnline = () => setIsOffline(false)
@@ -687,6 +690,7 @@ function App() {
         outsDelta: didStrikeout ? 1 : 0,
         earnedRunsDelta: didWalk ? Number((advanceOnWalk({ ...(current.runners || {}) }).runs) || 0) : 0,
       })
+      setStatsRefreshKey((k) => k + 1)
     } catch {
       // Mantem jogo local mesmo se backend indisponivel.
     }
@@ -825,6 +829,7 @@ function App() {
           onDefensiveOut={async (count = 1) => {
             try {
               await updatePitcherDefenseContribution({ outsDelta: Number(count || 0), earnedRunsDelta: 0 })
+              setStatsRefreshKey((k) => k + 1)
             } catch {
               // Mantem jogo local mesmo sem backend.
             }
@@ -832,10 +837,13 @@ function App() {
           onDefensiveEarnedRun={async (count = 1) => {
             try {
               await updatePitcherDefenseContribution({ outsDelta: 0, earnedRunsDelta: Number(count || 0) })
+              setStatsRefreshKey((k) => k + 1)
             } catch {
               // Mantem jogo local mesmo sem backend.
             }
           }}
+          statsRefreshKey={statsRefreshKey}
+          onStatsUpdated={notifyStatsUpdated}
           activeGame={activeGame}
           onEndGame={handleEndGame}
           allowPregameWithoutGame={true}

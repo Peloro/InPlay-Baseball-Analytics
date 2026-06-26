@@ -1,6 +1,6 @@
 import Modal from './ui/Modal'
 import { safeNumber, toFixed3 } from '../utils/number'
-import { avgFromHitting, eraFromPitching } from '../utils/stats'
+import { avgFromHitting, eraFromPitching, obpFromHitting, whipFromPitching, k9FromPitching, formatIpFromOuts } from '../utils/stats'
 import { detectPlayerType } from '../utils/player'
 
 function renderBlock(title, rows) {
@@ -35,17 +35,28 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
   const buildHittingRows = (hitting, entry) => [
     { label: 'AB', value: safeNumber(hitting.atBats) },
     { label: 'H', value: safeNumber(hitting.hits) },
+    { label: 'HR', value: safeNumber(hitting.homeRuns) },
+    { label: 'R', value: safeNumber(hitting.runs) },
+    { label: 'RBI', value: safeNumber(hitting.rbi) },
+    { label: 'BB', value: safeNumber(hitting.walks) },
     { label: 'SO', value: safeNumber(hitting.strikeouts) },
     { label: 'OUT', value: safeNumber(hitting.outs) },
     { label: 'AVG', value: entry?.avg ? toFixed3(entry.avg) : avgFromHitting(hitting) },
+    { label: 'OBP', value: obpFromHitting(hitting) },
   ]
 
   const buildPitchingRows = (pitching, entry) => [
-    { label: 'IP', value: safeNumber(pitching.inningsPitched) },
-    { label: 'ER', value: safeNumber(pitching.earnedRuns) },
+    { label: 'IP', value: formatIpFromOuts(pitching.outsPitched) },
+    { label: 'ERA', value: entry?.era ? toFixed3(entry.era) : eraFromPitching(pitching) },
+    { label: 'WHIP', value: whipFromPitching(pitching) },
+    { label: 'K/9', value: k9FromPitching(pitching) },
     { label: 'SO', value: safeNumber(pitching.strikeouts) },
     { label: 'BB', value: safeNumber(pitching.walks) },
-    { label: 'ERA', value: entry?.era ? toFixed3(entry.era) : eraFromPitching(pitching) },
+    { label: 'ER', value: safeNumber(pitching.earnedRuns) },
+    { label: 'H', value: safeNumber(pitching.hitsAllowed) },
+    { label: 'PC', value: safeNumber(pitching.pitchCount) },
+    { label: 'STR', value: safeNumber(pitching.strikes) },
+    { label: 'BAL', value: safeNumber(pitching.balls) },
   ]
 
   const buildDefenseRows = (defense) => [
