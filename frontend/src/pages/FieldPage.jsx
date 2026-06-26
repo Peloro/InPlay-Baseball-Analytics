@@ -187,7 +187,11 @@ function FieldPage({
   const [pendingSubstitution, setPendingSubstitution] = useState(null)
   const [pendingDefenseError, setPendingDefenseError] = useState(false)
   const [selectedErrorDefenderId, setSelectedErrorDefenderId] = useState('')
+  const [pendingOutTypeSelect, setPendingOutTypeSelect] = useState(false)
+  const [selectedOutType, setSelectedOutType] = useState('')
+  const [selectedOutFielderId, setSelectedOutFielderId] = useState('')
   const [pendingDoublePlaySelect, setPendingDoublePlaySelect] = useState(false)
+  const orderTouchRef = useRef({ dragging: null })
   const [selectedDoublePlayRunnerBase, setSelectedDoublePlayRunnerBase] = useState('')
   const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
   const [undoStack, setUndoStack] = useState([])
@@ -606,6 +610,34 @@ function FieldPage({
     setSetupDraggingId(null)
   }
 
+  const onOrderPointerDown = (id, ev) => {
+    if (ev.pointerType === 'mouse') return
+    ev.stopPropagation()
+    orderTouchRef.current.dragging = id
+    setSetupDraggingId(id)
+  }
+
+  const onOrderPointerMove = (ev) => {
+    if (ev.pointerType === 'mouse') return
+    if (!orderTouchRef.current.dragging) return
+    ev.stopPropagation()
+    const el = document.elementFromPoint(ev.clientX, ev.clientY)
+    const targetId = el?.closest('[data-order-id]')?.dataset?.orderId
+    if (targetId && targetId !== orderTouchRef.current.dragging) {
+      setSetupBattingOrder((current) => {
+        const from = current.indexOf(orderTouchRef.current.dragging)
+        const to = current.indexOf(targetId)
+        if (from < 0 || to < 0) return current
+        return reorderList(current, from, to)
+      })
+    }
+  }
+
+  const onOrderPointerUp = () => {
+    orderTouchRef.current.dragging = null
+    setSetupDraggingId(null)
+  }
+
   const toFieldPoint = useCallback((clientX, clientY) => {
     if (!fieldStageRef.current || !fieldRect.width || !fieldRect.height) return null
 
@@ -911,6 +943,9 @@ function FieldPage({
         strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
         outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
         walks: safeNumber(patch.hitting?.walks ?? current?.hitting?.walks),
+        runs: safeNumber(patch.hitting?.runs ?? current?.hitting?.runs),
+        rbi: safeNumber(patch.hitting?.rbi ?? current?.hitting?.rbi),
+        homeRuns: safeNumber(patch.hitting?.homeRuns ?? current?.hitting?.homeRuns),
       },
       pitching: {
         inningsPitched: safeNumber(current?.pitching?.inningsPitched),
@@ -921,6 +956,7 @@ function FieldPage({
         strikes: safeNumber(current?.pitching?.strikes),
         balls: safeNumber(current?.pitching?.balls),
         pitchCount: safeNumber(current?.pitching?.pitchCount),
+        hitsAllowed: safeNumber(current?.pitching?.hitsAllowed),
       },
       defense: {
         errors: safeNumber(current?.defense?.errors),
@@ -951,6 +987,10 @@ function FieldPage({
         hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
         strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
         outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
+        walks: safeNumber(patch.hitting?.walks ?? current?.hitting?.walks),
+        runs: safeNumber(patch.hitting?.runs ?? current?.hitting?.runs),
+        rbi: safeNumber(patch.hitting?.rbi ?? current?.hitting?.rbi),
+        homeRuns: safeNumber(patch.hitting?.homeRuns ?? current?.hitting?.homeRuns),
       },
       pitching: {
         inningsPitched: safeNumber(patch.pitching?.inningsPitched ?? current?.pitching?.inningsPitched),
@@ -961,6 +1001,7 @@ function FieldPage({
         strikes: safeNumber(patch.pitching?.strikes ?? current?.pitching?.strikes),
         balls: safeNumber(patch.pitching?.balls ?? current?.pitching?.balls),
         pitchCount: safeNumber(patch.pitching?.pitchCount ?? current?.pitching?.pitchCount),
+        hitsAllowed: safeNumber(patch.pitching?.hitsAllowed ?? current?.pitching?.hitsAllowed),
       },
       defense: {
         errors: safeNumber(patch.defense?.errors ?? current?.defense?.errors),
@@ -978,7 +1019,7 @@ function FieldPage({
     }
   }, [gameState.currentGameId, playersById])
 
-  const syncDefensivePitcherEvent = useCallback(async ({ outsDelta = 0, earnedRunsDelta = 0, pitchCountDelta = 0, walksDelta = 0, strikeoutsDelta = 0 } = {}) => {
+  const syncDefensivePitcherEvent = useCallback(async ({ outsDelta = 0, earnedRunsDelta = 0, pitchCountDelta = 0, walksDelta = 0, strikeoutsDelta = 0, hitsAllowedDelta = 0 } = {}) => {
     if (gameState.isAttacking) return
     if (!gameState.currentGameId || !gameState.currentPitcherId) return
 
@@ -997,6 +1038,7 @@ function FieldPage({
         strikes: safeNumber(current?.pitching?.strikes),
         balls: safeNumber(current?.pitching?.balls),
         pitchCount: safeNumber(current?.pitching?.pitchCount) + safeNumber(pitchCountDelta),
+        hitsAllowed: safeNumber(current?.pitching?.hitsAllowed) + safeNumber(hitsAllowedDelta),
       },
     }
 
@@ -1023,6 +1065,10 @@ function FieldPage({
           hits: safeNumber(entry.hitting?.hits),
           strikeouts: safeNumber(entry.hitting?.strikeouts),
           outs: safeNumber(entry.hitting?.outs),
+          walks: safeNumber(entry.hitting?.walks),
+          runs: safeNumber(entry.hitting?.runs),
+          rbi: safeNumber(entry.hitting?.rbi),
+          homeRuns: safeNumber(entry.hitting?.homeRuns),
         },
         pitching: {
           inningsPitched: safeNumber(entry.pitching?.inningsPitched),
@@ -1033,6 +1079,7 @@ function FieldPage({
           strikes: safeNumber(entry.pitching?.strikes),
           balls: safeNumber(entry.pitching?.balls),
           pitchCount: safeNumber(entry.pitching?.pitchCount),
+          hitsAllowed: safeNumber(entry.pitching?.hitsAllowed),
         },
         defense: {
           errors: safeNumber(entry.defense?.errors),
@@ -1086,7 +1133,7 @@ function FieldPage({
 
         await upsertPlayerStat(pid, {
           type: currentEntry.type,
-          hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+          hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
           pitching: {
             inningsPitched: 0,
             outsPitched: 0,
@@ -1096,6 +1143,7 @@ function FieldPage({
             strikes: 0,
             balls: 0,
             pitchCount: 0,
+            hitsAllowed: 0,
           },
           defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
         })
@@ -1197,14 +1245,30 @@ function FieldPage({
 
     try {
       const endedAsOut = kind === 'strikeout' || kind === 'out'
+      const isHitKind = kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun'
+      const isHomeRun = kind === 'homerun'
+
+      // Pre-compute runs scored to credit RBI to the batter.
+      // applyHitToBases already includes the batter in `runs` for home runs
+      // (e.g. solo HR → runs=1, grand slam → runs=4), so rbi = runsOnHit.
+      const hitPreview = isHitKind
+        ? applyHitToBases(gameState.runners || { first: false, second: false, third: false }, kind)
+        : null
+      const runsOnHit = hitPreview?.runs || 0
+      const rbiCredit = runsOnHit
+      const batterRuns = isHomeRun ? 1 : 0  // batter only scores in same PA on HR
+
       const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
       const current = found.data?.[0]
       const patch = {
         hitting: {
-          atBats: safeNumber(current?.hitting?.atBats) + 1,
-          hits: safeNumber(current?.hitting?.hits) + (kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun' ? 1 : 0),
-          strikeouts: safeNumber(current?.hitting?.strikeouts) + (kind === 'strikeout' ? 1 : 0),
-          outs: safeNumber(current?.hitting?.outs) + (endedAsOut ? 1 : 0),
+          atBats:    safeNumber(current?.hitting?.atBats)    + 1,
+          hits:      safeNumber(current?.hitting?.hits)      + (isHitKind ? 1 : 0),
+          strikeouts:safeNumber(current?.hitting?.strikeouts)+ (kind === 'strikeout' ? 1 : 0),
+          outs:      safeNumber(current?.hitting?.outs)      + (endedAsOut ? 1 : 0),
+          homeRuns:  safeNumber(current?.hitting?.homeRuns)  + (isHomeRun ? 1 : 0),
+          rbi:       safeNumber(current?.hitting?.rbi)       + rbiCredit,
+          runs:      safeNumber(current?.hitting?.runs)      + batterRuns,
         },
       }
       await upsertCurrentBatterStats(batterId, patch)
@@ -1263,6 +1327,7 @@ function FieldPage({
       await syncDefensivePitcherEvent({
         pitchCountDelta: 1,
         earnedRunsDelta: runsScored > 0 ? runsScored : 0,
+        hitsAllowedDelta: 1,
       })
     } catch {
       // Mantem fluxo local mesmo sem backend.
@@ -1370,7 +1435,7 @@ function FieldPage({
     }
   }, [captureUndoSnapshot, gameState.isAttacking, gameState.strikes, gameState.balls, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, upsertCurrentBatterStats])
 
-  const applyDefensiveOutEvent = useCallback(async (kind = 'out') => {
+  const applyDefensiveOutEvent = useCallback(async (outType = 'out', fielderId = '') => {
     if (gameState.isAttacking) return
 
     await captureUndoSnapshot()
@@ -1404,18 +1469,32 @@ function FieldPage({
         inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
         runners: sideSwitch ? { first: false, second: false, third: false } : current.runners,
       }
-    }, `Out defensivo: ${kind}`)
+    }, `Out defensivo: ${outType}`)
 
     try {
       await syncDefensivePitcherEvent({
         outsDelta: 1,
         pitchCountDelta: 1,
-        strikeoutsDelta: kind === 'strikeout' ? 1 : 0,
+        strikeoutsDelta: outType === 'strikeout' ? 1 : 0,
       })
+
+      if (fielderId && outType !== 'strikeout') {
+        const found = await gameStatsApi.listByGame(gameState.currentGameId, fielderId)
+        const cur = found.data?.[0]
+        await upsertPlayerStat(fielderId, {
+          defense: {
+            errors: safeNumber(cur?.defense?.errors),
+            doublePlays: safeNumber(cur?.defense?.doublePlays),
+            flyOuts: safeNumber(cur?.defense?.flyOuts) + (outType === 'flyout' ? 1 : 0),
+            groundOuts: safeNumber(cur?.defense?.groundOuts) + (outType === 'groundout' ? 1 : 0),
+            lineOuts: safeNumber(cur?.defense?.lineOuts) + (outType === 'lineout' ? 1 : 0),
+          },
+        })
+      }
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertPlayerStat])
 
   const applyDoublePlayWithRunner = async (runnerBase, defenderIds = []) => {
     if (!runnerBase) return
@@ -1559,11 +1638,32 @@ function FieldPage({
     try {
       if (!gameState.isAttacking) {
         await syncDefensivePitcherEvent({ outsDelta: 1, earnedRunsDelta: runScored, pitchCountDelta: 1 })
+      } else if (runScored > 0) {
+        // Sac fly: batter gets RBI for runs driven in (no AB counted)
+        const order = gameState.battingOrder || []
+        const batterIndex = Math.min(gameState.currentBatterIndex || 0, order.length - 1)
+        const batterId = order[batterIndex]
+        if (batterId && gameState.currentGameId) {
+          const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
+          const cur = found.data?.[0]
+          await upsertCurrentBatterStats(batterId, {
+            hitting: {
+              atBats:    safeNumber(cur?.hitting?.atBats),
+              hits:      safeNumber(cur?.hitting?.hits),
+              strikeouts:safeNumber(cur?.hitting?.strikeouts),
+              outs:      safeNumber(cur?.hitting?.outs),
+              walks:     safeNumber(cur?.hitting?.walks),
+              runs:      safeNumber(cur?.hitting?.runs),
+              rbi:       safeNumber(cur?.hitting?.rbi) + runScored,
+              homeRuns:  safeNumber(cur?.hitting?.homeRuns),
+            },
+          })
+        }
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertCurrentBatterStats])
 
   const applyHBP = useCallback(async () => {
     await captureUndoSnapshot()
@@ -1604,7 +1704,8 @@ function FieldPage({
 
     try {
       if (!gameState.isAttacking) {
-        await syncDefensivePitcherEvent({ pitchCountDelta: 1, walksDelta: 1 })
+        // HBP counts as a pitch and puts a runner on base, but is NOT a base-on-balls (BB)
+        await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
@@ -2356,7 +2457,7 @@ function FieldPage({
                   <button type="button" className="acoes-btn acoes-strike" onClick={() => handleDefensivePitch('strike')}>STRIKE</button>
                   <button type="button" className="acoes-btn acoes-ball" onClick={() => handleDefensivePitch('ball')}>BALL</button>
                   <button type="button" className="acoes-btn acoes-foul" onClick={() => handleDefensivePitch('foul')}>FOUL</button>
-                  <button type="button" className="acoes-btn acoes-out" onClick={() => applyDefensiveOutEvent('out')}>OUT</button>
+                  <button type="button" className="acoes-btn acoes-out" onClick={() => { setSelectedOutType(''); setSelectedOutFielderId(''); setPendingOutTypeSelect(true) }}>OUT</button>
                   <button type="button" className="acoes-btn acoes-1b" onClick={() => applyDefensiveHit('single')}>SINGLE</button>
                   <button type="button" className="acoes-btn acoes-2b" onClick={() => applyDefensiveHit('double')}>DOUBLE</button>
                   <button type="button" className="acoes-btn acoes-3b" onClick={() => applyDefensiveHit('triple')}>TRIPLE</button>
@@ -2521,19 +2622,27 @@ function FieldPage({
 
             <section className="player-stats-block">
               <h4>3) Ordem de rebatida</h4>
-              <div className="pregame-order-list">
+              <div
+                className="pregame-order-list"
+                style={{ touchAction: 'none' }}
+                onPointerMove={onOrderPointerMove}
+                onPointerUp={onOrderPointerUp}
+                onPointerCancel={onOrderPointerUp}
+              >
                 {setupBattingOrder.map((id, index) => {
                   const player = playersById[id]
                   if (!player) return null
                   return (
                     <button
                       key={`order-${id}`}
+                      data-order-id={id}
                       type="button"
                       className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
                       draggable
                       onDragStart={() => onBattingDragStart(id)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => onBattingDrop(id)}
+                      onPointerDown={(ev) => onOrderPointerDown(id, ev)}
                     >
                       <span>{index + 1}.</span>
                       <strong>{player.name}</strong>
@@ -2654,6 +2763,63 @@ function FieldPage({
           }}
           onCancel={() => setPendingSubstitution(null)}
         />
+      )}
+
+      {pendingOutTypeSelect && (
+        <Modal title="Tipo de out" onClose={() => setPendingOutTypeSelect(false)}>
+          <div className="player-stats-block">
+            <div className="detail-actions" style={{ flexWrap: 'wrap', marginBottom: '12px' }}>
+              {[
+                ['flyout', 'FO (Fly Out)'],
+                ['groundout', 'GO (Ground Out)'],
+                ['lineout', 'LO (Line Out)'],
+                ['strikeout', 'K (Strikeout)'],
+              ].map(([type, label]) => (
+                <Button
+                  key={type}
+                  type="button"
+                  variant={selectedOutType === type ? 'primary' : 'secondary'}
+                  onClick={() => setSelectedOutType(type)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+
+            {selectedOutType && selectedOutType !== 'strikeout' && (
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px' }}>Fielder (opcional)</label>
+                <select
+                  value={selectedOutFielderId}
+                  onChange={(ev) => setSelectedOutFielderId(ev.target.value)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">-- nenhum --</option>
+                  {errorDefenderOptions.map((opt) => (
+                    <option key={`out-fielder-${opt.id}`} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="detail-actions">
+              <Button type="button" variant="secondary" onClick={() => setPendingOutTypeSelect(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={!selectedOutType}
+                onClick={() => {
+                  applyDefensiveOutEvent(selectedOutType, selectedOutFielderId)
+                  setPendingOutTypeSelect(false)
+                }}
+              >
+                Confirmar out
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {pendingDefenseError && (
