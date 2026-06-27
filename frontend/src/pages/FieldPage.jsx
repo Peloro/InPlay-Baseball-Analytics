@@ -250,6 +250,7 @@ function FieldPage({
   const [selectedDoublePlayRunnerBase, setSelectedDoublePlayRunnerBase] = useState('')
   const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
   const [undoStack, setUndoStack] = useState([])
+  const [confirmChangePitcherAdv, setConfirmChangePitcherAdv] = useState(false)
   const [invalidFeedback, setInvalidFeedback] = useState('')
   const [pendingEndGame, setPendingEndGame] = useState(false)
   const [showFieldContainer] = useState(true)
@@ -929,6 +930,9 @@ function FieldPage({
     const order = ['first', 'second', 'third']
     const index = order.indexOf(base)
     if (index === -1) return
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
     onUpdateGameState((current) => {
       if (!current.runners?.[base]) return current
@@ -958,6 +962,10 @@ function FieldPage({
   }, [gameState.isAttacking, gameState.runners, onDefensiveEarnedRun, onUpdateGameState])
 
   const removeRunner = useCallback((base) => {
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
+
     onUpdateGameState((current) => {
       if (!current.runners?.[base]) return current
 
@@ -1103,6 +1111,14 @@ function FieldPage({
     setInvalidFeedback(message)
     window.setTimeout(() => setInvalidFeedback(''), 1400)
   }, [])
+
+  const prevUndoLenRef = useRef(0)
+  useEffect(() => {
+    if (undoStack.length >= 75 && prevUndoLenRef.current < 75) {
+      showInvalidAction('Histórico de desfazer quase cheio — ações antigas serão descartadas')
+    }
+    prevUndoLenRef.current = undoStack.length
+  }, [undoStack.length, showInvalidAction])
 
   const captureUndoSnapshot = useCallback(async () => {
     if (!gameState.currentGameId) return
@@ -1366,9 +1382,14 @@ function FieldPage({
 
     let runsScored = 0
 
+    // Pre-compute runs before onUpdateGameState so earnedRunsDelta is available synchronously
+    // (React's functional updater runs after current sync code — runsScored set inside it would be 0)
+    const preHitResult = applyHitToBases(gameState.runners || { first: false, second: false, third: false }, kind)
+    const preRunsScored = preHitResult.runs
+
     const isHit = kind === 'single' || kind === 'double' || kind === 'triple' || kind === 'homerun'
     if (isHit) {
-      const preview = applyHitToBases(gameState.runners || { first: false, second: false, third: false }, kind)
+      const preview = preHitResult
       const bases = preview.bases || 1
       const destName = bases >= 4 ? 'C' : bases === 3 ? '3B' : bases === 2 ? '2B' : '1B'
       const homePos = getDefaultFieldPosition('C')
@@ -1414,7 +1435,7 @@ function FieldPage({
     try {
       await syncDefensivePitcherEvent({
         pitchCountDelta: 1,
-        earnedRunsDelta: runsScored > 0 ? runsScored : 0,
+        earnedRunsDelta: preRunsScored,
         hitsAllowedDelta: 1,
       })
     } catch {
@@ -1442,6 +1463,13 @@ function FieldPage({
     const preOrder = gameState.battingOrder || []
     const preBatterIndex = Math.min(gameState.currentBatterIndex || 0, Math.max(0, preOrder.length - 1))
     const batterId = preOrder[preBatterIndex] || null
+
+    // Pre-compute forced runs to credit RBI on walk (mirrors logic inside onUpdateGameState)
+    let preScoredRuns = 0
+    if (didWalk) {
+      const preRunners = { ...(gameState.runners || { first: false, second: false, third: false }) }
+      preScoredRuns = forceAdvanceToFirst(preRunners).runs
+    }
 
     onUpdateGameState((current) => {
       if (!current.isAttacking) return current
@@ -1529,6 +1557,7 @@ function FieldPage({
             strikeouts: safeNumber(cur?.hitting?.strikeouts) + (didStrikeout ? 1 : 0),
             outs: safeNumber(cur?.hitting?.outs) + (didStrikeout ? 1 : 0),
             walks: safeNumber(cur?.hitting?.walks) + (didWalk ? 1 : 0),
+            rbi: safeNumber(cur?.hitting?.rbi) + (didWalk ? preScoredRuns : 0),
           },
         })
       } catch {
@@ -1711,9 +1740,17 @@ function FieldPage({
   }
 
   const applySacFly = useCallback(async () => {
+    if (!gameState.runners?.third) {
+      showInvalidAction('Nenhum corredor na terceira base para sac fly')
+      return
+    }
+
     await captureUndoSnapshot()
 
     let runScored = 0
+    // Pre-compute before state update: React's functional updater runs after current sync code,
+    // so runScored set inside onUpdateGameState would still be 0 in the try block below.
+    const preRunScored = 1
 
     onUpdateGameState((current) => {
       const hadRunnerOnThird = Boolean(current.runners?.third)
@@ -1768,9 +1805,9 @@ function FieldPage({
 
     try {
       if (!gameState.isAttacking) {
-        await syncDefensivePitcherEvent({ outsDelta: 1, earnedRunsDelta: runScored, pitchCountDelta: 1 })
-      } else if (runScored > 0) {
-        // Sac fly: batter gets RBI for runs driven in (no AB counted)
+        await syncDefensivePitcherEvent({ outsDelta: 1, earnedRunsDelta: preRunScored, pitchCountDelta: 1 })
+      } else {
+        // Sac fly: batter gets RBI (runner on third confirmed above, preRunScored = 1)
         const order = gameState.battingOrder || []
         const batterIndex = Math.min(gameState.currentBatterIndex || 0, order.length - 1)
         const batterId = order[batterIndex]
@@ -1785,7 +1822,7 @@ function FieldPage({
               outs:      safeNumber(cur?.hitting?.outs),
               walks:     safeNumber(cur?.hitting?.walks),
               runs:      safeNumber(cur?.hitting?.runs),
-              rbi:       safeNumber(cur?.hitting?.rbi) + runScored,
+              rbi:       safeNumber(cur?.hitting?.rbi) + preRunScored,
               homeRuns:  safeNumber(cur?.hitting?.homeRuns),
             },
           })
@@ -1794,7 +1831,7 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertCurrentBatterStats])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.runners, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertCurrentBatterStats, showInvalidAction])
 
   const applyHBP = useCallback(async () => {
     await captureUndoSnapshot()
@@ -1859,6 +1896,11 @@ function FieldPage({
   }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent])
 
   const applyErrorEvent = async (defenderId = '') => {
+    // Capture batter before state advances the index
+    const errPreOrder = gameState.battingOrder || []
+    const errPreIdx = Math.min(gameState.currentBatterIndex || 0, Math.max(0, errPreOrder.length - 1))
+    const errBatterId = gameState.isAttacking ? (errPreOrder[errPreIdx] || null) : null
+
     await captureUndoSnapshot()
 
     let runsScored = 0
@@ -1929,6 +1971,20 @@ function FieldPage({
 
         // Runs on errors are unearned — do NOT pass earnedRunsDelta
         await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
+      } else if (errBatterId && gameState.currentGameId) {
+        // Reach on error is an official AB (no hit credited)
+        const found = await gameStatsApi.listByGame(gameState.currentGameId, errBatterId)
+        const cur = found.data?.[0]
+        await upsertCurrentBatterStats(errBatterId, {
+          hitting: {
+            atBats: safeNumber(cur?.hitting?.atBats) + 1,
+            hits: safeNumber(cur?.hitting?.hits),
+            strikeouts: safeNumber(cur?.hitting?.strikeouts),
+            outs: safeNumber(cur?.hitting?.outs),
+            walks: safeNumber(cur?.hitting?.walks),
+            rbi: safeNumber(cur?.hitting?.rbi),
+          },
+        })
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
@@ -2695,22 +2751,45 @@ function FieldPage({
                     }}
                   />
                 </div>
-                <button
-                  type="button"
-                  className="acoes-change-pitcher-btn acoes-change-pitcher-btn--full"
-                  onClick={() => onUpdateGameState((current) => {
-                    const num = current.opposingPitcher?.number?.trim()
-                    const name = current.opposingPitcher?.name?.trim()
-                    const label = num ? (name ? `#${num} ${name}` : `#${num}`) : (name || 'Adv')
-                    return {
-                      ...current,
-                      opponentPitchCount: 0,
-                      gameLog: [...(current.gameLog || []), makeLogEntry(current, 'pitcher-change', `Pitcher Adv: ${label} entrou`)],
-                    }
-                  })}
-                >
-                  Trocar Pitcher Adv.
-                </button>
+                {confirmChangePitcherAdv ? (
+                  <div className="acoes-confirm-row">
+                    <span className="acoes-confirm-label">Resetar PC do pitcher adversário?</span>
+                    <button
+                      type="button"
+                      className="acoes-change-pitcher-btn acoes-change-pitcher-btn--confirm"
+                      onClick={() => {
+                        setConfirmChangePitcherAdv(false)
+                        onUpdateGameState((current) => {
+                          const num = current.opposingPitcher?.number?.trim()
+                          const name = current.opposingPitcher?.name?.trim()
+                          const label = num ? (name ? `#${num} ${name}` : `#${num}`) : (name || 'Adv')
+                          return {
+                            ...current,
+                            opponentPitchCount: 0,
+                            gameLog: [...(current.gameLog || []), makeLogEntry(current, 'pitcher-change', `Pitcher Adv: ${label} entrou`)],
+                          }
+                        })
+                      }}
+                    >
+                      Confirmar
+                    </button>
+                    <button
+                      type="button"
+                      className="acoes-change-pitcher-btn acoes-change-pitcher-btn--cancel"
+                      onClick={() => setConfirmChangePitcherAdv(false)}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="acoes-change-pitcher-btn acoes-change-pitcher-btn--full"
+                    onClick={() => setConfirmChangePitcherAdv(true)}
+                  >
+                    Trocar Pitcher Adv.
+                  </button>
+                )}
               </div>
             )}
 
@@ -3165,7 +3244,7 @@ function FieldPage({
             )}
 
             <div className="detail-actions" style={{ marginTop: '10px' }}>
-              <Button type="button" variant="primary" onClick={() => setPendingDoublePlaySelect(false)}>
+              <Button type="button" variant="secondary" onClick={() => setPendingDoublePlaySelect(false)}>
                 Cancelar
               </Button>
               <Button
@@ -3269,7 +3348,7 @@ function FieldPage({
               ))}
             </select>
             <div className="detail-actions" style={{ marginTop: '10px' }}>
-              <Button type="button" variant="primary" onClick={() => setPendingDefenseError(false)}>
+              <Button type="button" variant="secondary" onClick={() => setPendingDefenseError(false)}>
                 Cancelar
               </Button>
               <Button

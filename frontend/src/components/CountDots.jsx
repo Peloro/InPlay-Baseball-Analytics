@@ -1,6 +1,15 @@
+import React, { useMemo } from 'react'
+
 function CountDots({ label, value, max, color }) {
-  const safeValue = Math.max(0, Math.min(Number(value || 0), Number(max || 0)))
-  const dots = Array.from({ length: max }, (_, index) => index < safeValue)
+  const safeValue = useMemo(
+    () => Math.max(0, Math.min(Number(value || 0), Number(max || 0))),
+    [value, max],
+  )
+  const dots = useMemo(
+    () => Array.from({ length: max }, (_, index) => index < safeValue),
+    [max, safeValue],
+  )
+  const dotStyle = useMemo(() => ({ '--count-dot-color': color }), [color])
 
   return (
     <div className="count-dots-row" aria-label={label}>
@@ -10,7 +19,7 @@ function CountDots({ label, value, max, color }) {
           <span
             key={`${label}-${index}`}
             className={`count-dot ${filled ? 'filled' : ''}`}
-            style={{ '--count-dot-color': color }}
+            style={dotStyle}
           />
         ))}
       </div>
@@ -18,4 +27,4 @@ function CountDots({ label, value, max, color }) {
   )
 }
 
-export default CountDots
+export default React.memo(CountDots)

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 
-export default function Player({
+function Player({
   player,
   id,
   isOpponent,
@@ -65,3 +65,24 @@ export default function Player({
     </button>
   )
 }
+
+export default React.memo(Player, (prev, next) => {
+  return (
+    prev.id === next.id &&
+    prev.selectedId === next.selectedId &&
+    prev.draggingPlayerId === next.draggingPlayerId &&
+    prev.recentlyDroppedId === next.recentlyDroppedId &&
+    prev.tooltipId === next.tooltipId &&
+    prev.className === next.className &&
+    prev.isOpponent === next.isOpponent &&
+    prev.screen?.left === next.screen?.left &&
+    prev.screen?.top === next.screen?.top &&
+    prev.player === next.player &&
+    prev.getMainPosition === next.getMainPosition &&
+    prev.onPlayerClick === next.onPlayerClick &&
+    prev.openEditModal === next.openEditModal &&
+    prev.startDragPlayer === next.startDragPlayer &&
+    prev.onPointerDown === next.onPointerDown &&
+    prev.onDragStart === next.onDragStart
+  )
+})

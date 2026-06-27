@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import FieldPage from './pages/FieldPage'
-import TrainingField from './pages/TrainingField'
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react'
 import StatsPage from './pages/StatsPage'
-import JogadoresPage from './pages/JogadoresPage'
+
+const FieldPage = lazy(() => import('./pages/FieldPage'))
+const TrainingField = lazy(() => import('./pages/TrainingField'))
+const JogadoresPage = lazy(() => import('./pages/JogadoresPage'))
 import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus } from './services/api'
 import { addInningRuns } from './utils/stats'
 import { VALID_POSITIONS } from './data/positions'
@@ -230,7 +231,11 @@ function App() {
   const isOffline = syncStatus === 'offline'
 
   useEffect(() => {
-    window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
+    try {
+      window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
+    } catch {
+      // QuotaExceededError — state remains in memory; localStorage full
+    }
   }, [gameState])
 
   // Load players from local storage into React state
@@ -493,7 +498,7 @@ function App() {
       setGameState((current) => {
         const newId = getPlayerId(saved)
         const participantPlayerIds = [...new Set([...(current.participantPlayerIds || []), newId])]
-        const battingOrder = [...new Set([...(current.battingOrder || []), ...participantPlayerIds])]
+        const battingOrder = [...new Set([...(current.battingOrder || []), newId])]
         return {
           ...current,
           participantPlayerIds,
@@ -921,6 +926,7 @@ function App() {
       )}
       {gameAccessNotice && <div className="game-access-warning">{gameAccessNotice}</div>}
 
+      <Suspense fallback={null}>
       {page === 'game' ? (
         <FieldPage
           players={players}
@@ -982,6 +988,7 @@ function App() {
         />
       )}
 
+      </Suspense>
       {/* tool-dock removed: controls moved into bottom HUD for mobile/tablet */}
     </main>
   )

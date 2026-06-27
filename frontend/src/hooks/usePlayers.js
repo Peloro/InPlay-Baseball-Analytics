@@ -30,7 +30,7 @@ export default function usePlayers({ players, setPlayers, gameState }) {
       .filter((player) => {
         if (!term) return true
         return (
-          player.name.toLowerCase().includes(term)
+          (player.name?.toLowerCase() ?? '').includes(term)
           || String(player.number).includes(term)
           || getMainPosition(player).toLowerCase().includes(term)
         )

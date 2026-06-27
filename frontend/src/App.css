@@ -182,7 +182,7 @@
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
-  transition: transform 120ms ease, opacity 120ms ease, background-color 120ms ease;
+  transition: background-color 120ms ease, opacity 120ms ease;
 }
 
 .nav-label-short {
@@ -190,12 +190,11 @@
 }
 
 .nav-actions button:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: scale(1.03);
+  opacity: 0.85;
 }
 
 .nav-actions button:active:not(:disabled) {
-  transform: scale(0.97);
+  opacity: 0.65;
 }
 
 .nav-actions button:disabled {
@@ -304,40 +303,40 @@
   gap: 6px;
 }
 
-/* Hidden by default: roll out above the viewport */
+/* Hidden by default: fade out above */
 .game-scoreboard.hidden {
-  transform: translate(-50%, -140%);
+  transform: translate(-50%, -12px);
   opacity: 0;
   pointer-events: none;
-  animation: rollOut 220ms ease forwards;
+  animation: scoreboardOut 180ms ease forwards;
 }
 
-/* Visible state: roll in */
+/* Visible state: fade in */
 .game-scoreboard.visible {
   transform: translate(-50%, 0);
   opacity: 1;
   pointer-events: auto;
-  animation: rollIn 260ms cubic-bezier(.2,.9,.2,1) forwards;
+  animation: scoreboardIn 200ms ease forwards;
 }
 
-@keyframes rollIn {
+@keyframes scoreboardIn {
   from {
-    transform: translate(-50%, -160%) rotateX(18deg);
+    transform: translate(-50%, -10px);
     opacity: 0;
   }
   to {
-    transform: translate(-50%, 0) rotateX(0deg);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 }
 
-@keyframes rollOut {
+@keyframes scoreboardOut {
   from {
-    transform: translate(-50%, 0) rotateX(0deg);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
   to {
-    transform: translate(-50%, -160%) rotateX(18deg);
+    transform: translate(-50%, -10px);
     opacity: 0;
   }
 }
@@ -1237,11 +1236,12 @@
 .game-list button,
 .action-btn,
 .danger-btn,
+.secondary-btn,
 .detail-actions button,
 .player-form button,
 .link-btn,
 .custom-event button {
-  transition: transform 120ms ease, background-color 120ms ease, filter 120ms ease;
+  transition: background-color 120ms ease, filter 120ms ease, opacity 120ms ease;
 }
 
 .hud-actions button:hover,
@@ -1250,12 +1250,12 @@
 .game-list button:hover,
 .action-btn:hover,
 .danger-btn:hover,
+.secondary-btn:hover,
 .detail-actions button:hover,
 .player-form button:hover,
 .link-btn:hover,
 .custom-event button:hover {
-  transform: scale(1.05);
-  filter: brightness(1.04);
+  filter: brightness(1.08);
 }
 
 .hud-actions button:active,
@@ -1264,11 +1264,12 @@
 .game-list button:active,
 .action-btn:active,
 .danger-btn:active,
+.secondary-btn:active,
 .detail-actions button:active,
 .player-form button:active,
 .link-btn:active,
 .custom-event button:active {
-  transform: scale(0.95);
+  opacity: 0.8;
 }
 
 .stats-pulse {
@@ -1337,6 +1338,9 @@
   .full-width-btn,
   .bench-info-btn,
   .game-list button,
+  .action-btn,
+  .danger-btn,
+  .secondary-btn,
   .detail-actions button,
   .player-form button,
   .link-btn,
@@ -1761,6 +1765,12 @@ html, body {
   border-color: #742317;
   color: #fff;
   font-weight: 700;
+}
+
+.secondary-btn {
+  background: #2a2a2a;
+  border-color: #555;
+  color: #aaa;
 }
 
 .danger-btn:hover {
@@ -2202,11 +2212,17 @@ html, body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(17, 25, 20, 0.5);
+  background: rgba(17, 25, 20, 0.6);
   z-index: 10001;
   display: grid;
   place-items: center;
   padding: 16px;
+  animation: backdropFadeIn 140ms ease forwards;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .player-stats-modal {
@@ -2218,6 +2234,18 @@ html, body {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 14px;
+  animation: modalSlideUp 160ms ease forwards;
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .player-stats-head {
@@ -3017,6 +3045,30 @@ html {
 .acoes-change-pitcher-btn--full {
   width: 100%;
   text-align: center;
+}
+
+.acoes-confirm-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.acoes-confirm-label {
+  font-size: 0.62rem;
+  color: #f5a623;
+  text-align: center;
+}
+
+.acoes-change-pitcher-btn--confirm {
+  background: #1a3a1a;
+  border-color: #3a7a3a;
+  color: #7adb7a;
+}
+
+.acoes-change-pitcher-btn--cancel {
+  background: #2a1a1a;
+  border-color: #7a3a3a;
+  color: #db7a7a;
 }
 
 .acoes-runners-section {

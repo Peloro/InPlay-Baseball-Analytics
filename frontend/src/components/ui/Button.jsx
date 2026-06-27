@@ -4,6 +4,7 @@ export default function Button({ children, variant = 'primary', className = '', 
   // Map variant to existing CSS classes used across the app to keep visual parity
   const variantClass =
     variant === 'primary' ? 'action-btn' :
+    variant === 'secondary' ? 'secondary-btn' :
     variant === 'danger' ? 'danger-btn' :
     variant === 'link' ? 'link-btn' :
     variant === 'nav' ? 'nav-btn' :
