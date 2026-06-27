@@ -2340,6 +2340,13 @@ function FieldPage({
                 ? `Sub: ${incomingPlayer?.name || '?'} → ${playerOutName || '?'} (${positionToUse})`
                 : `${incomingPlayer?.name || '?'} entrou em campo (${positionToUse})`
 
+              // If the outgoing player was the active pitcher, auto-switch to the incoming one
+              let nextCurrentPitcherId = current.currentPitcherId
+              if (replacedId && replacedId === current.currentPitcherId) {
+                const inPositions = Array.isArray(incomingPlayer?.positions) ? incomingPlayer.positions : []
+                nextCurrentPitcherId = inPositions.includes('P') ? drag.playerId : null
+              }
+
               return {
                 ...current,
                 onFieldPlayerIds: Array.from(new Set(nextOnField)),
@@ -2350,6 +2357,7 @@ function FieldPage({
                 preGameConfigured: current.preGameConfigured || nextOnField.length === 9,
                 substitutions: [...(current.substitutions || []), subRecord],
                 gameLog: [...(current.gameLog || []), makeLogEntry(current, 'sub', subLogDesc)],
+                currentPitcherId: nextCurrentPitcherId,
               }
             }, replacedId
               ? `${incomingPlayer?.name || 'Jogador'} substituiu jogador em ${getMainPosition(incomingPlayer)}`
@@ -2398,6 +2406,48 @@ function FieldPage({
               participantPlayerIds: [...nextOnField, ...bench],
             }
           }, `${player?.name || 'Jogador'} foi para o banco`)
+        }
+
+        // Field-to-field: drop a field player onto another field player → swap their positions
+        if (drag.source === 'field' && inField && point) {
+          const draggedId = drag.playerId
+          const swapTarget = fieldPlayers.find(p => {
+            const id = getPlayerId(p)
+            return id !== draggedId && Math.hypot(p.x - point.x, p.y - point.y) < 10
+          })
+          if (swapTarget) {
+            const targetId = getPlayerId(swapTarget)
+            const draggedLineupEntry = (gameState.lineup || []).find(l => l.playerId === draggedId)
+            const targetLineupEntry = (gameState.lineup || []).find(l => l.playerId === targetId)
+            if (draggedLineupEntry && targetLineupEntry) {
+              const dp = draggedLineupEntry.position
+              const tp = targetLineupEntry.position
+              const dpCoord = getDefaultFieldPosition(dp)
+              const tpCoord = getDefaultFieldPosition(tp)
+              setPlayers((current) =>
+                current.map((p) => {
+                  const id = getPlayerId(p)
+                  if (id === draggedId) return { ...p, x: tpCoord.x, y: tpCoord.y }
+                  if (id === targetId) return { ...p, x: dpCoord.x, y: dpCoord.y }
+                  return p
+                }),
+              )
+              onUpdateGameState((current) => {
+                const nextLineup = (current.lineup || []).map(l => {
+                  if (l.playerId === draggedId) return { ...l, position: tp }
+                  if (l.playerId === targetId) return { ...l, position: dp }
+                  return l
+                })
+                const draggedName = playersById[draggedId]?.name || '?'
+                const targetName = swapTarget?.name || '?'
+                return {
+                  ...current,
+                  lineup: nextLineup,
+                  gameLog: [...(current.gameLog || []), makeLogEntry(current, 'swap', `Troca: ${draggedName} ↔ ${targetName}`)],
+                }
+              }, `Troca de posição`)
+            }
+          }
         }
 
         const start = dragStartRef.current
@@ -2483,9 +2533,13 @@ function FieldPage({
     return Array.isArray(rep) && rep.length > 0 ? rep : ['FB', 'CV', 'SL', 'CH', 'SI', 'CT']
   }, [playersById, gameState.currentPitcherId])
 
+  // Use a string key so this effect only fires when the actual repertoire content changes,
+  // not on every drag frame when playersById gets a new object reference.
+  const activePitchTypesKey = activePitchTypes.join(',')
   useEffect(() => {
-    setSelectedPitchType(t => activePitchTypes.includes(t) ? t : activePitchTypes[0])
-  }, [activePitchTypes])
+    const types = activePitchTypesKey.split(',')
+    setSelectedPitchType(t => types.includes(t) ? t : (types[0] || 'FB'))
+  }, [activePitchTypesKey])
   
   const opponentMarkers = useMemo(() => opponentDefense, [opponentDefense])
   const defensivePlayers = useMemo(() => {
