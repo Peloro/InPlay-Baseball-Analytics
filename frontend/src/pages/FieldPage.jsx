@@ -3072,6 +3072,7 @@ function FieldPage({
         <Modal
           title="Configuracao Inicial"
           onClose={gameState.currentGameId ? () => setShowPreGameSetup(false) : onCancelPreGame ?? undefined}
+          closeLabel="Cancelar"
         >
           <div className="pregame-grid">
                 <section className="player-stats-block pregame-info">
@@ -3222,11 +3223,6 @@ function FieldPage({
           </div>
 
           <div className="detail-actions">
-            {!gameState.currentGameId && onCancelPreGame && (
-              <Button type="button" variant="secondary" onClick={onCancelPreGame}>
-                Cancelar
-              </Button>
-            )}
             <Button
               type="button"
               variant="primary"
