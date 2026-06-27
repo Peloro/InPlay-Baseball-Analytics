@@ -20,6 +20,7 @@ import StatLabel from '../components/ui/StatLabel'
 
 const LONG_PRESS_MS = 450
 const DEFENSIVE_POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
+const PITCH_NAMES = { FB: 'Fastball', CV: 'Curveball', SL: 'Slider', CH: 'Changeup', SI: 'Sinker', CT: 'Cutter' }
 
 function makeOpponentMarkers() {
   return DEFENSIVE_POSITIONS.map((position) => {
@@ -2912,6 +2913,7 @@ function FieldPage({
                       >{t}</button>
                     ))}
                   </div>
+                  <div className="pitch-type-selected-desc">{PITCH_NAMES[selectedPitchType]}</div>
                   <button type="button" className="acoes-btn acoes-strike" onClick={() => handleDefensivePitch('strike')}>STRIKE</button>
                   <button type="button" className="acoes-btn acoes-ball" onClick={() => handleDefensivePitch('ball')}>BALL</button>
                   <button type="button" className="acoes-btn acoes-foul" onClick={() => handleDefensivePitch('foul')}>FOUL</button>
@@ -2962,11 +2964,11 @@ function FieldPage({
                   <div className="pitch-type-totals">
                     {['FB','CV','SL','CH','SI','CT'].map(t => {
                       const count = safeNumber(livePitching.pitchTypes?.[t])
-                      return count > 0 ? (
-                        <span key={t} className="pitch-type-count">
+                      return (
+                        <span key={t} className={`pitch-type-count${count === 0 ? ' pitch-type-count--zero' : ''}`}>
                           <em><StatLabel abbr={t} /></em>{count}
                         </span>
-                      ) : null
+                      )
                     })}
                   </div>
                 </div>

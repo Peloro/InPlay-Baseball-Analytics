@@ -3568,6 +3568,18 @@ html {
   margin-right: 2px;
   font-weight: 700;
 }
+.pitch-type-count--zero {
+  opacity: 0.28;
+}
+.pitch-type-selected-desc {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 0.6rem;
+  color: #5a6a7a;
+  letter-spacing: 0.04em;
+  padding: 0 0 2px;
+  min-height: 1em;
+}
 
 /* Box score — acoes panel inline version */
 .acoes-box-score-wrap {

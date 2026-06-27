@@ -46,19 +46,29 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
     { label: 'OBP', value: obpFromHitting(hitting) },
   ]
 
-  const buildPitchingRows = (pitching, entry) => [
-    { label: 'IP', value: formatIpFromOuts(pitching.outsPitched) },
-    { label: 'ERA', value: entry?.era ? toFixed3(entry.era) : eraFromPitching(pitching) },
-    { label: 'WHIP', value: whipFromPitching(pitching) },
-    { label: 'K/9', value: k9FromPitching(pitching) },
-    { label: 'SO', value: safeNumber(pitching.strikeouts) },
-    { label: 'BB', value: safeNumber(pitching.walks) },
-    { label: 'ER', value: safeNumber(pitching.earnedRuns) },
-    { label: 'H', value: safeNumber(pitching.hitsAllowed) },
-    { label: 'PC', value: safeNumber(pitching.pitchCount) },
-    { label: 'STR', value: safeNumber(pitching.strikes) },
-    { label: 'BAL', value: safeNumber(pitching.balls) },
-  ]
+  const buildPitchingRows = (pitching, entry) => {
+    const rows = [
+      { label: 'IP', value: formatIpFromOuts(pitching.outsPitched) },
+      { label: 'ERA', value: entry?.era ? toFixed3(entry.era) : eraFromPitching(pitching) },
+      { label: 'WHIP', value: whipFromPitching(pitching) },
+      { label: 'K/9', value: k9FromPitching(pitching) },
+      { label: 'SO', value: safeNumber(pitching.strikeouts) },
+      { label: 'BB', value: safeNumber(pitching.walks) },
+      { label: 'ER', value: safeNumber(pitching.earnedRuns) },
+      { label: 'H', value: safeNumber(pitching.hitsAllowed) },
+      { label: 'PC', value: safeNumber(pitching.pitchCount) },
+      { label: 'STR', value: safeNumber(pitching.strikes) },
+      { label: 'BAL', value: safeNumber(pitching.balls) },
+    ]
+    const typeKeys = ['FB', 'CV', 'SL', 'CH', 'SI', 'CT']
+    if (typeKeys.some(t => safeNumber(pitching.pitchTypes?.[t]) > 0)) {
+      typeKeys.forEach(t => {
+        const v = safeNumber(pitching.pitchTypes?.[t])
+        if (v > 0) rows.push({ label: t, value: v })
+      })
+    }
+    return rows
+  }
 
   const buildDefenseRows = (defense) => [
     { label: 'E', value: safeNumber(defense.errors) },
