@@ -263,6 +263,7 @@ function FieldPage({
   const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
   const isPinchingRef = useRef(false)
   const pinchRef = useRef({ initialDistance: 0, initialScale: 1, centerClientX: 0, centerClientY: 0, offsetX: 0, offsetY: 0 })
+  const isProcessingRef = useRef(false)
 
   const getDistance = (t1, t2) => {
     const dx = t2.clientX - t1.clientX
@@ -1151,9 +1152,16 @@ function FieldPage({
   }, [gameState])
 
   const handleDefensivePitch = useCallback(async (kind) => {
+    if (!gameState.currentPitcherId) {
+      showInvalidAction('Selecione o arremessador antes de registrar pitches')
+      return
+    }
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
     await captureUndoSnapshot()
     onPitchAction?.(kind, { pitchType: selectedPitchType })
-  }, [captureUndoSnapshot, onPitchAction, selectedPitchType])
+  }, [captureUndoSnapshot, gameState.currentPitcherId, onPitchAction, selectedPitchType, showInvalidAction])
 
   const handleUndo = useCallback(async () => {
     const latest = undoStack[undoStack.length - 1]
@@ -1231,6 +1239,9 @@ function FieldPage({
   const applyPlateAppearance = useCallback(async (kind) => {
     const order = gameState.battingOrder || []
     if (!order.length || !gameState.isAttacking) return
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
     await captureUndoSnapshot()
 
@@ -1343,6 +1354,13 @@ function FieldPage({
 
   const applyDefensiveHit = useCallback(async (kind) => {
     if (gameState.isAttacking) return
+    if (!gameState.currentPitcherId) {
+      showInvalidAction('Selecione o arremessador antes de registrar o evento')
+      return
+    }
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
     await captureUndoSnapshot()
 
@@ -1402,10 +1420,13 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent, setAnimatedBall, gameState.runners])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentPitcherId, onUpdateGameState, syncDefensivePitcherEvent, setAnimatedBall, gameState.runners, showInvalidAction])
 
   const applyAttackCountAction = useCallback(async (kind) => {
     if (!gameState.isAttacking) return
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
     await captureUndoSnapshot()
 
@@ -1518,6 +1539,13 @@ function FieldPage({
 
   const applyDefensiveOutEvent = useCallback(async (outType = 'out', fielderId = '') => {
     if (gameState.isAttacking) return
+    if (!gameState.currentPitcherId) {
+      showInvalidAction('Selecione o arremessador antes de registrar o evento')
+      return
+    }
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
     await captureUndoSnapshot()
 
@@ -1581,7 +1609,7 @@ function FieldPage({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertPlayerStat])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentPitcherId, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertPlayerStat, showInvalidAction])
 
   const applyDoublePlayWithRunner = async (runnerBase, defenderIds = []) => {
     if (!runnerBase) return
@@ -2242,6 +2270,12 @@ function FieldPage({
         }
 
         if (drag.source === 'field' && inBench) {
+          if (gameState.preGameConfigured && currentOnField.length <= 9) {
+            showInvalidAction('Faça uma substituição em vez de remover o jogador')
+            setDragPreview(null)
+            setDropTarget(null)
+            return
+          }
           onUpdateGameState((current) => {
             const nextOnField = (current.onFieldPlayerIds || []).filter((id) => id !== drag.playerId)
             const battingOrder = (current.battingOrder || []).filter((id) => id !== drag.playerId)

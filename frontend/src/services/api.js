@@ -74,6 +74,7 @@ function queueSync(method, url, data, localId = null) {
   const q = lfGet(LS.syncQueue)
   q.push({ method, url, data, _ts: Date.now(), localId })
   lfSet(LS.syncQueue, q)
+  emitStatus('pending')
 }
 
 // Returns IDs of records that are pending a POST to the server (created offline)

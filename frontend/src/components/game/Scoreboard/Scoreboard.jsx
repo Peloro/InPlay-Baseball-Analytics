@@ -66,7 +66,7 @@ export default function Scoreboard({ gameState, opponentName, visible = false })
                   {inningScores.home[i] != null ? inningScores.home[i] : (i + 1 < gameState.inning ? 0 : '–')}
                 </td>
               ))}
-              <td className="box-score-total">{gameState.awayScore || 0}</td>
+              <td className="box-score-total">{gameState.homeScore || 0}</td>
             </tr>
           </tbody>
         </table>
