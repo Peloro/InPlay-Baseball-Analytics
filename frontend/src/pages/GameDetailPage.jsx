@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import Button from '../components/ui/Button'
+import StatLabel from '../components/ui/StatLabel'
 import { safeNumber } from '../utils/number'
 import { avgFromValues, formatEraFromOuts, formatIpFromOuts } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
@@ -9,7 +10,7 @@ import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 function Stepper({ label, value, onMinus, onPlus }) {
   return (
     <div className="stat-stepper stat-box">
-      <span>{label}</span>
+      <span><StatLabel abbr={label} /></span>
       <button type="button" onClick={onMinus}>-</button>
       <strong>{safeNumber(value)}</strong>
       <button type="button" onClick={onPlus}>+</button>

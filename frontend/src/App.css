@@ -3981,3 +3981,55 @@ html {
   padding-left: 8px !important;
   text-align: center;
 }
+
+/* ── StatLabel tooltip ─────────────────────────────────────────── */
+.stat-label {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  border-bottom: 1px dotted var(--accent, #c6572f);
+  line-height: 1;
+}
+
+.stat-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  background: #1a2233;
+  border: 1px solid #3a4a60;
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  white-space: normal;
+  text-align: left;
+  font-weight: normal;
+  font-size: 0.72rem;
+}
+
+.stat-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #3a4a60;
+}
+
+.stat-tooltip__name {
+  color: #e8edf2;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.stat-tooltip__desc {
+  color: #8a9bb0;
+  line-height: 1.4;
+}

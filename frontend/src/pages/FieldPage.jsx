@@ -16,6 +16,7 @@ import useGameState from '../hooks/useGameState'
 import { safeNumber } from '../utils/number'
 import { formatEraFromOuts, formatIpFromOuts, outsToInnings, addInningRuns } from '../utils/stats'
 import { detectPlayerType, getPlayerId, getMainPosition } from '../utils/player'
+import StatLabel from '../components/ui/StatLabel'
 
 const LONG_PRESS_MS = 450
 const DEFENSIVE_POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -2947,23 +2948,23 @@ function FieldPage({
                     </div>
                   )}
                   <div className="acoes-pitcher-stats-grid">
-                    <div><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
-                    <div><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
+                    <div><span><StatLabel abbr="IP" /></span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
+                    <div><span><StatLabel abbr="ERA" /></span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
                     <div><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
-                    <div><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
+                    <div><span><StatLabel abbr="BB" /></span><strong>{safeNumber(livePitching.walks)}</strong></div>
                     <div className={overLimit ? 'pc-over' : nearLimit ? 'pc-near' : ''}>
-                      <span>PC</span>
+                      <span><StatLabel abbr="PC" /></span>
                       <strong>{pitcherPitches}{pitcherLimit ? `/${pitcherLimit}` : ''}</strong>
                     </div>
-                    <div><span>STR</span><strong>{safeNumber(livePitching.strikes)}</strong></div>
-                    <div><span>BAL</span><strong>{safeNumber(livePitching.balls)}</strong></div>
+                    <div><span><StatLabel abbr="STR" /></span><strong>{safeNumber(livePitching.strikes)}</strong></div>
+                    <div><span><StatLabel abbr="BAL" /></span><strong>{safeNumber(livePitching.balls)}</strong></div>
                   </div>
                   <div className="pitch-type-totals">
                     {['FB','CV','SL','CH','SI','CT'].map(t => {
                       const count = safeNumber(livePitching.pitchTypes?.[t])
                       return count > 0 ? (
                         <span key={t} className="pitch-type-count">
-                          <em>{t}</em>{count}
+                          <em><StatLabel abbr={t} /></em>{count}
                         </span>
                       ) : null
                     })}

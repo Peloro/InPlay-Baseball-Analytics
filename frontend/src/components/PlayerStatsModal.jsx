@@ -1,4 +1,5 @@
 import Modal from './ui/Modal'
+import StatLabel from './ui/StatLabel'
 import { safeNumber, toFixed3 } from '../utils/number'
 import { avgFromHitting, eraFromPitching, obpFromHitting, whipFromPitching, k9FromPitching, formatIpFromOuts } from '../utils/stats'
 import { detectPlayerType } from '../utils/player'
@@ -10,7 +11,7 @@ function renderBlock(title, rows) {
       <div className="player-stats-grid">
         {rows.map((row) => (
           <div key={`${title}-${row.label}`} className="player-stats-item">
-            <span>{row.label}</span>
+            <span><StatLabel abbr={row.label} /></span>
             <strong>{row.value}</strong>
           </div>
         ))}

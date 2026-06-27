@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import StatLabel from '../components/ui/StatLabel'
 import GameDetailPage from './GameDetailPage'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import PlayerStatsModal from '../components/PlayerStatsModal'
@@ -461,11 +462,11 @@ function StatsPage({
           {statsTab === 'hitters' ? (
             <>
               <div className="kpi">
-                <strong>AVG</strong>
+                <strong><StatLabel abbr="AVG" /></strong>
                 <span>{avgFromValues(seasonTotals.atBats, seasonTotals.hits)}</span>
               </div>
               <div className="kpi">
-                <strong>OBP</strong>
+                <strong><StatLabel abbr="OBP" /></strong>
                 <span>{(seasonTotals.atBats + seasonTotals.walks) ? (((seasonTotals.hits + seasonTotals.walks) / (seasonTotals.atBats + seasonTotals.walks)).toFixed(3)) : '---'}</span>
               </div>
               <div className="kpi">
@@ -481,11 +482,11 @@ function StatsPage({
                 <span>{seasonTotals.runs}</span>
               </div>
               <div className="kpi">
-                <strong>RBI</strong>
+                <strong><StatLabel abbr="RBI" /></strong>
                 <span>{seasonTotals.rbi}</span>
               </div>
               <div className="kpi">
-                <strong>BB</strong>
+                <strong><StatLabel abbr="BB" /></strong>
                 <span>{seasonTotals.walks}</span>
               </div>
               <div className="kpi">
@@ -496,19 +497,19 @@ function StatsPage({
           ) : (
             <>
               <div className="kpi">
-                <strong>IP</strong>
+                <strong><StatLabel abbr="IP" /></strong>
                 <span>{formatIpFromOuts(seasonTotals.outsPitched)}</span>
               </div>
               <div className="kpi">
-                <strong>ERA</strong>
+                <strong><StatLabel abbr="ERA" /></strong>
                 <span>{seasonTotals.outsPitched ? ((seasonTotals.earnedRuns * 27) / seasonTotals.outsPitched).toFixed(2) : '--'}</span>
               </div>
               <div className="kpi">
-                <strong>WHIP</strong>
+                <strong><StatLabel abbr="WHIP" /></strong>
                 <span>{seasonTotals.outsPitched ? (((seasonTotals.pitchingWalks + seasonTotals.hitsAllowed) / (seasonTotals.outsPitched / 3)).toFixed(2)) : '--'}</span>
               </div>
               <div className="kpi">
-                <strong>K/9</strong>
+                <strong><StatLabel abbr="K/9" /></strong>
                 <span>{seasonTotals.outsPitched ? (((seasonTotals.pitchingStrikeouts * 9) / (seasonTotals.outsPitched / 3)).toFixed(1)) : '--'}</span>
               </div>
               <div className="kpi">
@@ -516,11 +517,11 @@ function StatsPage({
                 <span>{seasonTotals.pitchingStrikeouts}</span>
               </div>
               <div className="kpi">
-                <strong>BB</strong>
+                <strong><StatLabel abbr="BB" /></strong>
                 <span>{seasonTotals.pitchingWalks}</span>
               </div>
               <div className="kpi">
-                <strong>ER</strong>
+                <strong><StatLabel abbr="ER" /></strong>
                 <span>{seasonTotals.earnedRuns}</span>
               </div>
             </>
@@ -626,25 +627,25 @@ function StatsPage({
                         <div><strong>H</strong><div>{safeNumber(entry.hitting?.hits)}</div></div>
                         <div><strong>HR</strong><div>{safeNumber(entry.hitting?.homeRuns)}</div></div>
                         <div><strong>R</strong><div>{safeNumber(entry.hitting?.runs)}</div></div>
-                        <div><strong>RBI</strong><div>{safeNumber(entry.hitting?.rbi)}</div></div>
-                        <div><strong>BB</strong><div>{safeNumber(entry.hitting?.walks)}</div></div>
+                        <div><strong><StatLabel abbr="RBI" /></strong><div>{safeNumber(entry.hitting?.rbi)}</div></div>
+                        <div><strong><StatLabel abbr="BB" /></strong><div>{safeNumber(entry.hitting?.walks)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.hitting?.strikeouts)}</div></div>
                         <div><strong>OUT</strong><div>{safeNumber(entry.hitting?.outs)}</div></div>
-                        <div><strong>AVG</strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</div></div>
-                        <div><strong>OBP</strong><div>{obpFromHitting(entry.hitting)}</div></div>
+                        <div><strong><StatLabel abbr="AVG" /></strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</div></div>
+                        <div><strong><StatLabel abbr="OBP" /></strong><div>{obpFromHitting(entry.hitting)}</div></div>
                       </div>
                     ) : (
                       <div className="stat-grid">
-                        <div><strong>IP</strong><div>{formatIpFromOuts(entry.pitching?.outsPitched)}</div></div>
-                        <div><strong>ERA</strong><div>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</div></div>
-                        <div><strong>WHIP</strong><div>{whipFromPitching(entry.pitching)}</div></div>
-                        <div><strong>K/9</strong><div>{k9FromPitching(entry.pitching)}</div></div>
+                        <div><strong><StatLabel abbr="IP" /></strong><div>{formatIpFromOuts(entry.pitching?.outsPitched)}</div></div>
+                        <div><strong><StatLabel abbr="ERA" /></strong><div>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</div></div>
+                        <div><strong><StatLabel abbr="WHIP" /></strong><div>{whipFromPitching(entry.pitching)}</div></div>
+                        <div><strong><StatLabel abbr="K/9" /></strong><div>{k9FromPitching(entry.pitching)}</div></div>
                         <div><strong>SO</strong><div>{safeNumber(entry.pitching?.strikeouts)}</div></div>
-                        <div><strong>BB</strong><div>{safeNumber(entry.pitching?.walks)}</div></div>
+                        <div><strong><StatLabel abbr="BB" /></strong><div>{safeNumber(entry.pitching?.walks)}</div></div>
                         <div><strong>H</strong><div>{safeNumber(entry.pitching?.hitsAllowed)}</div></div>
-                        <div><strong>PC</strong><div>{safeNumber(entry.pitching?.pitchCount)}</div></div>
-                        <div><strong>STR</strong><div>{safeNumber(entry.pitching?.strikes)}</div></div>
-                        <div><strong>BAL</strong><div>{safeNumber(entry.pitching?.balls)}</div></div>
+                        <div><strong><StatLabel abbr="PC" /></strong><div>{safeNumber(entry.pitching?.pitchCount)}</div></div>
+                        <div><strong><StatLabel abbr="STR" /></strong><div>{safeNumber(entry.pitching?.strikes)}</div></div>
+                        <div><strong><StatLabel abbr="BAL" /></strong><div>{safeNumber(entry.pitching?.balls)}</div></div>
                       </div>
                     )}
                   </div>
