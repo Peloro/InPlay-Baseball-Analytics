@@ -39,6 +39,25 @@ export default function StatLabel({ abbr }) {
     return () => document.removeEventListener('pointerdown', handleOutside)
   }, [open])
 
+  // After the tooltip renders, nudge it back inside the viewport if it overflows
+  useEffect(() => {
+    if (!open || !ref.current) return
+    const tooltip = ref.current.querySelector('[role="tooltip"]')
+    if (!tooltip) return
+    requestAnimationFrame(() => {
+      const box = tooltip.getBoundingClientRect()
+      const margin = 8
+      if (box.left < margin) {
+        tooltip.style.left = '0'
+        tooltip.style.transform = 'none'
+      } else if (box.right > window.innerWidth - margin) {
+        tooltip.style.left = 'auto'
+        tooltip.style.right = '0'
+        tooltip.style.transform = 'none'
+      }
+    })
+  }, [open])
+
   if (!def) return abbr
 
   return (
