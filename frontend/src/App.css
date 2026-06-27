@@ -3394,3 +3394,195 @@ html {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ── Opposing batter panel (acoes view, defensive side) ─────────── */
+
+.acoes-opp-batter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0 6px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.acoes-opp-batter-row {
+  display: flex;
+  gap: 6px;
+}
+
+.acoes-opp-batter-num {
+  width: 44px;
+  padding: 4px 6px;
+  font-size: 0.85rem;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #e8e8e8;
+  text-align: center;
+}
+
+.acoes-opp-batter-name {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #e8e8e8;
+}
+
+.acoes-opp-batter-stats {
+  font-size: 0.8rem;
+  color: #d2a100;
+  font-weight: 600;
+  padding: 2px 2px 0;
+}
+
+.acoes-opp-batter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.acoes-opp-lineup-slot {
+  font-size: 0.72rem;
+  color: #888;
+  font-style: italic;
+}
+
+.acoes-opp-pitcher-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0 4px;
+  border-top: 1px solid #2a2a2a;
+}
+
+/* ── Game Log view ──────────────────────────────────────────────── */
+
+.log-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.log-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #888;
+  margin: 0 0 2px;
+  border-bottom: 1px solid #2a2a2a;
+  padding-bottom: 4px;
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #1e1e1e;
+  font-size: 0.82rem;
+  border-left: 3px solid #333;
+}
+
+.log-entry--hit-single, .log-entry--hit-double, .log-entry--hit-triple { border-left-color: #1a6fa0; }
+.log-entry--hit-homerun { border-left-color: #6c2ec4; }
+.log-entry--out { border-left-color: #b83030; }
+.log-entry--walk { border-left-color: #2f9d58; }
+.log-entry--def-hit-single, .log-entry--def-hit-double, .log-entry--def-hit-triple { border-left-color: #7a4040; }
+.log-entry--def-hit-homerun { border-left-color: #8a3070; }
+.log-entry--def-out { border-left-color: #3a6040; }
+.log-entry--double-play { border-left-color: #3a3a3a; }
+.log-entry--sac-fly { border-left-color: #2e2e2e; }
+.log-entry--error { border-left-color: #7a2020; }
+.log-entry--hbp { border-left-color: #444; }
+.log-entry--sub { border-left-color: #7a6020; }
+.log-entry--pitcher-change { border-left-color: #2a6080; }
+
+.log-inning {
+  font-size: 0.72rem;
+  color: #888;
+  white-space: nowrap;
+  min-width: 44px;
+  flex-shrink: 0;
+}
+
+.log-desc {
+  color: #d0d0d0;
+  line-height: 1.3;
+}
+
+.log-empty {
+  font-size: 0.82rem;
+  color: #555;
+  padding: 8px 0;
+  margin: 0;
+}
+
+/* Opposing batters summary table */
+.log-opp-batters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-opp-batter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: #1e1e1e;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.log-opp-num {
+  font-weight: 700;
+  color: #d2a100;
+  min-width: 32px;
+}
+
+.log-opp-name {
+  color: #aaa;
+  flex: 1;
+}
+
+.log-opp-stat {
+  font-weight: 600;
+  color: #e8e8e8;
+  min-width: 36px;
+}
+
+.log-opp-badge {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  color: #bbb;
+}
+
+.log-opp-avg {
+  color: #888;
+  font-size: 0.78rem;
+  min-width: 38px;
+  text-align: right;
+}

@@ -12,6 +12,23 @@ import { getPlayerId } from './utils/player'
 
 const GAME_STATE_STORAGE_KEY = 'baseball_game_state_v2'
 
+function advanceOpponentLineup(current) {
+  const lineup = Array.isArray(current.opponentLineup) ? [...current.opponentLineup] : []
+  while (lineup.length < 9) lineup.push(null)
+  const idx = (typeof current.opponentLineupIndex === 'number' ? current.opponentLineupIndex : 0) % 9
+  const batter = current.currentOpponentBatter || { number: '', name: '' }
+  if (batter.number?.trim()) {
+    lineup[idx] = { number: batter.number.trim(), name: batter.name?.trim() || '' }
+  }
+  const nextIdx = (idx + 1) % 9
+  const nextBatter = lineup[nextIdx]
+  return {
+    opponentLineup: lineup,
+    opponentLineupIndex: nextIdx,
+    currentOpponentBatter: nextBatter || { number: '', name: '' },
+  }
+}
+
 const INITIAL_GAME_STATE = {
   inning: 1,
   inningHalf: 'top',
@@ -37,6 +54,13 @@ const INITIAL_GAME_STATE = {
   currentPitcherId: null,
   currentGameId: null,
   preGameConfigured: false,
+  gameLog: [],
+  substitutions: [],
+  currentOpponentBatter: { number: '', name: '' },
+  opposingBatters: {},
+  opponentLineup: [],
+  opponentLineupIndex: 0,
+  opposingPitcher: { number: '', name: '' },
 }
 
 
@@ -112,6 +136,13 @@ function getSavedGameState() {
       inningHalf: parsed?.inningHalf === 'bottom' ? 'bottom' : 'top',
       isAttacking: typeof parsed?.isAttacking === 'boolean' ? parsed.isAttacking : true,
       preGameConfigured: Boolean(parsed?.preGameConfigured),
+      gameLog: Array.isArray(parsed?.gameLog) ? parsed.gameLog : [],
+      substitutions: Array.isArray(parsed?.substitutions) ? parsed.substitutions : [],
+      currentOpponentBatter: parsed?.currentOpponentBatter || { number: '', name: '' },
+      opposingBatters: (parsed?.opposingBatters && typeof parsed.opposingBatters === 'object' && !Array.isArray(parsed.opposingBatters)) ? parsed.opposingBatters : {},
+      opponentLineup: Array.isArray(parsed?.opponentLineup) ? parsed.opponentLineup : [],
+      opponentLineupIndex: typeof parsed?.opponentLineupIndex === 'number' ? parsed.opponentLineupIndex : 0,
+      opposingPitcher: parsed?.opposingPitcher || { number: '', name: '' },
     }
   } catch {
     return INITIAL_GAME_STATE
@@ -359,6 +390,12 @@ function App() {
             participantPlayerIds: [...new Set([...lineup.map((item) => item.playerId), ...bench])],
             currentBatterIndex: Math.min(current.currentBatterIndex || 0, Math.max(0, battingOrder.length - 1)),
             preGameConfigured: true,
+            gameLog: Array.isArray(persistedState?.gameLog) ? persistedState.gameLog : current.gameLog || [],
+            substitutions: Array.isArray(persistedState?.substitutions) ? persistedState.substitutions : current.substitutions || [],
+            opposingBatters: persistedState?.opposingBatters || current.opposingBatters || {},
+            opponentLineup: Array.isArray(persistedState?.opponentLineup) ? persistedState.opponentLineup : current.opponentLineup || [],
+            opponentLineupIndex: typeof persistedState?.opponentLineupIndex === 'number' ? persistedState.opponentLineupIndex : current.opponentLineupIndex || 0,
+            opposingPitcher: persistedState?.opposingPitcher || current.opposingPitcher || { number: '', name: '' },
           }))
         } else {
           setGameState((current) => ({
@@ -384,6 +421,12 @@ function App() {
             battingOrder: [],
             currentPitcherId: null,
             preGameConfigured: false,
+            gameLog: Array.isArray(persistedState?.gameLog) ? persistedState.gameLog : current.gameLog || [],
+            substitutions: Array.isArray(persistedState?.substitutions) ? persistedState.substitutions : current.substitutions || [],
+            opposingBatters: persistedState?.opposingBatters || current.opposingBatters || {},
+            opponentLineup: Array.isArray(persistedState?.opponentLineup) ? persistedState.opponentLineup : current.opponentLineup || [],
+            opponentLineupIndex: typeof persistedState?.opponentLineupIndex === 'number' ? persistedState.opponentLineupIndex : current.opponentLineupIndex || 0,
+            opposingPitcher: persistedState?.opposingPitcher || current.opposingPitcher || { number: '', name: '' },
           }))
         }
       } catch {
@@ -428,6 +471,12 @@ function App() {
           currentPitcherId: gameState.currentPitcherId,
           runners: gameState.runners,
           preGameConfigured: gameState.preGameConfigured,
+          gameLog: gameState.gameLog || [],
+          substitutions: gameState.substitutions || [],
+          opposingBatters: gameState.opposingBatters || {},
+          opponentLineup: gameState.opponentLineup || [],
+          opponentLineupIndex: gameState.opponentLineupIndex || 0,
+          opposingPitcher: gameState.opposingPitcher || { number: '', name: '' },
         },
       }).catch(() => {})
     }, 250)
@@ -555,6 +604,13 @@ function App() {
       preGameConfigured: false,
       currentBatterIndex: 0,
       runners: { first: false, second: false, third: false },
+      gameLog: [],
+      substitutions: [],
+      currentOpponentBatter: { number: '', name: '' },
+      opposingBatters: {},
+      opponentLineup: [],
+      opponentLineupIndex: 0,
+      opposingPitcher: { number: '', name: '' },
     }))
   }
 
@@ -702,6 +758,7 @@ function App() {
         inningScores: scoredRuns > 0
           ? addInningRuns(state.inningScores, state.inning, state.isAttacking ? scoredRuns : 0, state.isAttacking ? 0 : scoredRuns)
           : (state.inningScores || { home: [], away: [] }),
+        ...((didStrikeout || didWalk) ? advanceOpponentLineup(state) : {}),
       }
     }, kind === 'foul' ? 'Foul adicionada' : kind === 'ball' ? 'Ball adicionada' : 'Strike adicionada')
 
@@ -757,6 +814,13 @@ function App() {
       preGameConfigured: false,
       currentBatterIndex: 0,
       runners: { first: false, second: false, third: false },
+      gameLog: [],
+      substitutions: [],
+      currentOpponentBatter: { number: '', name: '' },
+      opposingBatters: {},
+      opponentLineup: [],
+      opponentLineupIndex: 0,
+      opposingPitcher: { number: '', name: '' },
     }))
   }, [gameState.currentGameId, updateGameState])
 

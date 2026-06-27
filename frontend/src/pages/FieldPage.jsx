@@ -50,6 +50,60 @@ function reorderList(list, from, to) {
   return safe
 }
 
+function makeLogEntry(current, type, description) {
+  return {
+    id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+    ts: Date.now(),
+    inning: current.inning || 1,
+    half: current.inningHalf || 'top',
+    type,
+    description,
+  }
+}
+
+function updateOppBatter(current, result) {
+  const num = current.currentOpponentBatter?.number?.trim()
+  if (!num) return {}
+  const name = current.currentOpponentBatter?.name?.trim() || ''
+  const existing = current.opposingBatters?.[num] || { number: num, name, atBats: 0, hits: 0, outs: 0, walks: 0, strikeouts: 0, homeRuns: 0 }
+  const b = { ...existing, name: name || existing.name }
+  if (result === 'hit')      { b.atBats++; b.hits++ }
+  else if (result === 'homerun') { b.atBats++; b.hits++; b.homeRuns++ }
+  else if (result === 'out')     { b.atBats++; b.outs++ }
+  else if (result === 'strikeout') { b.atBats++; b.outs++; b.strikeouts++ }
+  else if (result === 'walk')    { b.walks++ }
+  else if (result === 'error')   { b.atBats++ }
+  else if (result === 'sacfly')  { b.outs++ }
+  return { opposingBatters: { ...(current.opposingBatters || {}), [num]: b } }
+}
+
+function oppBatterLabel(current) {
+  const num = current.currentOpponentBatter?.number?.trim()
+  const name = current.currentOpponentBatter?.name?.trim()
+  if (!num) return 'ADV'
+  return name ? `ADV #${num} ${name}` : `ADV #${num}`
+}
+
+function advanceOpponentLineup(current) {
+  const lineup = Array.isArray(current.opponentLineup) ? [...current.opponentLineup] : []
+  while (lineup.length < 9) lineup.push(null)
+  const idx = (typeof current.opponentLineupIndex === 'number' ? current.opponentLineupIndex : 0) % 9
+  const batter = current.currentOpponentBatter || { number: '', name: '' }
+  if (batter.number?.trim()) {
+    lineup[idx] = { number: batter.number.trim(), name: batter.name?.trim() || '' }
+  }
+  const nextIdx = (idx + 1) % 9
+  const nextBatter = lineup[nextIdx]
+  return {
+    opponentLineup: lineup,
+    opponentLineupIndex: nextIdx,
+    currentOpponentBatter: nextBatter || { number: '', name: '' },
+  }
+}
+
+const HIT_LABELS = { single: 'Simples', double: 'Dupla', triple: 'Tripla', homerun: 'Home Run' }
+const INNING_HALF = (half) => (half === 'top' ? '▲' : '▼')
+
 function applyRunnerAdvance(runners, basesToAdvance) {
   const order = ['first', 'second', 'third']
   const nextRunners = { first: false, second: false, third: false }
@@ -1225,6 +1279,15 @@ function FieldPage({
         : current.inningHalf || 'top'
       const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
 
+      const batterName = playersById[localOrder[currentIndex]]?.name || '?'
+      const logDesc = kind === 'homerun'
+        ? `${batterName}: Home Run${runs > 1 ? ` (${runs} pontos)` : ''}`
+        : isHit
+          ? `${batterName}: ${HIT_LABELS[kind] || kind}${runs > 0 ? ` (+${runs})` : ''}`
+          : kind === 'strikeout'
+            ? `${batterName}: K`
+            : `${batterName}: Out`
+
       return {
         ...current,
         outs: sideSwitch ? 0 : outs,
@@ -1238,6 +1301,7 @@ function FieldPage({
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
         inningScores: runs > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? runs : 0, current.isAttacking ? 0 : runs) : (current.inningScores || { home: [], away: [] }),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, isHit ? `hit-${kind}` : 'out', logDesc)],
       }
     }, `Acao de bastao: ${kind}`)
 
@@ -1304,6 +1368,8 @@ function FieldPage({
       const hitResult = applyHitToBases(current.runners || { first: false, second: false, third: false }, kind)
       runsScored = hitResult.runs
 
+      const logDesc = `${oppBatterLabel(current)}: ${HIT_LABELS[kind] || kind}${hitResult.runs > 0 ? ` (+${hitResult.runs})` : ''}`
+
       return {
         ...current,
         balls: 0,
@@ -1319,6 +1385,9 @@ function FieldPage({
         homeScore: (current.homeScore || 0) + (current.isAttacking ? hitResult.runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? hitResult.runs : 0),
         inningScores: hitResult.runs > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? hitResult.runs : 0, current.isAttacking ? 0 : hitResult.runs) : (current.inningScores || { home: [], away: [] }),
+        ...updateOppBatter(current, kind === 'homerun' ? 'homerun' : 'hit'),
+        ...advanceOpponentLineup(current),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, `def-hit-${kind}`, logDesc)],
       }
     }, `Hit do adversario: ${kind}`)
 
@@ -1399,6 +1468,15 @@ function FieldPage({
         ? getNextBatterIndexFromState(current)
         : Number(current.currentBatterIndex || 0)
 
+      const logEntries = current.gameLog || []
+      let newLog = logEntries
+      if (cDidStrikeout || cDidWalk) {
+        const batterIdx = Math.min(current.currentBatterIndex || 0, Math.max(0, order.length - 1))
+        const batterName = playersById[order[batterIdx]]?.name || '?'
+        const logDesc = cDidStrikeout ? `${batterName}: K` : `${batterName}: BB (base por bolas)`
+        newLog = [...logEntries, makeLogEntry(current, cDidStrikeout ? 'out' : 'walk', logDesc)]
+      }
+
       return {
         ...current,
         // attack-side increment goes to opponentPitchCount only
@@ -1414,6 +1492,7 @@ function FieldPage({
         homeScore: Number(current.homeScore || 0) + scoredRuns,
         awayScore: Number(current.awayScore || 0),
         inningScores: scoredRuns > 0 ? addInningRuns(current.inningScores, current.inning, scoredRuns, 0) : (current.inningScores || { home: [], away: [] }),
+        gameLog: newLog,
       }
     }, `Contagem no ataque: ${kind}`)
 
@@ -1454,6 +1533,9 @@ function FieldPage({
         : current.inningHalf || 'top'
       const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
 
+      const outLabel = outType === 'strikeout' ? 'K' : outType === 'flyout' ? 'FO' : outType === 'groundout' ? 'GO' : outType === 'lineout' ? 'LO' : 'Out'
+      const logDesc = `${oppBatterLabel(current)}: ${outLabel}`
+
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
@@ -1470,6 +1552,9 @@ function FieldPage({
         inningHalf: nextHalf,
         inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
         runners: sideSwitch ? { first: false, second: false, third: false } : current.runners,
+        ...updateOppBatter(current, outType === 'strikeout' ? 'strikeout' : 'out'),
+        ...advanceOpponentLineup(current),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'def-out', logDesc)],
       }
     }, `Out defensivo: ${outType}`)
 
@@ -1526,6 +1611,9 @@ function FieldPage({
         : current.inningHalf || 'top'
       const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
 
+      const dpSide = current.isAttacking ? 'Nós' : oppBatterLabel(current)
+      const logDesc = `${dpSide}: Double Play em ${runnerBase}${defenderText ? ` (${defenderText})` : ''}`
+
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
@@ -1543,6 +1631,8 @@ function FieldPage({
         inningHalf: nextHalf,
         inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
+        ...(!current.isAttacking ? advanceOpponentLineup(current) : {}),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'double-play', logDesc)],
       }
     }, `Double play em ${runnerBase}${defenderText}`)
 
@@ -1615,6 +1705,13 @@ function FieldPage({
         : current.inningHalf || 'top'
       const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
 
+      const sfOrder = current.battingOrder || []
+      const sfIdx = Math.min(current.currentBatterIndex || 0, Math.max(0, sfOrder.length - 1))
+      const sfWho = current.isAttacking
+        ? (playersById[sfOrder[sfIdx]]?.name || '?')
+        : oppBatterLabel(current)
+      const sfLogDesc = `${sfWho}: Sac Fly${runScored > 0 ? ' (+1)' : ''}`
+
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
@@ -1635,6 +1732,9 @@ function FieldPage({
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runScored : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runScored : 0),
         inningScores: runScored > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? runScored : 0, current.isAttacking ? 0 : runScored) : (current.inningScores || { home: [], away: [] }),
+        ...(!current.isAttacking ? updateOppBatter(current, 'sacfly') : {}),
+        ...(!current.isAttacking ? advanceOpponentLineup(current) : {}),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'sac-fly', sfLogDesc)],
       }
     }, 'Sac fly')
 
@@ -1676,6 +1776,14 @@ function FieldPage({
 
       const ourR = current.isAttacking ? forced.runs : 0
       const theirR = current.isAttacking ? 0 : forced.runs
+
+      const hbpOrder = current.battingOrder || []
+      const hbpIdx = Math.min(current.currentBatterIndex || 0, Math.max(0, hbpOrder.length - 1))
+      const hbpWho = current.isAttacking
+        ? (playersById[hbpOrder[hbpIdx]]?.name || '?')
+        : oppBatterLabel(current)
+      const hbpLogEntry = makeLogEntry(current, 'hbp', `${hbpWho}: HBP`)
+
       if (current.isAttacking) {
         return {
           ...current,
@@ -1687,6 +1795,7 @@ function FieldPage({
           homeScore: (current.homeScore || 0) + ourR,
           awayScore: (current.awayScore || 0) + theirR,
           inningScores: forced.runs > 0 ? addInningRuns(current.inningScores, current.inning, ourR, theirR) : (current.inningScores || { home: [], away: [] }),
+          gameLog: [...(current.gameLog || []), hbpLogEntry],
         }
       }
 
@@ -1706,6 +1815,8 @@ function FieldPage({
         homeScore: (current.homeScore || 0) + ourR,
         awayScore: (current.awayScore || 0) + theirR,
         inningScores: forced.runs > 0 ? addInningRuns(current.inningScores, current.inning, ourR, theirR) : (current.inningScores || { home: [], away: [] }),
+        ...advanceOpponentLineup(current),
+        gameLog: [...(current.gameLog || []), hbpLogEntry],
       }
     }, 'HBP')
 
@@ -1731,6 +1842,10 @@ function FieldPage({
 
       const errOurR = current.isAttacking ? advanced.runs : 0
       const errTheirR = current.isAttacking ? 0 : advanced.runs
+
+      const errWho = current.isAttacking ? 'Erro do ADV' : `Erro: ${playersById[defenderId]?.name || 'defensor'}`
+      const errLogEntry = makeLogEntry(current, 'error', errWho)
+
       if (current.isAttacking) {
         return {
           ...current,
@@ -1742,6 +1857,7 @@ function FieldPage({
           homeScore: (current.homeScore || 0) + errOurR,
           awayScore: (current.awayScore || 0) + errTheirR,
           inningScores: advanced.runs > 0 ? addInningRuns(current.inningScores, current.inning, errOurR, errTheirR) : (current.inningScores || { home: [], away: [] }),
+          gameLog: [...(current.gameLog || []), errLogEntry],
         }
       }
 
@@ -1761,6 +1877,9 @@ function FieldPage({
         homeScore: (current.homeScore || 0) + errOurR,
         awayScore: (current.awayScore || 0) + errTheirR,
         inningScores: advanced.runs > 0 ? addInningRuns(current.inningScores, current.inning, errOurR, errTheirR) : (current.inningScores || { home: [], away: [] }),
+        ...updateOppBatter(current, 'error'),
+        ...advanceOpponentLineup(current),
+        gameLog: [...(current.gameLog || []), errLogEntry],
       }
     }, defenderId ? `Erro defensivo: ${defenderId}` : 'Erro defensivo')
 
@@ -2072,6 +2191,22 @@ function FieldPage({
                 .map((item) => getPlayerId(item))
                 .filter((id) => !nextOnField.includes(id))
 
+              const playerOutName = replacedId ? (playersById[replacedId]?.name || '') : ''
+              const subRecord = {
+                id: `sub_${Date.now()}`,
+                ts: Date.now(),
+                inning: current.inning || 1,
+                half: current.inningHalf || 'top',
+                playerInId: drag.playerId,
+                playerInName: incomingPlayer?.name || '',
+                position: positionToUse,
+                playerOutId: replacedId || null,
+                playerOutName,
+              }
+              const subLogDesc = replacedId
+                ? `Sub: ${incomingPlayer?.name || '?'} → ${playerOutName || '?'} (${positionToUse})`
+                : `${incomingPlayer?.name || '?'} entrou em campo (${positionToUse})`
+
               return {
                 ...current,
                 onFieldPlayerIds: Array.from(new Set(nextOnField)),
@@ -2080,6 +2215,8 @@ function FieldPage({
                 bench,
                 participantPlayerIds: [...nextOnField, ...bench],
                 preGameConfigured: current.preGameConfigured || nextOnField.length === 9,
+                substitutions: [...(current.substitutions || []), subRecord],
+                gameLog: [...(current.gameLog || []), makeLogEntry(current, 'sub', subLogDesc)],
               }
             }, replacedId
               ? `${incomingPlayer?.name || 'Jogador'} substituiu jogador em ${getMainPosition(incomingPlayer)}`
@@ -2446,14 +2583,106 @@ function FieldPage({
               </div>
             )}
 
+            {!gameState.isAttacking && (() => {
+              const oppLineup = Array.isArray(gameState.opponentLineup) ? gameState.opponentLineup : []
+              const oppIdx = typeof gameState.opponentLineupIndex === 'number' ? gameState.opponentLineupIndex : 0
+              const knownCount = oppLineup.filter(Boolean).length
+              const slotLabel = knownCount === 9
+                ? `${oppIdx + 1}º rebatedor`
+                : `${knownCount}/9 registrados`
+              const currentBatterStats = gameState.currentOpponentBatter?.number?.trim()
+                ? gameState.opposingBatters?.[gameState.currentOpponentBatter.number.trim()]
+                : null
+              return (
+                <div className="acoes-opp-batter-section">
+                  <div className="acoes-opp-batter-header">
+                    <span className="acoes-label">Batter Adv.</span>
+                    <span className="acoes-opp-lineup-slot">{slotLabel}</span>
+                  </div>
+                  <div className="acoes-opp-batter-row">
+                    <input
+                      type="text"
+                      className="acoes-opp-batter-num"
+                      placeholder="#"
+                      maxLength={3}
+                      value={gameState.currentOpponentBatter?.number || ''}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        onUpdateGameState((curr) => ({ ...curr, currentOpponentBatter: { ...curr.currentOpponentBatter, number: v } }))
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="acoes-opp-batter-name"
+                      placeholder="Nome (opcional)"
+                      value={gameState.currentOpponentBatter?.name || ''}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        onUpdateGameState((curr) => ({ ...curr, currentOpponentBatter: { ...curr.currentOpponentBatter, name: v } }))
+                      }}
+                    />
+                  </div>
+                  {currentBatterStats && (() => {
+                    const b = currentBatterStats
+                    const avg = b.atBats > 0 ? (b.hits / b.atBats).toFixed(3) : '.000'
+                    return (
+                      <div className="acoes-opp-batter-stats">
+                        {b.hits}-{b.atBats}{b.homeRuns ? `, ${b.homeRuns}HR` : ''}{b.strikeouts ? `, ${b.strikeouts}K` : ''}{b.walks ? `, ${b.walks}BB` : ''} · {avg}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )
+            })()}
+
+            {gameState.isAttacking && (
+              <div className="acoes-opp-pitcher-section">
+                <span className="acoes-label">Pitcher Adv.</span>
+                <div className="acoes-opp-batter-row">
+                  <input
+                    type="text"
+                    className="acoes-opp-batter-num"
+                    placeholder="#"
+                    maxLength={3}
+                    value={gameState.opposingPitcher?.number || ''}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      onUpdateGameState((curr) => ({ ...curr, opposingPitcher: { ...curr.opposingPitcher, number: v } }))
+                    }}
+                  />
+                  <input
+                    type="text"
+                    className="acoes-opp-batter-name"
+                    placeholder="Nome (opcional)"
+                    value={gameState.opposingPitcher?.name || ''}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      onUpdateGameState((curr) => ({ ...curr, opposingPitcher: { ...curr.opposingPitcher, name: v } }))
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="acoes-change-pitcher-btn"
+                    onClick={() => onUpdateGameState((current) => {
+                      const num = current.opposingPitcher?.number?.trim()
+                      const name = current.opposingPitcher?.name?.trim()
+                      const label = num ? (name ? `#${num} ${name}` : `#${num}`) : (name || 'Adv')
+                      return {
+                        ...current,
+                        opponentPitchCount: 0,
+                        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'pitcher-change', `Pitcher Adv: ${label} entrou`)],
+                      }
+                    })}
+                  >
+                    Trocar
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="acoes-pc-row">
               <div className="acoes-pc-item"><span>PC Nós</span><strong>{gameState.ourPitchCount || 0}</strong></div>
               <div className="acoes-pc-item"><span>PC Adv</span><strong>{gameState.opponentPitchCount || 0}</strong></div>
-              {gameState.isAttacking && (
-                <button type="button" className="acoes-change-pitcher-btn" onClick={() => onUpdateGameState((current) => ({ ...current, opponentPitchCount: 0 }), 'Pitcher adversario trocado')}>
-                  Trocar Pitcher Adv.
-                </button>
-              )}
             </div>
 
             <div className="acoes-runners-section">
@@ -2586,6 +2815,66 @@ function FieldPage({
         </div>
       )}
 
+      {gameSubView === 'log' && (
+        <div className="log-view">
+          <div className="log-section">
+            <h4 className="log-section-title">Play-by-play</h4>
+            {(gameState.gameLog || []).length === 0 ? (
+              <p className="log-empty">Nenhum evento registrado ainda.</p>
+            ) : (
+              <div className="log-list">
+                {[...(gameState.gameLog || [])].reverse().map((entry) => (
+                  <div key={entry.id} className={`log-entry log-entry--${(entry.type || 'other').replace(/[^a-z-]/g, '-')}`}>
+                    <span className="log-inning">{entry.inning}º {INNING_HALF(entry.half)}</span>
+                    <span className="log-desc">{entry.description}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {(gameState.substitutions || []).length > 0 && (
+            <div className="log-section">
+              <h4 className="log-section-title">Substituições</h4>
+              <div className="log-list">
+                {[...(gameState.substitutions || [])].reverse().map((sub) => (
+                  <div key={sub.id} className="log-entry log-entry--sub">
+                    <span className="log-inning">{sub.inning}º {INNING_HALF(sub.half)}</span>
+                    <span className="log-desc">
+                      {sub.playerOutName
+                        ? `${sub.playerInName} → ${sub.playerOutName} (${sub.position})`
+                        : `${sub.playerInName} entrou (${sub.position})`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {Object.keys(gameState.opposingBatters || {}).length > 0 && (
+            <div className="log-section">
+              <h4 className="log-section-title">Batters adversários</h4>
+              <div className="log-opp-batters">
+                {Object.values(gameState.opposingBatters || {}).map((b) => {
+                  const avg = b.atBats > 0 ? (b.hits / b.atBats).toFixed(3) : '.000'
+                  return (
+                    <div key={b.number} className="log-opp-batter-row">
+                      <span className="log-opp-num">#{b.number}</span>
+                      {b.name && <span className="log-opp-name">{b.name}</span>}
+                      <span className="log-opp-stat">{b.hits}-{b.atBats}</span>
+                      {b.homeRuns > 0 && <span className="log-opp-badge">{b.homeRuns}HR</span>}
+                      {b.strikeouts > 0 && <span className="log-opp-badge">{b.strikeouts}K</span>}
+                      {b.walks > 0 && <span className="log-opp-badge">{b.walks}BB</span>}
+                      <span className="log-opp-avg">{avg}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Sub-view toggle */}
       <div className="game-subview-bar" role="tablist" aria-label="Visão do jogo">
         <button
@@ -2605,6 +2894,15 @@ function FieldPage({
           onClick={() => setGameSubView('acoes')}
         >
           Ações
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={gameSubView === 'log'}
+          className={gameSubView === 'log' ? 'active' : ''}
+          onClick={() => setGameSubView('log')}
+        >
+          Log{(gameState.gameLog || []).length > 0 ? ` (${(gameState.gameLog || []).length})` : ''}
         </button>
       </div>
 

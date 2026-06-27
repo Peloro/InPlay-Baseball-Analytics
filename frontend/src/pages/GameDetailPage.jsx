@@ -147,6 +147,33 @@ function generateTextReport(game, rows) {
     }
   }
 
+  // Substitutions
+  const subs = gs.substitutions || []
+  if (subs.length > 0) {
+    lines.push('')
+    lines.push('SUBSTITUIÇÕES')
+    lines.push(sep)
+    for (const sub of subs) {
+      const half = sub.half === 'top' ? '▲' : '▼'
+      const desc = sub.playerOutName
+        ? `${sub.playerInName} → ${sub.playerOutName} (${sub.position})`
+        : `${sub.playerInName} entrou (${sub.position})`
+      lines.push(`${pad(`${sub.inning}º ${half}`, 8, true)} ${desc}`)
+    }
+  }
+
+  // Play-by-play
+  const log = gs.gameLog || []
+  if (log.length > 0) {
+    lines.push('')
+    lines.push('PLAY-BY-PLAY')
+    lines.push(sep)
+    for (const entry of log) {
+      const half = entry.half === 'top' ? '▲' : '▼'
+      lines.push(`${pad(`${entry.inning}º ${half}`, 8, true)} ${entry.description}`)
+    }
+  }
+
   lines.push('')
   lines.push(`Gerado em: ${new Date().toLocaleString('pt-BR')}`)
   return lines.join('\n')
@@ -192,6 +219,26 @@ function generateHtmlReport(game, rows) {
       </tbody></table>`
   }
 
+  const subs = gs.substitutions || []
+  const subsHtml = subs.length > 0 ? `
+    <h2>Substituições</h2>
+    <table><thead><tr><th>Inning</th><th>Entrou</th><th>Saiu</th><th>Pos.</th></tr></thead><tbody>
+    ${subs.map((s) => {
+      const half = s.half === 'top' ? '▲' : '▼'
+      return `<tr><td>${s.inning}º ${half}</td><td>${s.playerInName || '—'}</td><td>${s.playerOutName || '—'}</td><td>${s.position || '—'}</td></tr>`
+    }).join('')}
+    </tbody></table>` : ''
+
+  const gameLog = gs.gameLog || []
+  const logHtml = gameLog.length > 0 ? `
+    <h2>Play-by-play</h2>
+    <table><thead><tr><th>Inning</th><th>Evento</th></tr></thead><tbody>
+    ${gameLog.map((e) => {
+      const half = e.half === 'top' ? '▲' : '▼'
+      return `<tr><td>${e.inning}º ${half}</td><td>${e.description}</td></tr>`
+    }).join('')}
+    </tbody></table>` : ''
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -227,6 +274,8 @@ ${linescoreHtml}
   <tbody>${battingRows}</tbody>
 </table>
 ${pitchers.length ? `<h2>Pitching</h2><table><thead><tr><th>Pitcher</th><th>IP</th><th>ER</th><th>ERA</th><th>H</th><th>SO</th><th>BB</th><th>PC</th></tr></thead><tbody>${pitchingRows}</tbody></table>` : ''}
+${subsHtml}
+${logHtml}
 <p style="font-size:.8em;color:#777;margin-top:1.5em">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
 </body>
 </html>`
