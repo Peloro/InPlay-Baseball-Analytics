@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/public/Ativo%201CAASOvtr.svg" alt="CAASO Baseball Tracker" width="200"/>
+  <img src="frontend/public/Ativo%201Cporcotransparente.png" alt="CAASO Baseball Tracker" width="200"/>
 
   # CAASO Baseball Tracker
 
