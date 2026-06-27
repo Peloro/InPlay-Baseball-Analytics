@@ -150,10 +150,12 @@ function StatsPage({
       const ids = new Set(gameState.participantPlayerIds || [])
       return ids.size ? players.filter((p) => ids.has(getPlayerId(p))) : players
     }
-    const gameParticipantIds = new Set([
-      ...(viewingGame.lineup || []).map((item) => item.playerId),
-      ...(viewingGame.bench || []),
-    ])
+    // For historical games: combine lineup, bench, and participantPlayerIds saved in
+    // the nested gameState (the periodic save writes participantPlayerIds there).
+    const lineupIds = (viewingGame.lineup || []).map((item) => item.playerId)
+    const benchIds = viewingGame.bench || []
+    const savedParticipants = viewingGame.gameState?.participantPlayerIds || []
+    const gameParticipantIds = new Set([...lineupIds, ...benchIds, ...savedParticipants])
     return gameParticipantIds.size
       ? players.filter((p) => gameParticipantIds.has(getPlayerId(p)))
       : players
@@ -317,96 +319,34 @@ function StatsPage({
     setColSort({ col: null, dir: 'desc' })
   }, [statsTab])
 
-  const upsertGameStat = async (playerId, patch = {}) => {
-    const found = gameStats.find((item) => {
-      const itemPlayerId = item.playerId?._id || item.playerId
-      return itemPlayerId === playerId
-    })
-
-    const fallback = found || {
-      _id: null,
-      gameId: viewingGameId,
-      ...EMPTY_GAME_STAT,
-    }
-
-    const player = players.find((item) => getPlayerId(item) === playerId)
-    const detectedType = detectPlayerType(player)
-
-    const payload = {
-      type: detectedType,
-      hitting: {
-        atBats: safeNumber(patch.hitting?.atBats ?? fallback.hitting?.atBats),
-        hits: safeNumber(patch.hitting?.hits ?? fallback.hitting?.hits),
-        strikeouts: safeNumber(patch.hitting?.strikeouts ?? fallback.hitting?.strikeouts),
-        outs: safeNumber(patch.hitting?.outs ?? fallback.hitting?.outs),
-        walks: safeNumber(patch.hitting?.walks ?? fallback.hitting?.walks),
-        runs: safeNumber(patch.hitting?.runs ?? fallback.hitting?.runs),
-        rbi: safeNumber(patch.hitting?.rbi ?? fallback.hitting?.rbi),
-        homeRuns: safeNumber(patch.hitting?.homeRuns ?? fallback.hitting?.homeRuns),
-      },
-      pitching: {
-        inningsPitched: safeNumber(
-          patch.pitching?.inningsPitched ?? fallback.pitching?.inningsPitched,
-        ),
-        outsPitched: safeNumber(patch.pitching?.outsPitched ?? fallback.pitching?.outsPitched),
-        earnedRuns: safeNumber(patch.pitching?.earnedRuns ?? fallback.pitching?.earnedRuns),
-        strikeouts: safeNumber(patch.pitching?.strikeouts ?? fallback.pitching?.strikeouts),
-        walks: safeNumber(patch.pitching?.walks ?? fallback.pitching?.walks),
-        strikes: safeNumber(patch.pitching?.strikes ?? fallback.pitching?.strikes),
-        balls: safeNumber(patch.pitching?.balls ?? fallback.pitching?.balls),
-        pitchCount: safeNumber(patch.pitching?.pitchCount ?? fallback.pitching?.pitchCount),
-        hitsAllowed: safeNumber(patch.pitching?.hitsAllowed ?? fallback.pitching?.hitsAllowed),
-      },
-      defense: {
-        errors: safeNumber(patch.defense?.errors ?? fallback.defense?.errors),
-        doublePlays: safeNumber(patch.defense?.doublePlays ?? fallback.defense?.doublePlays),
-        flyOuts: safeNumber(patch.defense?.flyOuts ?? fallback.defense?.flyOuts),
-        groundOuts: safeNumber(patch.defense?.groundOuts ?? fallback.defense?.groundOuts),
-        lineOuts: safeNumber(patch.defense?.lineOuts ?? fallback.defense?.lineOuts),
-      },
-    }
-
-    let response
+  // Writes a complete stat record for one player in the viewed game.
+  // Uses (gameId, playerId) as the composite key so it never fails due to
+  // stale React-state _ids after a background server sync replaces local ids.
+  const upsertGameStat = useCallback((playerId, fullPayload) => {
+    if (!viewingGameId) return
+    const player = players.find((p) => getPlayerId(p) === playerId)
+    const payload = { type: detectPlayerType(player), ...fullPayload }
 
     setSaveStatus('saving')
+    gameStatsApi.upsert(viewingGameId, playerId, payload)
 
-    if (found?._id) {
-      response = await gameStatsApi.update(found._id, payload)
-    } else {
-      response = await gameStatsApi.create({
-        gameId: viewingGameId,
-        playerId,
-        ...payload,
-      })
-    }
-
-    const saved = response.data
-    setGameStats((current) => {
-      const index = current.findIndex((item) => item._id === saved._id)
-      if (index < 0) return [saved, ...current]
-      const next = [...current]
-      next[index] = saved
-      return next
-    })
-    await loadSeasonStats()
+    // Refresh React state from localStorage so it stays in sync with any
+    // background server-sync that may have replaced local ids since the last read.
+    setGameStats(gameStatsApi.listByGame(viewingGameId).data)
+    loadSeasonStats().catch(() => {})
     setSaveStatus('saved')
     window.setTimeout(() => setSaveStatus('idle'), 900)
-  }
+  }, [viewingGameId, players, loadSeasonStats])
 
-  const resetCurrentGameStats = async () => {
+  const resetCurrentGameStats = () => {
     if (!viewingGameId) return
-
     setSaveStatus('saving')
     for (const player of detailRosterPlayers) {
       const playerId = getPlayerId(player)
-      await upsertGameStat(playerId, {
-        hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0 },
-        pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0 },
-        defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
-      })
+      gameStatsApi.upsert(viewingGameId, playerId, { ...EMPTY_GAME_STAT, type: detectPlayerType(player) })
     }
-
-    await loadGameStats(viewingGameId)
+    setGameStats(gameStatsApi.listByGame(viewingGameId).data)
+    loadSeasonStats().catch(() => {})
     setSaveStatus('saved')
     window.setTimeout(() => setSaveStatus('idle'), 900)
   }
@@ -828,35 +768,29 @@ function StatsPage({
               gameStats={gameStats}
               onClose={() => setShowGameDetail(false)}
               onOpenPlayer={openPlayerDetails}
-              onQuickEvent={async (playerId, category, fieldKey, delta) => {
-                const current = gameStats.find((entry) => {
+              onQuickEvent={(playerId, category, fieldKey, delta) => {
+                // Read FRESH from localStorage — avoids stale React state after background server sync
+                const freshStats = gameStatsApi.listByGame(viewingGameId).data
+                const current = freshStats.find((entry) => {
                   const entryPlayerId = entry.playerId?._id || entry.playerId
                   return entryPlayerId === playerId
                 }) || { ...EMPTY_GAME_STAT }
 
-                const currentCategory = current?.[category] || EMPTY_GAME_STAT[category]
-                const currentValue = safeNumber(currentCategory?.[fieldKey])
+                const currentCategory = current[category] || EMPTY_GAME_STAT[category]
+                const currentValue = safeNumber(currentCategory[fieldKey])
                 const newValue = Math.max(0, currentValue + delta)
+                const updatedCategory = { ...currentCategory, [fieldKey]: newValue }
 
-                const updatedCategory = {
-                  ...currentCategory,
-                  [fieldKey]: newValue,
-                }
-
-                // Auto-recompute inningsPitched from outsPitched so they stay in sync
                 if (category === 'pitching' && fieldKey === 'outsPitched') {
                   updatedCategory.inningsPitched = Math.floor(newValue / 3) + ((newValue % 3) / 10)
                 }
 
-                await upsertGameStat(
-                  playerId,
-                  {
-                    hitting: current.hitting || EMPTY_GAME_STAT.hitting,
-                    pitching: current.pitching || EMPTY_GAME_STAT.pitching,
-                    defense: { ...(current.defense || EMPTY_GAME_STAT.defense) },
-                    [category]: updatedCategory,
-                  },
-                )
+                upsertGameStat(playerId, {
+                  hitting: current.hitting || EMPTY_GAME_STAT.hitting,
+                  pitching: current.pitching || EMPTY_GAME_STAT.pitching,
+                  defense: current.defense || EMPTY_GAME_STAT.defense,
+                  [category]: updatedCategory,
+                })
               }}
             />
           </div>

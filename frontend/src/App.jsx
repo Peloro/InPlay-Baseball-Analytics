@@ -177,11 +177,7 @@ async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
     },
   }
 
-  if (current?._id) {
-    await gameStatsApi.update(current._id, payload)
-  } else {
-    await gameStatsApi.create({ gameId, playerId: pitcherId, ...payload })
-  }
+  gameStatsApi.upsert(gameId, pitcherId, payload)
 }
 
 function App() {

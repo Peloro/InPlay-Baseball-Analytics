@@ -971,11 +971,7 @@ function FieldPage({
       },
     }
 
-    if (current?._id) {
-      await gameStatsApi.update(current._id, payload)
-    } else {
-      await gameStatsApi.create({ gameId: gameState.currentGameId, playerId, ...payload })
-    }
+    gameStatsApi.upsert(gameState.currentGameId, playerId, payload)
   }, [gameState.currentGameId, playersById])
 
   const upsertPlayerStat = useCallback(async (playerId, patch = {}) => {
@@ -1017,11 +1013,7 @@ function FieldPage({
       },
     }
 
-    if (current?._id) {
-      await gameStatsApi.update(current._id, payload)
-    } else {
-      await gameStatsApi.create({ gameId: gameState.currentGameId, playerId, ...payload })
-    }
+    gameStatsApi.upsert(gameState.currentGameId, playerId, payload)
   }, [gameState.currentGameId, playersById])
 
   const syncDefensivePitcherEvent = useCallback(async ({ outsDelta = 0, earnedRunsDelta = 0, pitchCountDelta = 0, walksDelta = 0, strikeoutsDelta = 0, hitsAllowedDelta = 0 } = {}) => {

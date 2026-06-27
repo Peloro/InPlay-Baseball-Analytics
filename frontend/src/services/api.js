@@ -322,45 +322,47 @@ export const gamesApi = {
 export const gameStatsApi = {
   listByGame(gameId, playerId) {
     const all = lfGet(LS.gameStats)
-    const filtered = all.filter(s =>
-      s.gameId === gameId && (!playerId || s.playerId === playerId)
-    )
-    // No background server fetch here: it would overwrite fresh local writes
-    // with stale server data before the write queue has had a chance to sync.
-    // Reads are always from localStorage (local-first). Server sync is write-only.
-    return { data: filtered }
+    if (!playerId) return { data: all.filter(s => s.gameId === gameId) }
+    const pid = String(playerId?._id || playerId)
+    return { data: all.filter(s => s.gameId === gameId && String(s.playerId?._id || s.playerId) === pid) }
   },
 
-  create(payload) {
-    const record = { ...payload, _id: uid() }
-    lfSet(LS.gameStats, [...lfGet(LS.gameStats), record])
+  // Upsert using (gameId, playerId) as composite key.
+  // Avoids the stale-_id bug: after a background server sync replaces a local
+  // _id with the MongoDB id, subsequent writes still find the record correctly.
+  upsert(gameId, playerId, payload) {
+    const pid = String(playerId?._id || playerId)
+    const all = lfGet(LS.gameStats)
+    const idx = all.findIndex(s =>
+      s.gameId === gameId && String(s.playerId?._id || s.playerId) === pid
+    )
 
-    // Fire network sync in background — do NOT await it so callers see
-    // the local write immediately and the HUD can refresh without delay.
-    netWrite('post', '/game-stats', payload).then(synced => {
-      if (synced?._id) {
-        const list = lfGet(LS.gameStats)
-        const idx = list.findIndex(s => s._id === record._id)
-        if (idx !== -1) { list[idx] = synced; lfSet(LS.gameStats, list) }
-      } else {
-        queueSync('post', '/game-stats', payload, record._id)
-      }
-    }).catch(() => queueSync('post', '/game-stats', payload, record._id))
+    let record
+    if (idx >= 0) {
+      record = { ...all[idx], ...payload }
+      all[idx] = record
+      lfSet(LS.gameStats, all)
+      const id = record._id
+      netWrite('put', `/game-stats/${id}`, payload)
+        .catch(() => queueSync('put', `/game-stats/${id}`, payload, id))
+    } else {
+      record = { _id: uid(), gameId, playerId: pid, ...payload }
+      const localId = record._id
+      lfSet(LS.gameStats, [...lfGet(LS.gameStats), record])
+      netWrite('post', '/game-stats', { gameId, playerId: pid, ...payload })
+        .then(synced => {
+          if (synced?._id) {
+            const list = lfGet(LS.gameStats)
+            const i = list.findIndex(s => s._id === localId)
+            if (i >= 0) { list[i] = synced; lfSet(LS.gameStats, list) }
+          } else {
+            queueSync('post', '/game-stats', { gameId, playerId: pid, ...payload }, localId)
+          }
+        })
+        .catch(() => queueSync('post', '/game-stats', { gameId, playerId: pid, ...payload }, localId))
+    }
 
     return { data: record }
-  },
-
-  update(id, patch) {
-    const list = lfGet(LS.gameStats)
-    const idx = list.findIndex(s => s._id === id || s.id === id)
-    if (idx !== -1) { list[idx] = { ...list[idx], ...patch }; lfSet(LS.gameStats, list) }
-
-    // Fire network sync in background — same rationale as create above.
-    netWrite('put', `/game-stats/${id}`, patch).then(synced => {
-      if (!synced) queueSync('put', `/game-stats/${id}`, patch, id)
-    }).catch(() => queueSync('put', `/game-stats/${id}`, patch, id))
-
-    return { data: idx !== -1 ? list[idx] : { _id: id, ...patch } }
   },
 }
 
