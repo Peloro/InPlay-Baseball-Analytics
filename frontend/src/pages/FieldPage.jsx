@@ -2477,6 +2477,15 @@ function FieldPage({
     safeNumber(livePitching.strikes),
     safeNumber(livePitching.balls),
   ].join('|'), [livePitching])
+
+  const activePitchTypes = useMemo(() => {
+    const rep = playersById[gameState.currentPitcherId]?.pitchRepertoire
+    return Array.isArray(rep) && rep.length > 0 ? rep : ['FB', 'CV', 'SL', 'CH', 'SI', 'CT']
+  }, [playersById, gameState.currentPitcherId])
+
+  useEffect(() => {
+    setSelectedPitchType(t => activePitchTypes.includes(t) ? t : activePitchTypes[0])
+  }, [activePitchTypes])
   
   const opponentMarkers = useMemo(() => opponentDefense, [opponentDefense])
   const defensivePlayers = useMemo(() => {
@@ -2904,7 +2913,7 @@ function FieldPage({
               ) : (
                 <>
                   <div className="pitch-type-selector">
-                    {['FB','CV','SL','CH','SI','CT'].map(t => (
+                    {activePitchTypes.map(t => (
                       <button
                         key={t}
                         type="button"
@@ -2962,7 +2971,7 @@ function FieldPage({
                     <div><span><StatLabel abbr="BAL" /></span><strong>{safeNumber(livePitching.balls)}</strong></div>
                   </div>
                   <div className="pitch-type-totals">
-                    {['FB','CV','SL','CH','SI','CT'].map(t => {
+                    {activePitchTypes.map(t => {
                       const count = safeNumber(livePitching.pitchTypes?.[t])
                       return (
                         <span key={t} className={`pitch-type-count${count === 0 ? ' pitch-type-count--zero' : ''}`}>

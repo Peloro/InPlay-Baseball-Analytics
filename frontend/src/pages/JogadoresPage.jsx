@@ -8,9 +8,9 @@ import { VALID_POSITIONS } from '../data/positions'
 import { getPlayerId, getMainPosition } from '../utils/player'
 
 function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, gameState, onUpdateGameState }) {
-  const [form, setForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchCountLimit: '' })
+  const [form, setForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchCountLimit: '', pitchRepertoire: [] })
   const [editingPlayerId, setEditingPlayerId] = useState(null)
-  const [editingForm, setEditingForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
+  const [editingForm, setEditingForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchRepertoire: [] })
   const [focusedPlayerId, setFocusedPlayerId] = useState(null)
   const [pendingDeletePlayer, setPendingDeletePlayer] = useState(null)
   const [focusedSeasonEntry, setFocusedSeasonEntry] = useState(null)
@@ -56,8 +56,27 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       positions: form.positions,
       activePosition: form.activePosition,
       pitchCountLimit: form.pitchCountLimit !== '' ? Number(form.pitchCountLimit) : null,
+      pitchRepertoire: form.positions.includes('P') ? form.pitchRepertoire : [],
     })
-    setForm({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchCountLimit: '' })
+    setForm({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchCountLimit: '', pitchRepertoire: [] })
+  }
+
+  const toggleFormPitchType = (type) => {
+    setForm((c) => ({
+      ...c,
+      pitchRepertoire: c.pitchRepertoire.includes(type)
+        ? c.pitchRepertoire.filter(t => t !== type)
+        : [...c.pitchRepertoire, type],
+    }))
+  }
+
+  const toggleEditPitchType = (type) => {
+    setEditingForm((c) => ({
+      ...c,
+      pitchRepertoire: c.pitchRepertoire.includes(type)
+        ? c.pitchRepertoire.filter(t => t !== type)
+        : [...c.pitchRepertoire, type],
+    }))
   }
 
   const toggleFormPosition = (position) => {
@@ -80,6 +99,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       positions: Array.isArray(player.positions) && player.positions.length ? player.positions : ['DH'],
       activePosition: player.activePosition || player.positions?.[0] || 'DH',
       pitchCountLimit: player.pitchCountLimit != null ? String(player.pitchCountLimit) : '',
+      pitchRepertoire: Array.isArray(player.pitchRepertoire) ? player.pitchRepertoire : [],
     })
   }
 
@@ -101,6 +121,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       positions: editingForm.positions,
       activePosition: editingForm.activePosition,
       pitchCountLimit: editingForm.pitchCountLimit !== '' ? Number(editingForm.pitchCountLimit) : null,
+      pitchRepertoire: editingForm.positions.includes('P') ? editingForm.pitchRepertoire : [],
     })
     setEditingPlayerId(null)
   }
@@ -164,6 +185,19 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
               value={form.pitchCountLimit}
               onChange={(e) => setForm((c) => ({ ...c, pitchCountLimit: e.target.value }))}
             />
+            {form.positions.includes('P') && (
+              <>
+                <label className="field-label">Tipos de arremesso (vazio = todos)</label>
+                <div className="positions-picker">
+                  {['FB','CV','SL','CH','SI','CT'].map(t => (
+                    <label key={t}>
+                      <input type="checkbox" checked={form.pitchRepertoire.includes(t)} onChange={() => toggleFormPitchType(t)} />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="positions-picker">
               {VALID_POSITIONS.map((position) => (
                 <label key={position}>
@@ -283,6 +317,19 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
               value={editingForm.pitchCountLimit ?? ''}
               onChange={(e) => setEditingForm((c) => ({ ...c, pitchCountLimit: e.target.value }))}
             />
+            {editingForm.positions.includes('P') && (
+              <>
+                <label className="field-label">Tipos de arremesso (vazio = todos)</label>
+                <div className="positions-picker">
+                  {['FB','CV','SL','CH','SI','CT'].map(t => (
+                    <label key={t}>
+                      <input type="checkbox" checked={editingForm.pitchRepertoire.includes(t)} onChange={() => toggleEditPitchType(t)} />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="positions-picker">
               {VALID_POSITIONS.map((position) => (
                 <label key={`edit-pos-${position}`}>
