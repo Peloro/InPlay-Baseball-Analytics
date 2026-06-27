@@ -1,72 +1,157 @@
-# Baseball App
+<div align="center">
+  <img src="frontend/public/Ativo%201CAASOvtr.svg" alt="CAASO Baseball Tracker" width="200"/>
 
-Aplicação full-stack para acompanhar jogos de beisebol: campo interativo, gerenciamento de escalação e registro de estatísticas.
+  # CAASO Baseball Tracker
 
-Principais recursos:
-- Campo interativo com suporte a mouse e toque (drag + long-press)
-- Cadastro e edição de jogadores
-- Registro de estatísticas de jogo (batedores e arremessadores)
-- Sincronização com API Express + MongoDB
+  **Live game tracking and season statistics for the CAASO  baseball team**
 
-Tecnologias
-- Frontend: React + Vite
-- Backend: Node.js + Express
-- Banco: MongoDB (Atlas ou local)
+  [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://reactjs.org/)
+  [![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
+  [![Capacitor](https://img.shields.io/badge/Capacitor-8.4-119eff?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+  [![Express](https://img.shields.io/badge/Express-5.2-000000?logo=express&logoColor=white)](https://expressjs.com/)
+  [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47a248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+  [![License](https://img.shields.io/badge/License-MIT-f5d400)](LICENSE)
 
-Estrutura do repositório
-- `frontend/` — código React (Vite)
-- `backend/` — API Express + modelos Mongoose
+  [Features](#-features) · [Installation](#-installation) · [Usage](#-usage) · [Configuration](#-configuration) · [Contributing](#-contributing)
 
-Pré-requisitos
-- Node.js v16+ (recomendado)
-- npm ou yarn
-- MongoDB Atlas ou instância local do MongoDB
+</div>
 
-Configuração rápida
+---
 
-1) Backend
+## About
+
+CAASO Baseball Tracker is a mobile-first app for live game tracking and statistics management for the **CAASO** university baseball team. The app runs fully offline — all data is stored locally in `localStorage` and synced with the backend in the background whenever a connection is available.
+
+It is distributed as an **Android APK** via Capacitor and can also be used directly in the browser.
+
+---
+
+## Features
+
+| | |
+|---|---|
+| **Interactive Field** | Drag-and-drop players onto the diamond, track the live score, balls, strikes, outs, and innings in real time |
+| **Full Statistics** | Batting (AB, H, 2B, 3B, HR, BB, K, R, RBI) and Pitching (IP, K, BB, ER, pitch count) accumulated per season |
+| **Game Management** | Pre-game lineup setup, batting order, in-game substitutions, opponent lineup tracking, and a per-play event log |
+| **Training Mode** | Practice field with a free-draw canvas for tactical notes and player positioning |
+| **Offline-First** | All data persists in `localStorage`. Works without internet; syncs with the backend silently in background |
+| **Export** | Generate a printable game report as PDF for sharing or archiving |
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Tool | Min version |
+|---|---|
+| Node.js | 18+ |
+| npm | 9+ |
+| Android Studio | For APK builds |
+| Java JDK | 17+ (Capacitor requirement) |
+
+### Quick Start
 
 ```bash
-cd backend
-cp .env.example .env
-# Edite backend/.env e defina MONGODB_URI
+# Clone the repository
+git clone https://github.com/Peloro/CAASO-Baseball-Tracker.git
+cd CAASO-Baseball-Tracker
+
+# Frontend
+cd frontend
 npm install
+
+# Backend
+cd ../backend
+npm install
+```
+
+### Key Dependencies
+
+| Package | Version | Role |
+|---|---|---|
+| `react` | 19.2 | UI framework |
+| `vite` | 8 | Build tool & dev server |
+| `@capacitor/android` | 8.4 | Android APK packaging |
+| `express` | 5.2 | REST API |
+| `mongoose` | 9.4 | MongoDB ODM |
+
+---
+
+## Usage
+
+### Web Development
+
+```bash
+# Terminal 1 — Backend
+cd backend
+npm start
+
+# Terminal 2 — Frontend
+cd frontend
 npm run dev
 ```
 
-A API padrão roda em `http://localhost:4000`.
+Open `http://localhost:5173` in your browser.
 
-2) Frontend
+### Android APK Build
 
 ```bash
 cd frontend
-cp .env.example .env
-# (opcional) ajuste variáveis no frontend/.env
-npm install
-npm run dev
+npm run build
+npx cap sync android
+npx cap open android   # Opens Android Studio to generate the APK
 ```
 
-O frontend roda em `http://localhost:5173` (Vite).
+### App Navigation
 
-Variáveis de ambiente
-- `backend/.env`: `MONGODB_URI` — string de conexão do MongoDB.
-- `frontend/.env`: variáveis de configuração do Vite (opcional).
+| Tab | Purpose |
+|---|---|
+| **Jogo / Campo** | Live game view — interactive field, scoreboard HUD, pitcher controls, lineup |
+| **Treino** | Practice field with free-draw canvas for tactical annotations |
+| **Jogadores** | Player roster management — add, edit, and remove players |
+| **Stats** | Season batting and pitching stats, sortable per player |
 
-Principais rotas da API (resumo)
-- `GET /players` — lista jogadores
-- `POST /players` — cria jogador
-- `PUT /players/:id` — atualiza jogador
-- `DELETE /players/:id` — remove jogador
-- `GET /games`, `POST /games`, `PUT /games/:id` — endpoints de jogo
-- `game-stats` — endpoints para criar/atualizar estatísticas por jogo
+### Game Flow
 
-Observações de desenvolvimento
-- O estado principal do jogo é mantido em `frontend/src/App.jsx` e sincronizado com a API quando um `game` está aberto.
-- Posições, escalação e ordenação estão em `frontend/src/data` e `frontend/src/hooks`.
+1. **New Game** — Choose home/away, set the starting lineup and batting order
+2. **Field Setup** — Drag players from the bench onto their positions on the diamond
+3. **Live Tracking** — Use the HUD to record pitches, hits, outs, runs, and substitutions
+4. **Finish Game** — End the game to commit all stats to the season totals
 
-Contribuindo
-- Abra uma issue para reportar bugs ou sugerir melhorias.
-- Envie PRs com mudanças pequenas e documentadas.
 
-Licença
-- Projeto fornecido sem licença explícita — adicione uma licença se desejar compartilhar publicamente.
+> The frontend works **100% offline** without the backend. `VITE_API_URL` is only used for optional background sync.
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Commit your changes: `git commit -m "feat: add my feature"`
+4. Push to the branch: `git push origin feat/my-feature`
+5. Open a Pull Request
+
+### Open Areas
+
+- Defensive stats (errors, putouts, assists)
+- CSV data export
+- iOS support via Capacitor
+- Season progression charts
+- Tournament mode (multiple teams)
+
+---
+
+## License
+
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
+
+---
+
+<div align="center">
+
+  Made with ♥ for Brazilian university baseball
+
+  [![GitHub](https://img.shields.io/badge/GitHub-Peloro-181717?logo=github)](https://github.com/Peloro)
+
+</div>
