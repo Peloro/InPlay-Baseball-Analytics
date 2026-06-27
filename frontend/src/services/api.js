@@ -76,6 +76,16 @@ async function netWrite(method, url, data) {
 
 function queueSync(method, url, data, localId = null) {
   const q = lfGet(LS.syncQueue)
+  if (method !== 'post') {
+    // For PUT/DELETE, replace any existing item with the same URL to avoid queue bloat
+    const idx = q.findIndex(item => item.method === method && item.url === url)
+    if (idx !== -1) {
+      q[idx] = { method, url, data, _ts: Date.now(), localId }
+      lfSet(LS.syncQueue, q)
+      emitStatus('pending')
+      return
+    }
+  }
   q.push({ method, url, data, _ts: Date.now(), localId })
   lfSet(LS.syncQueue, q)
   emitStatus('pending')
@@ -152,6 +162,7 @@ export async function flushWriteQueue() {
 // and subscribes to 'baseball:syncstatus' DOM events for reactive updates.
 
 let _syncStatus = http ? 'unknown' : 'no-backend'
+let _syncing = false
 
 export function getSyncStatus() { return _syncStatus }
 
@@ -172,6 +183,8 @@ export async function syncWithServer() {
     emitStatus('offline')
     return { ok: false, reason: 'offline' }
   }
+  if (_syncing) return { ok: false, reason: 'busy' }
+  _syncing = true
 
   emitStatus('syncing')
   try {
@@ -199,6 +212,8 @@ export async function syncWithServer() {
   } catch {
     emitStatus('error')
     return { ok: false, reason: 'error' }
+  } finally {
+    _syncing = false
   }
 }
 
@@ -226,7 +241,8 @@ export const playersApi = {
       return { data: synced }
     }
 
-    queueSync('post', '/players', payload, record._id)
+    // null = network failure (retry later); {} = server rejected (don't retry)
+    if (synced === null) queueSync('post', '/players', payload, record._id)
     return { data: record }
   },
 
@@ -289,7 +305,7 @@ export const gamesApi = {
       return { data: synced }
     }
 
-    queueSync('post', '/games', payload, record._id)
+    if (synced === null) queueSync('post', '/games', payload, record._id)
     return { data: record }
   },
 
@@ -363,7 +379,7 @@ export const gameStatsApi = {
             const list = lfGet(LS.gameStats)
             const i = list.findIndex(s => s._id === localId)
             if (i >= 0) { list[i] = synced; lfSet(LS.gameStats, list) }
-          } else {
+          } else if (synced === null) {
             queueSync('post', '/game-stats', { gameId, playerId: pid, ...payload }, localId)
           }
         })
