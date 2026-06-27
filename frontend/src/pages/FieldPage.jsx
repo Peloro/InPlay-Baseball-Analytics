@@ -2660,23 +2660,23 @@ function FieldPage({
                       onUpdateGameState((curr) => ({ ...curr, opposingPitcher: { ...curr.opposingPitcher, name: v } }))
                     }}
                   />
-                  <button
-                    type="button"
-                    className="acoes-change-pitcher-btn"
-                    onClick={() => onUpdateGameState((current) => {
-                      const num = current.opposingPitcher?.number?.trim()
-                      const name = current.opposingPitcher?.name?.trim()
-                      const label = num ? (name ? `#${num} ${name}` : `#${num}`) : (name || 'Adv')
-                      return {
-                        ...current,
-                        opponentPitchCount: 0,
-                        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'pitcher-change', `Pitcher Adv: ${label} entrou`)],
-                      }
-                    })}
-                  >
-                    Trocar
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  className="acoes-change-pitcher-btn acoes-change-pitcher-btn--full"
+                  onClick={() => onUpdateGameState((current) => {
+                    const num = current.opposingPitcher?.number?.trim()
+                    const name = current.opposingPitcher?.name?.trim()
+                    const label = num ? (name ? `#${num} ${name}` : `#${num}`) : (name || 'Adv')
+                    return {
+                      ...current,
+                      opponentPitchCount: 0,
+                      gameLog: [...(current.gameLog || []), makeLogEntry(current, 'pitcher-change', `Pitcher Adv: ${label} entrou`)],
+                    }
+                  })}
+                >
+                  Trocar Pitcher Adv.
+                </button>
               </div>
             )}
 

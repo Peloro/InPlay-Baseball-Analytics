@@ -3014,6 +3014,11 @@ html {
   white-space: nowrap;
 }
 
+.acoes-change-pitcher-btn--full {
+  width: 100%;
+  text-align: center;
+}
+
 .acoes-runners-section {
   display: flex;
   flex-direction: column;
