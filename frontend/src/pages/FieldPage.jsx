@@ -3250,7 +3250,7 @@ function FieldPage({
           danger
           onConfirm={() => {
             setPendingEndGame(false)
-            setGameSummarySnapshot({ homeScore: gameState.homeScore, awayScore: gameState.awayScore, inning: gameState.inning, opponentName: opponentName || 'Adversário' })
+            setGameSummarySnapshot({ homeScore: gameState.homeScore, awayScore: gameState.awayScore, inning: gameState.inning, opponentName: opponentName || 'Adversário', inningScores: gameState.inningScores || { home: [], away: [] } })
             setShowGameSummary(true)
           }}
           onCancel={() => setPendingEndGame(false)}
@@ -3284,17 +3284,6 @@ function FieldPage({
       {showGameSummary && gameSummarySnapshot && (
         <Modal title="Resumo do Jogo" onClose={() => { setShowGameSummary(false); onEndGame?.() }}>
           <div className="game-summary">
-            <div className="game-summary-score">
-              <div className="game-summary-side">
-                <div className="game-summary-team">CAASO</div>
-                <div className="game-summary-runs">{gameSummarySnapshot.homeScore}</div>
-              </div>
-              <div className="game-summary-sep">×</div>
-              <div className="game-summary-side">
-                <div className="game-summary-team">{gameSummarySnapshot.opponentName}</div>
-                <div className="game-summary-runs">{gameSummarySnapshot.awayScore}</div>
-              </div>
-            </div>
             <div className="game-summary-result">
               {gameSummarySnapshot.homeScore > gameSummarySnapshot.awayScore
                 ? 'CAASO venceu!'
@@ -3302,7 +3291,38 @@ function FieldPage({
                   ? `${gameSummarySnapshot.opponentName} venceu`
                   : 'Empate'}
             </div>
-            <p className="game-summary-innings">Innings jogados: {gameSummarySnapshot.inning}</p>
+            <div className="game-summary-box-wrap">
+              <table className="game-summary-box">
+                <thead>
+                  <tr>
+                    <th className="gsb-team"></th>
+                    {Array.from(
+                      { length: Math.max(gameSummarySnapshot.inning, (gameSummarySnapshot.inningScores?.home || []).length, (gameSummarySnapshot.inningScores?.away || []).length, 1) },
+                      (_, i) => <th key={i} className="gsb-cell">{i + 1}</th>
+                    )}
+                    <th className="gsb-total">R</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="gsb-team gsb-team-label">{gameSummarySnapshot.opponentName}</td>
+                    {Array.from(
+                      { length: Math.max(gameSummarySnapshot.inning, (gameSummarySnapshot.inningScores?.home || []).length, (gameSummarySnapshot.inningScores?.away || []).length, 1) },
+                      (_, i) => <td key={i} className="gsb-cell">{(gameSummarySnapshot.inningScores?.away || [])[i] ?? 0}</td>
+                    )}
+                    <td className="gsb-total">{gameSummarySnapshot.awayScore}</td>
+                  </tr>
+                  <tr>
+                    <td className="gsb-team gsb-team-label">CAASO</td>
+                    {Array.from(
+                      { length: Math.max(gameSummarySnapshot.inning, (gameSummarySnapshot.inningScores?.home || []).length, (gameSummarySnapshot.inningScores?.away || []).length, 1) },
+                      (_, i) => <td key={i} className="gsb-cell">{(gameSummarySnapshot.inningScores?.home || [])[i] ?? 0}</td>
+                    )}
+                    <td className="gsb-total">{gameSummarySnapshot.homeScore}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
               <Button variant="primary" onClick={() => { setShowGameSummary(false); onEndGame?.() }}>
                 Ver Estatísticas
