@@ -387,7 +387,7 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
           <Button type="button" variant="secondary" onClick={handlePrintReport}>
             Imprimir / PDF
           </Button>
-          <button type="button" onClick={onClose}>Fechar</button>
+          <Button type="button" variant="secondary" onClick={onClose}>Fechar</Button>
         </div>
       </div>
       <p>
