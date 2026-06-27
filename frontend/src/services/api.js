@@ -67,7 +67,11 @@ async function netWrite(method, url, data) {
       ? await http.delete(url)
       : await http[method](url, data)
     return res.data
-  } catch { return null }
+  } catch (e) {
+    // 4xx = permanent client error, no point retrying (404 DELETE = already gone)
+    if (e?.response?.status >= 400 && e?.response?.status < 500) return {}
+    return null
+  }
 }
 
 function queueSync(method, url, data, localId = null) {
