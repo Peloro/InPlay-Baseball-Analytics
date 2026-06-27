@@ -76,6 +76,26 @@ function queueSync(method, url, data, localId = null) {
   lfSet(LS.syncQueue, q)
 }
 
+// Returns IDs of records that are pending a POST to the server (created offline)
+function pendingSyncIds(storeKey) {
+  const q = lfGet(LS.syncQueue)
+  const urlPrefix = storeKey === LS.players ? '/players' : storeKey === LS.games ? '/games' : '/game-stats'
+  const ids = new Set()
+  for (const item of q) {
+    if (item.method === 'post' && item.localId && item.url === urlPrefix) ids.add(item.localId)
+  }
+  return ids
+}
+
+// Merges server list with local-only records (created offline, not yet synced)
+function mergeWithLocal(serverList, localKey) {
+  const pendingIds = pendingSyncIds(localKey)
+  if (!pendingIds.size) return serverList
+  const local = lfGet(localKey)
+  const localOnly = local.filter(r => pendingIds.has(r._id))
+  return [...serverList, ...localOnly]
+}
+
 function replaceIdInStores(postUrl, localId, serverId, serverRecord) {
   if (postUrl === '/players') {
     const list = lfGet(LS.players)
@@ -122,21 +142,70 @@ export async function flushWriteQueue() {
   lfSet(LS.syncQueue, failed)
 }
 
+// ── Sync status ───────────────────────────────────────────────────
+// Tracks the last known sync state. App reads this via getSyncStatus()
+// and subscribes to 'baseball:syncstatus' DOM events for reactive updates.
+
+let _syncStatus = http ? 'unknown' : 'no-backend'
+
+export function getSyncStatus() { return _syncStatus }
+
+function emitStatus(status) {
+  _syncStatus = status
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('baseball:syncstatus', { detail: { status } }))
+  }
+}
+
+// ── syncWithServer ────────────────────────────────────────────────
+// Full sync cycle: push pending writes → pull fresh data → merge local.
+// Call this on app mount and on reconnect. All game-time reads stay local.
+
+export async function syncWithServer() {
+  if (!http) return { ok: false, reason: 'no-backend' }
+  if (!navigator.onLine) {
+    emitStatus('offline')
+    return { ok: false, reason: 'offline' }
+  }
+
+  emitStatus('syncing')
+  try {
+    // Push pending local writes first so the server pull reflects them
+    await flushWriteQueue()
+
+    // Pull fresh data from server and merge with any still-pending local records
+    const [players, games] = await Promise.all([
+      netGet('/players'),
+      netGet('/games'),
+    ])
+
+    if (Array.isArray(players)) lfSet(LS.players, mergeWithLocal(players, LS.players))
+    if (Array.isArray(games))   lfSet(LS.games,   mergeWithLocal(games,   LS.games))
+
+    const pendingLeft = lfGet(LS.syncQueue).length
+    emitStatus(pendingLeft > 0 ? 'pending' : 'synced')
+
+    // Signal React to re-fetch from updated localStorage
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('baseball:synced'))
+    }
+
+    return { ok: true }
+  } catch {
+    emitStatus('error')
+    return { ok: false, reason: 'error' }
+  }
+}
+
 if (typeof window !== 'undefined' && http) {
-  window.addEventListener('online', () => { flushWriteQueue().catch(() => {}) })
+  window.addEventListener('online', () => { syncWithServer().catch(() => {}) })
+  window.addEventListener('offline', () => { emitStatus('offline') })
 }
 
 // ── Players ───────────────────────────────────────────────────────
 
 export const playersApi = {
-  async list() {
-    if (http) {
-      const data = await netGet('/players')
-      if (Array.isArray(data) && data.length) {
-        lfSet(LS.players, data)
-        return { data }
-      }
-    }
+  list() {
     return { data: lfGet(LS.players) }
   },
 
@@ -180,14 +249,7 @@ export const playersApi = {
 // ── Games ─────────────────────────────────────────────────────────
 
 export const gamesApi = {
-  async list() {
-    if (http) {
-      const data = await netGet('/games')
-      if (Array.isArray(data) && data.length) {
-        lfSet(LS.games, data)
-        return { data }
-      }
-    }
+  list() {
     return { data: lfGet(LS.games) }
   },
 
@@ -196,6 +258,11 @@ export const gamesApi = {
     if (http && id) {
       netGet(`/games/${id}`).then(data => {
         if (!data) return
+        // Don't overwrite if there are pending local writes for this game
+        const hasPending = lfGet(LS.syncQueue).some(
+          item => item.localId === id || item.url.includes(`/${id}`)
+        )
+        if (hasPending) return
         const list = lfGet(LS.games)
         const idx = list.findIndex(g => g._id === id || g.id === id)
         if (idx !== -1) { list[idx] = data; lfSet(LS.games, list) }

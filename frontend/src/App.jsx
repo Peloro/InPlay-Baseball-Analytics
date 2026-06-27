@@ -3,7 +3,8 @@ import FieldPage from './pages/FieldPage'
 import TrainingField from './pages/TrainingField'
 import StatsPage from './pages/StatsPage'
 import JogadoresPage from './pages/JogadoresPage'
-import api, { gameStatsApi, gamesApi } from './services/api'
+import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus } from './services/api'
+import { addInningRuns } from './utils/stats'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
 import Button from './components/ui/Button'
@@ -23,6 +24,7 @@ const INITIAL_GAME_STATE = {
   pitchCounts: {},
   homeScore: 0,
   awayScore: 0,
+  inningScores: { home: [], away: [] },
   isAttacking: true,
   score: { home: 0, away: 0 },
   onFieldPlayerIds: [],
@@ -59,6 +61,7 @@ function normalizePlayer(player) {
     ...player,
     positions: safePositions,
     activePosition,
+    pitchCountLimit: Number.isFinite(player?.pitchCountLimit) ? player.pitchCountLimit : null,
     x: Number.isFinite(player?.x) ? player.x : 50,
     y: Number.isFinite(player?.y) ? player.y : 50,
   }
@@ -95,6 +98,7 @@ function getSavedGameState() {
         : Number.isFinite(parsed?.score?.away)
           ? parsed.score.away
           : 0,
+      inningScores: parsed?.inningScores || { home: [], away: [] },
       score: { ...INITIAL_GAME_STATE.score, ...(parsed?.score || {}) },
       runners: { ...INITIAL_GAME_STATE.runners, ...(parsed?.runners || {}) },
       onFieldPlayerIds: Array.isArray(parsed?.onFieldPlayerIds) ? parsed.onFieldPlayerIds : [],
@@ -157,6 +161,12 @@ async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
       balls:          Number((patch?.balls          ?? current?.pitching?.balls)          || 0),
       pitchCount:     Number((patch?.pitchCount     ?? current?.pitching?.pitchCount)     || 0),
       hitsAllowed:    Number((patch?.hitsAllowed    ?? current?.pitching?.hitsAllowed)    || 0),
+      pitchTypes: (() => {
+        const cur = current?.pitching?.pitchTypes || {}
+        const type = patch?.pitchType || ''
+        const TYPES = ['FB', 'CV', 'SL', 'CH', 'SI', 'CT', 'other']
+        return Object.fromEntries(TYPES.map(t => [t, Number(cur[t] || 0) + (type === t ? 1 : 0)]))
+      })(),
     },
     defense: {
       errors:      Number(current?.defense?.errors      || 0),
@@ -185,68 +195,73 @@ function App() {
   const [gameAccessNotice, setGameAccessNotice] = useState('')
   const [isGameEntering, setIsGameEntering] = useState(false)
   const [navCollapsed, setNavCollapsed] = useState(false)
-  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [syncStatus, setSyncStatus] = useState(getSyncStatus)
   // Incremented after each pitcher stat write so useGameState re-fetches the live HUD
   const [statsRefreshKey, setStatsRefreshKey] = useState(0)
   const notifyStatsUpdated = useCallback(() => setStatsRefreshKey((k) => k + 1), [])
 
-  useEffect(() => {
-    const onOnline = () => setIsOffline(false)
-    const onOffline = () => setIsOffline(true)
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-    }
-  }, [])
+  const isOffline = syncStatus === 'offline'
 
   useEffect(() => {
     window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
   }, [gameState])
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const playersResponse = await api.get('/players')
+  // Load players from local storage into React state
+  const loadPlayers = useCallback(() => {
+    try {
+      const playersResponse = api.get('/players')
+      const fetchedPlayers = playersResponse.data || []
+      const normalizedPlayers = fetchedPlayers.map((player) => normalizePlayer(player))
+      const ids = normalizedPlayers.map((item) => getPlayerId(item))
 
-        const fetchedPlayers = playersResponse.data || []
-        const normalizedPlayers = fetchedPlayers.map((player) => normalizePlayer(player))
-        const ids = normalizedPlayers.map((item) => getPlayerId(item))
+      setPlayers(normalizedPlayers)
+      setGameState((current) => {
+        const validOnField = (current.onFieldPlayerIds || []).filter((id) => ids.includes(id))
+        const validParticipants = (current.participantPlayerIds || []).filter((id) => ids.includes(id))
+        const safeParticipants = validParticipants.length ? validParticipants : ids
+        const validBattingOrder = (current.battingOrder || []).filter((id) => safeParticipants.includes(id))
+        const battingOrder = validBattingOrder.length ? validBattingOrder : safeParticipants
+        const currentBatterIndex = battingOrder.length
+          ? Math.min(current.currentBatterIndex || 0, battingOrder.length - 1)
+          : 0
 
-        setPlayers(normalizedPlayers)
-        setGameState((current) => {
-          const validOnField = (current.onFieldPlayerIds || []).filter((id) => ids.includes(id))
-          const validParticipants = (current.participantPlayerIds || []).filter((id) => ids.includes(id))
-          const safeParticipants = validParticipants.length ? validParticipants : ids
-          const validBattingOrder = (current.battingOrder || []).filter((id) => safeParticipants.includes(id))
-          const battingOrder = validBattingOrder.length ? validBattingOrder : safeParticipants
-          const currentBatterIndex = battingOrder.length
-            ? Math.min(current.currentBatterIndex || 0, battingOrder.length - 1)
-            : 0
-
-          return {
-            ...current,
-            onFieldPlayerIds: validOnField,
-            participantPlayerIds: safeParticipants,
-            battingOrder,
-            lineup: (current.lineup || []).filter((item) => ids.includes(item?.playerId)),
-            bench: (current.bench || []).filter((id) => ids.includes(id)),
-            currentBatterIndex,
-          }
-        })
-      } catch {
-        setPlayers([])
-        setGameState((current) => ({
+        return {
           ...current,
-          onFieldPlayerIds: [],
-          participantPlayerIds: [],
-        }))
-      }
+          onFieldPlayerIds: validOnField,
+          participantPlayerIds: safeParticipants,
+          battingOrder,
+          lineup: (current.lineup || []).filter((item) => ids.includes(item?.playerId)),
+          bench: (current.bench || []).filter((id) => ids.includes(id)),
+          currentBatterIndex,
+        }
+      })
+    } catch {
+      setPlayers([])
+      setGameState((current) => ({
+        ...current,
+        onFieldPlayerIds: [],
+        participantPlayerIds: [],
+      }))
     }
-
-    loadData()
   }, [])
+
+  // On mount: load local data immediately, then sync with server in background
+  useEffect(() => {
+    loadPlayers()
+    syncWithServer().catch(() => {})
+  }, [loadPlayers])
+
+  // React to sync events: update status indicator and re-load players after sync
+  useEffect(() => {
+    const onStatus = (e) => setSyncStatus(e.detail.status)
+    const onSynced = () => loadPlayers()
+    window.addEventListener('baseball:syncstatus', onStatus)
+    window.addEventListener('baseball:synced', onSynced)
+    return () => {
+      window.removeEventListener('baseball:syncstatus', onStatus)
+      window.removeEventListener('baseball:synced', onSynced)
+    }
+  }, [loadPlayers])
 
   useEffect(() => {
     if (gameState.isAttacking) {
@@ -534,6 +549,7 @@ function App() {
       pitchCounts: {},
       homeScore: 0,
       awayScore: 0,
+      inningScores: { home: [], away: [] },
       isAttacking: true,
       lineup: [],
       bench: [],
@@ -573,6 +589,9 @@ function App() {
       strikes: Number(current?.pitching?.strikes || 0),
       balls: Number(current?.pitching?.balls || 0),
       pitchCount: Number(current?.pitching?.pitchCount || 0),
+      hitsAllowed: Number(current?.pitching?.hitsAllowed || 0),
+      // pitchType is a string like 'FB' — upsertPitcherStatRecord increments the right counter
+      pitchType: flags.pitchType || '',
     }
 
     if (kind === 'strike') pitching.strikes += 1
@@ -615,7 +634,7 @@ function App() {
     await upsertPitcherStatRecord({ gameId: gameState.currentGameId, pitcherId, current, patch })
   }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking])
 
-  const handlePitchAction = useCallback(async (kind) => {
+  const handlePitchAction = useCallback(async (kind, opts = {}) => {
     const current = gameState
     if (current.isAttacking) return
 
@@ -684,6 +703,9 @@ function App() {
         runners: nextRunners,
         homeScore: Number(state.homeScore || 0) + (state.isAttacking ? scoredRuns : 0),
         awayScore: Number(state.awayScore || 0) + (!state.isAttacking ? scoredRuns : 0),
+        inningScores: scoredRuns > 0
+          ? addInningRuns(state.inningScores, state.inning, state.isAttacking ? scoredRuns : 0, state.isAttacking ? 0 : scoredRuns)
+          : (state.inningScores || { home: [], away: [] }),
       }
     }, kind === 'foul' ? 'Foul adicionada' : kind === 'ball' ? 'Ball adicionada' : 'Strike adicionada')
 
@@ -694,6 +716,7 @@ function App() {
         countAsStrike,
         outsDelta: didStrikeout ? 1 : 0,
         earnedRunsDelta: didWalk ? Number((advanceOnWalk({ ...(current.runners || {}) }).runs) || 0) : 0,
+        pitchType: opts.pitchType || '',
       })
       setStatsRefreshKey((k) => k + 1)
     } catch {
@@ -731,6 +754,7 @@ function App() {
       pitchCounts: {},
       homeScore: 0,
       awayScore: 0,
+      inningScores: { home: [], away: [] },
       isAttacking: true,
       lineup: [],
       bench: [],
@@ -766,6 +790,19 @@ function App() {
             <h1>Beisebol CAASO</h1>
             <span>RAÇA CAASO</span>
           </div>
+          {syncStatus !== 'no-backend' && (
+            <span
+              className={`sync-dot sync-dot--${syncStatus}`}
+              title={
+                syncStatus === 'synced'  ? 'Sincronizado'
+                : syncStatus === 'syncing' ? 'Sincronizando...'
+                : syncStatus === 'offline' ? 'Sem conexão'
+                : syncStatus === 'pending' ? 'Pendente'
+                : syncStatus === 'error'   ? 'Erro de sync'
+                : ''
+              }
+            />
+          )}
         </div>
         <nav className="nav-actions" role="navigation" aria-label="Navegação principal">
           <button
@@ -814,9 +851,12 @@ function App() {
         <button type="button" className="nav-toggle-btn" onClick={() => setNavCollapsed(true)} aria-label="Ocultar navegação">▲</button>
       </header>
 
-      {isOffline && (
-        <div className="offline-banner" role="status" aria-live="polite">
-          Sem conexão — dados salvos localmente
+      {syncStatus !== 'no-backend' && syncStatus !== 'synced' && syncStatus !== 'unknown' && (
+        <div className={`sync-banner sync-banner--${syncStatus}`} role="status" aria-live="polite">
+          {syncStatus === 'offline'  && 'Sem conexão — usando dados locais'}
+          {syncStatus === 'syncing'  && 'Sincronizando com servidor...'}
+          {syncStatus === 'pending'  && 'Dados pendentes de sincronização'}
+          {syncStatus === 'error'    && 'Erro de sincronização — dados salvos localmente'}
         </div>
       )}
       {gameAccessNotice && <div className="game-access-warning">{gameAccessNotice}</div>}

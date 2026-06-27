@@ -14,7 +14,7 @@ import Bench from '../components/game/Bench/Bench'
 import usePlayers from '../hooks/usePlayers'
 import useGameState from '../hooks/useGameState'
 import { safeNumber } from '../utils/number'
-import { formatEraFromOuts, formatIpFromOuts, outsToInnings } from '../utils/stats'
+import { formatEraFromOuts, formatIpFromOuts, outsToInnings, addInningRuns } from '../utils/stats'
 import { detectPlayerType, getPlayerId, getMainPosition } from '../utils/player'
 
 const LONG_PRESS_MS = 450
@@ -190,6 +190,7 @@ function FieldPage({
   const [pendingOutTypeSelect, setPendingOutTypeSelect] = useState(false)
   const [selectedOutType, setSelectedOutType] = useState('')
   const [selectedOutFielderId, setSelectedOutFielderId] = useState('')
+  const [selectedPitchType, setSelectedPitchType] = useState('FB')
   const [pendingDoublePlaySelect, setPendingDoublePlaySelect] = useState(false)
   const orderTouchRef = useRef({ dragging: null })
   const [selectedDoublePlayRunnerBase, setSelectedDoublePlayRunnerBase] = useState('')
@@ -885,11 +886,14 @@ function FieldPage({
         nextRunners[nextBase] = true
       }
 
+      const ourR = current.isAttacking ? runs : 0
+      const theirR = current.isAttacking ? 0 : runs
       return {
         ...current,
         runners: nextRunners,
-        homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
-        awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
+        homeScore: (current.homeScore || 0) + ourR,
+        awayScore: (current.awayScore || 0) + theirR,
+        inningScores: runs > 0 ? addInningRuns(current.inningScores, current.inning, ourR, theirR) : (current.inningScores || { home: [], away: [] }),
       }
     }, `Corredor avancou de ${base}`)
 
@@ -1002,6 +1006,7 @@ function FieldPage({
         balls: safeNumber(patch.pitching?.balls ?? current?.pitching?.balls),
         pitchCount: safeNumber(patch.pitching?.pitchCount ?? current?.pitching?.pitchCount),
         hitsAllowed: safeNumber(patch.pitching?.hitsAllowed ?? current?.pitching?.hitsAllowed),
+        pitchTypes: patch.pitching?.pitchTypes ?? current?.pitching?.pitchTypes ?? { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
       },
       defense: {
         errors: safeNumber(patch.defense?.errors ?? current?.defense?.errors),
@@ -1039,6 +1044,7 @@ function FieldPage({
         balls: safeNumber(current?.pitching?.balls),
         pitchCount: safeNumber(current?.pitching?.pitchCount) + safeNumber(pitchCountDelta),
         hitsAllowed: safeNumber(current?.pitching?.hitsAllowed) + safeNumber(hitsAllowedDelta),
+        pitchTypes: current?.pitching?.pitchTypes ?? { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
       },
     }
 
@@ -1080,6 +1086,7 @@ function FieldPage({
           balls: safeNumber(entry.pitching?.balls),
           pitchCount: safeNumber(entry.pitching?.pitchCount),
           hitsAllowed: safeNumber(entry.pitching?.hitsAllowed),
+          pitchTypes: entry.pitching?.pitchTypes ?? { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
         },
         defense: {
           errors: safeNumber(entry.defense?.errors),
@@ -1099,8 +1106,8 @@ function FieldPage({
 
   const handleDefensivePitch = useCallback(async (kind) => {
     await captureUndoSnapshot()
-    onPitchAction?.(kind)
-  }, [captureUndoSnapshot, onPitchAction])
+    onPitchAction?.(kind, { pitchType: selectedPitchType })
+  }, [captureUndoSnapshot, onPitchAction, selectedPitchType])
 
   const handleUndo = useCallback(async () => {
     const latest = undoStack[undoStack.length - 1]
@@ -1238,6 +1245,7 @@ function FieldPage({
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
+        inningScores: runs > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? runs : 0, current.isAttacking ? 0 : runs) : (current.inningScores || { home: [], away: [] }),
       }
     }, `Acao de bastao: ${kind}`)
 
@@ -1318,6 +1326,7 @@ function FieldPage({
         runners: hitResult.nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? hitResult.runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? hitResult.runs : 0),
+        inningScores: hitResult.runs > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? hitResult.runs : 0, current.isAttacking ? 0 : hitResult.runs) : (current.inningScores || { home: [], away: [] }),
       }
     }, `Hit do adversario: ${kind}`)
 
@@ -1412,6 +1421,7 @@ function FieldPage({
         runners: nextRunners,
         homeScore: Number(current.homeScore || 0) + scoredRuns,
         awayScore: Number(current.awayScore || 0),
+        inningScores: scoredRuns > 0 ? addInningRuns(current.inningScores, current.inning, scoredRuns, 0) : (current.inningScores || { home: [], away: [] }),
       }
     }, `Contagem no ataque: ${kind}`)
 
@@ -1632,6 +1642,7 @@ function FieldPage({
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runScored : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runScored : 0),
+        inningScores: runScored > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? runScored : 0, current.isAttacking ? 0 : runScored) : (current.inningScores || { home: [], away: [] }),
       }
     }, 'Sac fly')
 
@@ -1671,6 +1682,8 @@ function FieldPage({
     onUpdateGameState((current) => {
       const forced = forceAdvanceToFirst(current.runners || { first: false, second: false, third: false })
 
+      const ourR = current.isAttacking ? forced.runs : 0
+      const theirR = current.isAttacking ? 0 : forced.runs
       if (current.isAttacking) {
         return {
           ...current,
@@ -1679,8 +1692,9 @@ function FieldPage({
           strikes: 0,
           currentBatterIndex: getNextBatterIndexFromState(current),
           runners: forced.nextRunners,
-          homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
-          awayScore: (current.awayScore || 0) + (!current.isAttacking ? forced.runs : 0),
+          homeScore: (current.homeScore || 0) + ourR,
+          awayScore: (current.awayScore || 0) + theirR,
+          inningScores: forced.runs > 0 ? addInningRuns(current.inningScores, current.inning, ourR, theirR) : (current.inningScores || { home: [], away: [] }),
         }
       }
 
@@ -1697,8 +1711,9 @@ function FieldPage({
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
         runners: forced.nextRunners,
-        homeScore: (current.homeScore || 0) + (current.isAttacking ? forced.runs : 0),
-        awayScore: (current.awayScore || 0) + (!current.isAttacking ? forced.runs : 0),
+        homeScore: (current.homeScore || 0) + ourR,
+        awayScore: (current.awayScore || 0) + theirR,
+        inningScores: forced.runs > 0 ? addInningRuns(current.inningScores, current.inning, ourR, theirR) : (current.inningScores || { home: [], away: [] }),
       }
     }, 'HBP')
 
@@ -1722,6 +1737,8 @@ function FieldPage({
       const nextRunners = { ...advanced.nextRunners, first: true }
       runsScored = advanced.runs
 
+      const errOurR = current.isAttacking ? advanced.runs : 0
+      const errTheirR = current.isAttacking ? 0 : advanced.runs
       if (current.isAttacking) {
         return {
           ...current,
@@ -1730,8 +1747,9 @@ function FieldPage({
           strikes: 0,
           currentBatterIndex: getNextBatterIndexFromState(current),
           runners: nextRunners,
-          homeScore: (current.homeScore || 0) + (current.isAttacking ? advanced.runs : 0),
-          awayScore: (current.awayScore || 0) + (!current.isAttacking ? advanced.runs : 0),
+          homeScore: (current.homeScore || 0) + errOurR,
+          awayScore: (current.awayScore || 0) + errTheirR,
+          inningScores: advanced.runs > 0 ? addInningRuns(current.inningScores, current.inning, errOurR, errTheirR) : (current.inningScores || { home: [], away: [] }),
         }
       }
 
@@ -1748,8 +1766,9 @@ function FieldPage({
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
         runners: nextRunners,
-        homeScore: (current.homeScore || 0) + (current.isAttacking ? advanced.runs : 0),
-        awayScore: (current.awayScore || 0) + (!current.isAttacking ? advanced.runs : 0),
+        homeScore: (current.homeScore || 0) + errOurR,
+        awayScore: (current.awayScore || 0) + errTheirR,
+        inningScores: advanced.runs > 0 ? addInningRuns(current.inningScores, current.inning, errOurR, errTheirR) : (current.inningScores || { home: [], away: [] }),
       }
     }, defenderId ? `Erro defensivo: ${defenderId}` : 'Erro defensivo')
 
@@ -2319,6 +2338,53 @@ function FieldPage({
               <span className="acoes-inning-half">{gameState.inningHalf === 'top' ? '▲' : '▼'}</span>
             </div>
 
+            {(() => {
+              const is = gameState.inningScores || { home: [], away: [] }
+              const total = Math.max(9, is.home.length, is.away.length, gameState.inning || 1)
+              const cols = Array.from({ length: total }, (_, i) => i)
+              return (
+                <div className="acoes-box-score-wrap">
+                  <table className="box-score acoes-box-score">
+                    <thead>
+                      <tr>
+                        <th className="box-score-team"></th>
+                        {cols.map(i => (
+                          <th key={i} className={`box-score-cell${i + 1 === gameState.inning ? ' box-score-current' : ''}`}>{i + 1}</th>
+                        ))}
+                        <th className="box-score-total">R</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className={!gameState.isAttacking ? 'box-score-batting' : ''}>
+                        <td className="box-score-team box-score-team--away">
+                          {!gameState.isAttacking && <span className="box-score-bat-indicator"></span>}
+                          <span className="box-score-team-label">▲ ADV</span>
+                        </td>
+                        {cols.map(i => (
+                          <td key={i} className={`box-score-cell${i + 1 === gameState.inning ? ' box-score-current' : ''}`}>
+                            {is.away[i] != null ? is.away[i] : (i + 1 < gameState.inning ? 0 : '–')}
+                          </td>
+                        ))}
+                        <td className="box-score-total">{gameState.awayScore || 0}</td>
+                      </tr>
+                      <tr className={gameState.isAttacking ? 'box-score-batting' : ''}>
+                        <td className="box-score-team box-score-team--home">
+                          {gameState.isAttacking && <span className="box-score-bat-indicator"></span>}
+                          <span className="box-score-team-label">▼ NÓS</span>
+                        </td>
+                        {cols.map(i => (
+                          <td key={i} className={`box-score-cell${i + 1 === gameState.inning ? ' box-score-current' : ''}`}>
+                            {is.home[i] != null ? is.home[i] : (i + 1 < gameState.inning ? 0 : '–')}
+                          </td>
+                        ))}
+                        <td className="box-score-total">{gameState.homeScore || 0}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
+
             <div className="acoes-mode-row">
               <span className={`hud-mode-badge ${gameState.isAttacking ? 'hud-mode-attack' : 'hud-mode-defense'}`}>
                 {gameState.isAttacking ? 'ATACANDO' : 'DEFENDENDO'}
@@ -2454,6 +2520,16 @@ function FieldPage({
                 </>
               ) : (
                 <>
+                  <div className="pitch-type-selector">
+                    {['FB','CV','SL','CH','SI','CT'].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={`pitch-type-btn${selectedPitchType === t ? ' active' : ''}`}
+                        onClick={() => setSelectedPitchType(t)}
+                      >{t}</button>
+                    ))}
+                  </div>
                   <button type="button" className="acoes-btn acoes-strike" onClick={() => handleDefensivePitch('strike')}>STRIKE</button>
                   <button type="button" className="acoes-btn acoes-ball" onClick={() => handleDefensivePitch('ball')}>BALL</button>
                   <button type="button" className="acoes-btn acoes-foul" onClick={() => handleDefensivePitch('foul')}>FOUL</button>
@@ -2470,19 +2546,50 @@ function FieldPage({
               )}
             </div>
 
-            {!gameState.isAttacking && (
-              <div key={`pitching-pulse-${pitchingPulseKey}`} className="acoes-pitcher-stats stats-pulse">
-                <div className="acoes-pitcher-stats-grid">
-                  <div><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
-                  <div><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
-                  <div><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
-                  <div><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
-                  <div><span>PC</span><strong>{gameState.currentPitcherId && gameState.pitchCounts ? (gameState.pitchCounts[gameState.currentPitcherId] ?? 0) : 0}</strong></div>
-                  <div><span>STR</span><strong>{safeNumber(livePitching.strikes)}</strong></div>
-                  <div><span>BAL</span><strong>{safeNumber(livePitching.balls)}</strong></div>
+            {!gameState.isAttacking && (() => {
+              const pitcherPitches = gameState.currentPitcherId && gameState.pitchCounts
+                ? (gameState.pitchCounts[gameState.currentPitcherId] ?? 0)
+                : 0
+              const pitcherLimit = playersById[gameState.currentPitcherId]?.pitchCountLimit ?? null
+              const nearLimit = pitcherLimit !== null && pitcherPitches >= pitcherLimit - 10
+              const overLimit = pitcherLimit !== null && pitcherPitches >= pitcherLimit
+              return (
+                <div key={`pitching-pulse-${pitchingPulseKey}`} className="acoes-pitcher-stats stats-pulse">
+                  {overLimit && (
+                    <div className="pitch-limit-alert pitch-limit-alert--over">
+                      LIMITE DE PITCHES ATINGIDO ({pitcherPitches}/{pitcherLimit})
+                    </div>
+                  )}
+                  {nearLimit && !overLimit && (
+                    <div className="pitch-limit-alert pitch-limit-alert--near">
+                      Aproximando do limite: {pitcherPitches}/{pitcherLimit}
+                    </div>
+                  )}
+                  <div className="acoes-pitcher-stats-grid">
+                    <div><span>IP</span><strong>{formatIpFromOuts(livePitching.outsPitched)}</strong></div>
+                    <div><span>ERA</span><strong>{formatEraFromOuts(livePitching.outsPitched, livePitching.earnedRuns)}</strong></div>
+                    <div><span>SO</span><strong>{safeNumber(livePitching.strikeouts)}</strong></div>
+                    <div><span>BB</span><strong>{safeNumber(livePitching.walks)}</strong></div>
+                    <div className={overLimit ? 'pc-over' : nearLimit ? 'pc-near' : ''}>
+                      <span>PC</span>
+                      <strong>{pitcherPitches}{pitcherLimit ? `/${pitcherLimit}` : ''}</strong>
+                    </div>
+                    <div><span>STR</span><strong>{safeNumber(livePitching.strikes)}</strong></div>
+                    <div><span>BAL</span><strong>{safeNumber(livePitching.balls)}</strong></div>
+                  </div>
+                  <div className="pitch-type-totals">
+                    {['FB','CV','SL','CH','SI','CT'].map(t => {
+                      const count = safeNumber(livePitching.pitchTypes?.[t])
+                      return count > 0 ? (
+                        <span key={t} className="pitch-type-count">
+                          <em>{t}</em>{count}
+                        </span>
+                      ) : null
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
         </div>
       )}

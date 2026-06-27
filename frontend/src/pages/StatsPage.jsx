@@ -738,7 +738,7 @@ function StatsPage({
 
         {!sortedGames.length && (
           <div className="empty-state-card">
-            <div className="empty-state-icon">⚾</div>
+            <div className="empty-state-icon"></div>
             <p>Nenhum jogo registrado ainda.</p>
             <p className="empty-state-hint">Vá para <strong>Jogo</strong> para iniciar uma partida.</p>
           </div>

@@ -8,7 +8,7 @@ import { VALID_POSITIONS } from '../data/positions'
 import { getPlayerId, getMainPosition } from '../utils/player'
 
 function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, gameState, onUpdateGameState }) {
-  const [form, setForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
+  const [form, setForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchCountLimit: '' })
   const [editingPlayerId, setEditingPlayerId] = useState(null)
   const [editingForm, setEditingForm] = useState({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
   const [focusedPlayerId, setFocusedPlayerId] = useState(null)
@@ -55,8 +55,9 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       number: Number(form.number),
       positions: form.positions,
       activePosition: form.activePosition,
+      pitchCountLimit: form.pitchCountLimit !== '' ? Number(form.pitchCountLimit) : null,
     })
-    setForm({ name: '', number: '', positions: ['DH'], activePosition: 'DH' })
+    setForm({ name: '', number: '', positions: ['DH'], activePosition: 'DH', pitchCountLimit: '' })
   }
 
   const toggleFormPosition = (position) => {
@@ -78,6 +79,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       number: String(player.number || ''),
       positions: Array.isArray(player.positions) && player.positions.length ? player.positions : ['DH'],
       activePosition: player.activePosition || player.positions?.[0] || 'DH',
+      pitchCountLimit: player.pitchCountLimit != null ? String(player.pitchCountLimit) : '',
     })
   }
 
@@ -98,6 +100,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
       number: Number(editingForm.number) || 0,
       positions: editingForm.positions,
       activePosition: editingForm.activePosition,
+      pitchCountLimit: editingForm.pitchCountLimit !== '' ? Number(editingForm.pitchCountLimit) : null,
     })
     setEditingPlayerId(null)
   }
@@ -151,6 +154,15 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
               type="number"
               value={form.number}
               onChange={(e) => setForm((c) => ({ ...c, number: e.target.value }))}
+            />
+            <label htmlFor="add-player-pitch-limit" className="field-label">Limite de pitches (deixe em branco = sem limite)</label>
+            <input
+              id="add-player-pitch-limit"
+              placeholder="Ex: 85"
+              type="number"
+              min="1"
+              value={form.pitchCountLimit}
+              onChange={(e) => setForm((c) => ({ ...c, pitchCountLimit: e.target.value }))}
             />
             <div className="positions-picker">
               {VALID_POSITIONS.map((position) => (
@@ -261,6 +273,15 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
               placeholder="Numero"
               value={editingForm.number}
               onChange={(e) => setEditingForm((c) => ({ ...c, number: e.target.value }))}
+            />
+            <label htmlFor="edit-player-pitch-limit" className="field-label">Limite de pitches (deixe em branco = sem limite)</label>
+            <input
+              id="edit-player-pitch-limit"
+              placeholder="Ex: 85"
+              type="number"
+              min="1"
+              value={editingForm.pitchCountLimit ?? ''}
+              onChange={(e) => setEditingForm((c) => ({ ...c, pitchCountLimit: e.target.value }))}
             />
             <div className="positions-picker">
               {VALID_POSITIONS.map((position) => (

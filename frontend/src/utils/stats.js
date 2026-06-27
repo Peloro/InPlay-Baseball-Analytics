@@ -71,6 +71,19 @@ export function inningsToOuts(innings) {
   return whole * 3 + fraction
 }
 
+// Updates the per-inning score table when runs are scored.
+// Returns a new { home, away } object — does not mutate.
+export function addInningRuns(inningScores, inning, ourRuns, theirRuns) {
+  const idx = Math.max(0, (inning || 1) - 1)
+  const home = [...(inningScores?.home || [])]
+  const away = [...(inningScores?.away || [])]
+  while (home.length <= idx) home.push(0)
+  while (away.length <= idx) away.push(0)
+  if (ourRuns > 0) home[idx] = (home[idx] || 0) + ourRuns
+  if (theirRuns > 0) away[idx] = (away[idx] || 0) + theirRuns
+  return { home, away }
+}
+
 export function obpFromHitting(hitting) {
   const h = toNum(hitting?.hits)
   const bb = toNum(hitting?.walks)
