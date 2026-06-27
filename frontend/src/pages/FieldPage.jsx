@@ -232,7 +232,7 @@ function FieldPage({
   const [setupBattingOrder, setSetupBattingOrder] = useState([])
   const [pregameForm, setPregameForm] = useState(() => {
     const today = new Date().toISOString().split('T')[0]
-    return { date: today, opponentName: '', competition: '', location: '' }
+    return { date: today, opponentName: '', competition: '', location: '', maxInnings: '9' }
   })
   const [setupDraggingId, setSetupDraggingId] = useState(null)
   const [opponentDefense, setOpponentDefense] = useState(makeOpponentMarkers)
@@ -253,6 +253,11 @@ function FieldPage({
   const [confirmChangePitcherAdv, setConfirmChangePitcherAdv] = useState(false)
   const [invalidFeedback, setInvalidFeedback] = useState('')
   const [pendingEndGame, setPendingEndGame] = useState(false)
+  const [pendingRemoveRunner, setPendingRemoveRunner] = useState(null)
+  const [pendingAutoEnd, setPendingAutoEnd] = useState(null)
+  const [showGameSummary, setShowGameSummary] = useState(false)
+  const [gameSummarySnapshot, setGameSummarySnapshot] = useState(null)
+  const autoEndShownRef = useRef(null)
   const [showFieldContainer] = useState(true)
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [gameSubView, setGameSubView] = useState('campo')
@@ -507,6 +512,46 @@ function FieldPage({
     prevScoreRef.current = { home: nextHome, away: nextAway }
   }, [gameState.homeScore, gameState.awayScore, gameState.preGameConfigured])
 
+  useEffect(() => {
+    autoEndShownRef.current = null
+  }, [gameState.currentGameId])
+
+  useEffect(() => {
+    const maxInn = Number(gameState.maxInnings) || 0
+    if (!maxInn || !gameState.currentGameId || !gameState.preGameConfigured) return
+
+    let kind = null
+    let message = null
+
+    if (gameState.inning > maxInn && autoEndShownRef.current !== 'limit') {
+      kind = 'limit'
+      message = `Limite de ${maxInn} innings atingido. Encerrar o jogo?`
+    } else if (
+      autoEndShownRef.current !== 'walkoff' &&
+      autoEndShownRef.current !== 'limit' &&
+      gameState.inningHalf === 'bottom' &&
+      gameState.inning >= maxInn &&
+      gameState.isAttacking &&
+      gameState.homeScore > gameState.awayScore
+    ) {
+      kind = 'walkoff'
+      message = 'Walk-off! CAASO venceu. Encerrar o jogo?'
+    }
+
+    if (kind && message) {
+      autoEndShownRef.current = kind
+      setPendingAutoEnd(message)
+    }
+  }, [
+    gameState.inning,
+    gameState.maxInnings,
+    gameState.homeScore,
+    gameState.awayScore,
+    gameState.isAttacking,
+    gameState.inningHalf,
+    gameState.currentGameId,
+    gameState.preGameConfigured,
+  ])
 
   useEffect(() => {
     if (gameState.isAttacking) return
@@ -593,6 +638,7 @@ function FieldPage({
       runners: { first: false, second: false, third: false },
       inning: current.inning || 1,
       inningHalf: current.inningHalf || 'top',
+      maxInnings: Number(pregameForm.maxInnings) || 0,
     }), 'Configuracao inicial confirmada')
 
     // Ensure a game exists: create if missing, then persist setup to backend
@@ -612,6 +658,7 @@ function FieldPage({
           battingOrder: setupBattingOrder,
           bench,
           isAttacking: setupAttacking,
+          maxInnings: Number(pregameForm.maxInnings) || 0,
         })
         const created = response.data
         targetGameId = created && created._id ? created._id : targetGameId
@@ -2821,7 +2868,7 @@ function FieldPage({
                     </span>
                     <button type="button" className="acoes-runner-btn" onClick={() => onUpdateGameState((current) => ({ ...current, runners: { ...current.runners, [base]: true } }), `Corredor em ${base}`)}>+</button>
                     <button type="button" className="acoes-runner-btn" onClick={() => advanceRunner(base)}>Av</button>
-                    <button type="button" className="acoes-runner-btn" onClick={() => removeRunner(base)}>Out</button>
+                    <button type="button" className="acoes-runner-btn" onClick={() => setPendingRemoveRunner(base)}>Out</button>
                   </div>
                 ))}
               </div>
@@ -3060,6 +3107,16 @@ function FieldPage({
                     value={pregameForm.location}
                     onChange={(e) => setPregameForm((c) => ({ ...c, location: e.target.value }))}
                   />
+                  <label htmlFor="pregame-innings" className="field-label" style={{ marginTop: 8, display: 'block' }}>Innings (0 = ilimitado)</label>
+                  <input
+                    id="pregame-innings"
+                    type="number"
+                    min="0"
+                    max="20"
+                    placeholder="9"
+                    value={pregameForm.maxInnings}
+                    onChange={(e) => setPregameForm((c) => ({ ...c, maxInnings: e.target.value }))}
+                  />
                 </section>
 
                 <section className="player-stats-block">
@@ -3191,9 +3248,68 @@ function FieldPage({
           message="Encerrar o jogo? Esta ação é irreversível."
           confirmLabel="Encerrar"
           danger
-          onConfirm={() => { setPendingEndGame(false); onEndGame?.() }}
+          onConfirm={() => {
+            setPendingEndGame(false)
+            setGameSummarySnapshot({ homeScore: gameState.homeScore, awayScore: gameState.awayScore, inning: gameState.inning, opponentName: opponentName || 'Adversário' })
+            setShowGameSummary(true)
+          }}
           onCancel={() => setPendingEndGame(false)}
         />
+      )}
+
+      {pendingRemoveRunner && (
+        <ConfirmModal
+          message={`Eliminar corredor em ${pendingRemoveRunner === 'first' ? '1ª' : pendingRemoveRunner === 'second' ? '2ª' : '3ª'} base?`}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={() => { const b = pendingRemoveRunner; setPendingRemoveRunner(null); removeRunner(b) }}
+          onCancel={() => setPendingRemoveRunner(null)}
+        />
+      )}
+
+      {pendingAutoEnd && (
+        <ConfirmModal
+          message={pendingAutoEnd}
+          confirmLabel="Encerrar"
+          danger
+          onConfirm={() => {
+            setPendingAutoEnd(null)
+            setGameSummarySnapshot({ homeScore: gameState.homeScore, awayScore: gameState.awayScore, inning: gameState.inning, opponentName: opponentName || 'Adversário' })
+            setShowGameSummary(true)
+          }}
+          onCancel={() => setPendingAutoEnd(null)}
+        />
+      )}
+
+      {showGameSummary && gameSummarySnapshot && (
+        <Modal title="Resumo do Jogo" onClose={() => { setShowGameSummary(false); onEndGame?.() }}>
+          <div className="game-summary">
+            <div className="game-summary-score">
+              <div className="game-summary-side">
+                <div className="game-summary-team">CAASO</div>
+                <div className="game-summary-runs">{gameSummarySnapshot.homeScore}</div>
+              </div>
+              <div className="game-summary-sep">×</div>
+              <div className="game-summary-side">
+                <div className="game-summary-team">{gameSummarySnapshot.opponentName}</div>
+                <div className="game-summary-runs">{gameSummarySnapshot.awayScore}</div>
+              </div>
+            </div>
+            <div className="game-summary-result">
+              {gameSummarySnapshot.homeScore > gameSummarySnapshot.awayScore
+                ? 'CAASO venceu!'
+                : gameSummarySnapshot.homeScore < gameSummarySnapshot.awayScore
+                  ? `${gameSummarySnapshot.opponentName} venceu`
+                  : 'Empate'}
+            </div>
+            <p className="game-summary-innings">Innings jogados: {gameSummarySnapshot.inning}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <Button variant="primary" onClick={() => { setShowGameSummary(false); onEndGame?.() }}>
+                Ver Estatísticas
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {pendingDoublePlaySelect && (

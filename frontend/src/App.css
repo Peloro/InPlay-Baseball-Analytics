@@ -3916,3 +3916,56 @@ html {
   min-width: 38px;
   text-align: right;
 }
+
+.game-summary {
+  padding: 4px 0 8px;
+}
+
+.game-summary-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  margin: 16px 0 12px;
+}
+
+.game-summary-side {
+  text-align: center;
+}
+
+.game-summary-team {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.game-summary-runs {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #f5d400;
+  line-height: 1;
+}
+
+.game-summary-sep {
+  font-size: 1.5rem;
+  color: #555;
+  align-self: center;
+}
+
+.game-summary-result {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #eee;
+  margin: 8px 0 4px;
+}
+
+.game-summary-innings {
+  text-align: center;
+  font-size: 0.82rem;
+  color: #888;
+  margin: 0;
+}

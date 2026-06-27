@@ -62,6 +62,7 @@ const INITIAL_GAME_STATE = {
   opponentLineup: [],
   opponentLineupIndex: 0,
   opposingPitcher: { number: '', name: '' },
+  maxInnings: 0,
 }
 
 
@@ -144,6 +145,7 @@ function getSavedGameState() {
       opponentLineup: Array.isArray(parsed?.opponentLineup) ? parsed.opponentLineup : [],
       opponentLineupIndex: typeof parsed?.opponentLineupIndex === 'number' ? parsed.opponentLineupIndex : 0,
       opposingPitcher: parsed?.opposingPitcher || { number: '', name: '' },
+      maxInnings: typeof parsed?.maxInnings === 'number' ? parsed.maxInnings : 0,
     }
   } catch {
     return INITIAL_GAME_STATE
@@ -401,6 +403,7 @@ function App() {
             opponentLineup: Array.isArray(persistedState?.opponentLineup) ? persistedState.opponentLineup : current.opponentLineup || [],
             opponentLineupIndex: typeof persistedState?.opponentLineupIndex === 'number' ? persistedState.opponentLineupIndex : current.opponentLineupIndex || 0,
             opposingPitcher: persistedState?.opposingPitcher || current.opposingPitcher || { number: '', name: '' },
+            maxInnings: typeof persistedState?.maxInnings === 'number' ? persistedState.maxInnings : (typeof game?.maxInnings === 'number' ? game.maxInnings : current.maxInnings || 0),
           }))
         } else {
           setGameState((current) => ({
@@ -432,6 +435,7 @@ function App() {
             opponentLineup: Array.isArray(persistedState?.opponentLineup) ? persistedState.opponentLineup : current.opponentLineup || [],
             opponentLineupIndex: typeof persistedState?.opponentLineupIndex === 'number' ? persistedState.opponentLineupIndex : current.opponentLineupIndex || 0,
             opposingPitcher: persistedState?.opposingPitcher || current.opposingPitcher || { number: '', name: '' },
+            maxInnings: typeof persistedState?.maxInnings === 'number' ? persistedState.maxInnings : (typeof game?.maxInnings === 'number' ? game.maxInnings : current.maxInnings || 0),
           }))
         }
       } catch {
@@ -482,6 +486,7 @@ function App() {
           opponentLineup: gameState.opponentLineup || [],
           opponentLineupIndex: gameState.opponentLineupIndex || 0,
           opposingPitcher: gameState.opposingPitcher || { number: '', name: '' },
+          maxInnings: gameState.maxInnings || 0,
         },
       }).catch(() => {})
     }, 250)
