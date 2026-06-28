@@ -61,7 +61,7 @@ async function netGet(url, params) {
 }
 
 async function netWrite(method, url, data) {
-  if (!http) return null
+  if (!http) return {}
   try {
     const res = method === 'delete'
       ? await http.delete(url)
@@ -178,7 +178,11 @@ function emitStatus(status) {
 // Call this on app mount and on reconnect. All game-time reads stay local.
 
 export async function syncWithServer() {
-  if (!http) return { ok: false, reason: 'no-backend' }
+  if (!http) {
+    lfSet(LS.syncQueue, [])
+    emitStatus('no-backend')
+    return { ok: false, reason: 'no-backend' }
+  }
   if (!navigator.onLine) {
     emitStatus('offline')
     return { ok: false, reason: 'offline' }
@@ -192,13 +196,15 @@ export async function syncWithServer() {
     await flushWriteQueue()
 
     // Pull fresh data from server and merge with any still-pending local records
-    const [players, games] = await Promise.all([
+    const [players, games, gameStats] = await Promise.all([
       netGet('/players'),
       netGet('/games'),
+      netGet('/game-stats'),
     ])
 
-    if (Array.isArray(players)) lfSet(LS.players, mergeWithLocal(players, LS.players))
-    if (Array.isArray(games))   lfSet(LS.games,   mergeWithLocal(games,   LS.games))
+    if (Array.isArray(players))   lfSet(LS.players,   mergeWithLocal(players,   LS.players))
+    if (Array.isArray(games))     lfSet(LS.games,      mergeWithLocal(games,     LS.games))
+    if (Array.isArray(gameStats)) lfSet(LS.gameStats,  mergeWithLocal(gameStats, LS.gameStats))
 
     const pendingLeft = lfGet(LS.syncQueue).length
     emitStatus(pendingLeft > 0 ? 'pending' : 'synced')

@@ -63,6 +63,15 @@ function mergeStatPayload(body = {}, current = EMPTY_STATS) {
   return { hitting, pitching, defense }
 }
 
+router.get('/', async (req, res) => {
+  try {
+    const stats = await GameStat.find().sort({ updatedAt: -1 })
+    res.json(stats)
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar estatisticas.' })
+  }
+})
+
 router.post('/', async (req, res) => {
   try {
     const { gameId, playerId } = req.body
