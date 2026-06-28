@@ -1,10 +1,17 @@
 const express = require('express')
 const mongoose = require('mongoose')
+const { body } = require('express-validator')
 const Player = require('../models/Player')
 const GameStat = require('../models/GameStat')
 const { VALID_POSITIONS } = require('../constants/positions')
+const validate = require('../middleware/validate')
 
 const router = express.Router()
+
+const playerRules = [
+  body('name').trim().isLength({ min: 1, max: 100 }).withMessage('name invalido (1-100 chars).'),
+  body('number').isNumeric().withMessage('number deve ser um numero.'),
+]
 
 router.get('/', async (req, res) => {
   try {
@@ -30,7 +37,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-router.post('/', async (req, res) => {
+router.post('/', playerRules, validate, async (req, res) => {
   try {
     const { name, number, positions, activePosition, position, x, y } = req.body
 
@@ -72,7 +79,7 @@ router.post('/', async (req, res) => {
   }
 })
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', playerRules, validate, async (req, res) => {
   try {
     const { name, number, positions, activePosition } = req.body
 

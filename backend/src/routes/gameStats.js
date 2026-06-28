@@ -1,9 +1,16 @@
 const express = require('express')
 const mongoose = require('mongoose')
+const { body } = require('express-validator')
 const GameStat = require('../models/GameStat')
 const Player = require('../models/Player')
+const validate = require('../middleware/validate')
 
 const router = express.Router()
+
+const gameStatRules = [
+  body('gameId').isMongoId().withMessage('gameId invalido.'),
+  body('playerId').isMongoId().withMessage('playerId invalido.'),
+]
 
 const EMPTY_STATS = {
   hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
@@ -88,7 +95,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-router.post('/', async (req, res) => {
+router.post('/', gameStatRules, validate, async (req, res) => {
   try {
     const { gameId, playerId } = req.body
 

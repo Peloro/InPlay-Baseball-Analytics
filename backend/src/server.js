@@ -9,6 +9,7 @@ const statsRouter = require('./routes/stats')
 const gamesRouter = require('./routes/games')
 const gameStatsRouter = require('./routes/gameStats')
 const seasonStatsRouter = require('./routes/seasonStats')
+const exportRouter = require('./routes/export')
 const authMiddleware = require('./middleware/auth')
 
 dotenv.config()
@@ -30,6 +31,7 @@ app.use('/stats', authMiddleware, statsRouter)
 app.use('/games', authMiddleware, gamesRouter)
 app.use('/game-stats', authMiddleware, gameStatsRouter)
 app.use('/season-stats', authMiddleware, seasonStatsRouter)
+app.use('/export', authMiddleware, exportRouter)
 
 async function startServer() {
   try {

@@ -6,6 +6,7 @@ const TrainingField = lazy(() => import('./pages/TrainingField'))
 const JogadoresPage = lazy(() => import('./pages/JogadoresPage'))
 import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus, getAuth, logout } from './services/api'
 import LoginPage from './pages/LoginPage'
+import SettingsPage from './pages/SettingsPage'
 import { addInningRuns } from './utils/stats'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
@@ -948,6 +949,15 @@ function App() {
             <span className="nav-label-full">Stats</span>
             <span className="nav-label-short">Stats</span>
           </button>
+          <button
+            type="button"
+            className={page === 'settings' ? 'active' : ''}
+            aria-selected={page === 'settings'}
+            onClick={() => setPage('settings')}
+          >
+            <span className="nav-label-full">Ajustes</span>
+            <span className="nav-label-short">Ajustes</span>
+          </button>
         </nav>
         <button
           type="button"
@@ -1024,6 +1034,8 @@ function App() {
           gameState={gameState}
           onUpdateGameState={updateGameState}
         />
+      ) : page === 'settings' ? (
+        <SettingsPage onLogout={handleLogout} />
       ) : (
         <StatsPage
           players={players}

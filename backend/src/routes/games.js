@@ -1,9 +1,16 @@
 const express = require('express')
 const mongoose = require('mongoose')
+const { body } = require('express-validator')
 const Game = require('../models/Game')
 const GameStat = require('../models/GameStat')
+const validate = require('../middleware/validate')
 
 const router = express.Router()
+
+const gameCreateRules = [
+  body('date').notEmpty().withMessage('date obrigatorio.'),
+  body('competition').trim().isLength({ min: 1 }).withMessage('competition obrigatorio.'),
+]
 
 function sanitizeSetupPayload(body = {}) {
   const payload = {}
@@ -45,7 +52,7 @@ function sanitizeSetupPayload(body = {}) {
   return payload
 }
 
-router.post('/', async (req, res) => {
+router.post('/', gameCreateRules, validate, async (req, res) => {
   try {
     const { date, opponent, opponentName, competition, location = '' } = req.body
     const setup = sanitizeSetupPayload(req.body)
