@@ -4,6 +4,7 @@ import StatLabel from '../components/ui/StatLabel'
 import { safeNumber } from '../utils/number'
 import { avgFromValues, formatEraFromOuts, formatIpFromOuts } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
+import { EMPTY_HITTING, EMPTY_PITCHING, EMPTY_DEFENSE } from '../constants/stats'
 
 
 
@@ -359,9 +360,9 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
         player,
         playerId,
         type: detectPlayerType(player),
-        hitting: stat.hitting || { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
-        pitching: stat.pitching || { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
-        defense: stat.defense || { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
+        hitting: stat.hitting || EMPTY_HITTING,
+        pitching: stat.pitching || EMPTY_PITCHING,
+        defense: stat.defense || EMPTY_DEFENSE,
       }
     })
   }, [gameStats, players])

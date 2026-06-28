@@ -1,8 +1,9 @@
 import Modal from './ui/Modal'
 import StatLabel from './ui/StatLabel'
 import { safeNumber, toFixed3 } from '../utils/number'
-import { avgFromHitting, eraFromPitching, obpFromHitting, whipFromPitching, k9FromPitching, formatIpFromOuts } from '../utils/stats'
+import { eraFromPitching, whipFromPitching, k9FromPitching, formatIpFromOuts } from '../utils/stats'
 import { detectPlayerType } from '../utils/player'
+import { HITTER_COLS, DEFENSE_COLS } from '../constants/statColumns'
 
 function renderBlock(title, rows) {
   return (
@@ -33,18 +34,8 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
   const gamePitching = gameEntry?.pitching || {}
   const gameDefense = gameEntry?.defense || {}
 
-  const buildHittingRows = (hitting, entry) => [
-    { label: 'AB', value: safeNumber(hitting.atBats) },
-    { label: 'H', value: safeNumber(hitting.hits) },
-    { label: 'HR', value: safeNumber(hitting.homeRuns) },
-    { label: 'R', value: safeNumber(hitting.runs) },
-    { label: 'RBI', value: safeNumber(hitting.rbi) },
-    { label: 'BB', value: safeNumber(hitting.walks) },
-    { label: 'SO', value: safeNumber(hitting.strikeouts) },
-    { label: 'OUT', value: safeNumber(hitting.outs) },
-    { label: 'AVG', value: entry?.avg ? toFixed3(entry.avg) : avgFromHitting(hitting) },
-    { label: 'OBP', value: obpFromHitting(hitting) },
-  ]
+  const buildHittingRows = (hitting, entry) =>
+    HITTER_COLS.map(({ label, get }) => ({ label, value: get({ hitting, avg: entry?.avg }) }))
 
   const buildPitchingRows = (pitching, entry) => {
     const rows = [
@@ -70,13 +61,8 @@ function PlayerStatsModal({ player, seasonEntry, gameEntry, onClose }) {
     return rows
   }
 
-  const buildDefenseRows = (defense) => [
-    { label: 'E', value: safeNumber(defense.errors) },
-    { label: 'DP', value: safeNumber(defense.doublePlays) },
-    { label: 'FO', value: safeNumber(defense.flyOuts) },
-    { label: 'GO', value: safeNumber(defense.groundOuts) },
-    { label: 'LO', value: safeNumber(defense.lineOuts) },
-  ]
+  const buildDefenseRows = (defense) =>
+    DEFENSE_COLS.map(({ label, get }) => ({ label, value: get({ defense }) }))
 
   return (
     <Modal title={`${player.name} #${player.number}`} onClose={onClose}>

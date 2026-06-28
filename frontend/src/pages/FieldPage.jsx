@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import useFieldZoom from '../hooks/useFieldZoom'
 import useDragPosition from '../hooks/useDragPosition'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
@@ -16,6 +17,8 @@ import useGameState from '../hooks/useGameState'
 import { safeNumber } from '../utils/number'
 import { formatEraFromOuts, formatIpFromOuts, outsToInnings, addInningRuns } from '../utils/stats'
 import { detectPlayerType, getPlayerId, getMainPosition } from '../utils/player'
+import { EMPTY_GAME_STAT, EMPTY_PITCHING } from '../constants/stats'
+import { incrementPitcherCount, computeInningTransition } from '../utils/gameState'
 import StatLabel from '../components/ui/StatLabel'
 
 const LONG_PRESS_MS = 450
@@ -249,6 +252,7 @@ function FieldPage({
   const [selectedPitchType, setSelectedPitchType] = useState('FB')
   const [pendingDoublePlaySelect, setPendingDoublePlaySelect] = useState(false)
   const orderTouchRef = useRef({ dragging: null })
+  const orderListRef = useRef(null)
   const [selectedDoublePlayRunnerBase, setSelectedDoublePlayRunnerBase] = useState('')
   const [selectedDoublePlayDefenderIds, setSelectedDoublePlayDefenderIds] = useState([])
   const [undoStack, setUndoStack] = useState([])
@@ -265,135 +269,10 @@ function FieldPage({
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [gameSubView, setGameSubView] = useState('campo')
   const touchStartRef = useRef(null)
-  const [zoom, setZoom] = useState(0.85)
-  const [offsetX, setOffsetX] = useState(0)
-  const [offsetY, setOffsetY] = useState(0)
-  const isPanningRef = useRef(false)
-  const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
-  const isPinchingRef = useRef(false)
-  const pinchRef = useRef({ initialDistance: 0, initialScale: 1, centerClientX: 0, centerClientY: 0, offsetX: 0, offsetY: 0 })
   const isProcessingRef = useRef(false)
 
-  const getDistance = (t1, t2) => {
-    const dx = t2.clientX - t1.clientX
-    const dy = t2.clientY - t1.clientY
-    return Math.hypot(dx, dy)
-  }
-
-  const getCenter = (t1, t2) => ({ x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 })
-
-  const handleTouchStartMobile = (ev) => {
-    if (!ev.touches) return
-    if (ev.touches.length === 2) {
-      isPinchingRef.current = true
-      const d = getDistance(ev.touches[0], ev.touches[1])
-      const center = getCenter(ev.touches[0], ev.touches[1])
-      pinchRef.current = {
-        initialDistance: d,
-        initialScale: zoom,
-        centerClientX: center.x,
-        centerClientY: center.y,
-        offsetX,
-        offsetY,
-      }
-      ev.preventDefault()
-      isPanningRef.current = false
-    } else if (ev.touches.length === 1) {
-      const t = ev.touches[0]
-      const target = ev.target
-      if (
-        target &&
-        target.closest &&
-        (target.closest('.player-marker') ||
-          target.closest('.animated-ball-marker') ||
-          target.closest('.runner-marker') ||
-          target.closest('.tool-dock') ||
-          target.closest('.player-tooltip'))
-      ) {
-        // touched an interactive element — let its handlers take precedence
-        return
-      }
-      // Only start panning on touch when in mouse tool. Pen/pointer should
-      // allow their own interactions (drawing/laser) and must not trigger pan.
-      if (activeTool === 'mouse') {
-        isPanningRef.current = true
-        panStartRef.current = { x: t.clientX, y: t.clientY, offsetX, offsetY }
-        ev.preventDefault()
-      }
-    }
-  }
-
-  const handleTouchMoveMobile = (ev) => {
-    if (!ev.touches) return
-    if (isPinchingRef.current && ev.touches.length === 2) {
-      const d = getDistance(ev.touches[0], ev.touches[1])
-      const factor = d / (pinchRef.current.initialDistance || 1)
-      let newScale = pinchRef.current.initialScale * factor
-      newScale = Math.max(0.5, Math.min(2.5, newScale))
-
-      const center = getCenter(ev.touches[0], ev.touches[1])
-      const stageRect = fieldStageRef.current?.getBoundingClientRect() || { left: 0, top: 0, width: 0, height: 0 }
-      const centerLocalX = center.x - stageRect.left
-      const centerLocalY = center.y - stageRect.top
-
-      const contentX = (centerLocalX - pinchRef.current.offsetX) / pinchRef.current.initialScale
-      const contentY = (centerLocalY - pinchRef.current.offsetY) / pinchRef.current.initialScale
-
-      const nextOffsetX = centerLocalX - contentX * newScale
-      const nextOffsetY = centerLocalY - contentY * newScale
-
-      const contentWidth = fieldRect.width * newScale
-      const contentHeight = fieldRect.height * newScale
-      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-      const maxX = extraX
-      const maxY = extraY
-      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
-      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
-
-      requestAnimationFrame(() => {
-        setZoom(Number(newScale.toFixed(3)))
-        setOffsetX(clampX)
-        setOffsetY(clampY)
-      })
-
-      ev.preventDefault()
-      return
-    }
-
-    if (isPanningRef.current && ev.touches.length === 1) {
-      const t = ev.touches[0]
-      const dx = t.clientX - panStartRef.current.x
-      const dy = t.clientY - panStartRef.current.y
-      requestAnimationFrame(() => {
-        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
-        const contentWidth = fieldRect.width * zoom
-        const contentHeight = fieldRect.height * zoom
-        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-        const maxX = extraX
-        const maxY = extraY
-        const rawX = panStartRef.current.offsetX + dx
-        const rawY = panStartRef.current.offsetY + dy
-        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
-        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
-      })
-      ev.preventDefault()
-    }
-  }
-
-  const handleTouchEndMobile = (ev) => {
-    if (!ev.touches || ev.touches.length < 2) {
-      isPinchingRef.current = false
-    }
-    if (!ev.touches || ev.touches.length === 0) {
-      isPanningRef.current = false
-    }
-  }
+  const { zoom, offsetX, offsetY, handleTouchStartMobile, handleTouchMoveMobile, handleTouchEndMobile } =
+    useFieldZoom({ fieldRect, fieldStageRef, activeTool })
 
   const {
     benchSearch,
@@ -722,6 +601,7 @@ function FieldPage({
     ev.stopPropagation()
     orderTouchRef.current.dragging = id
     setSetupDraggingId(id)
+    orderListRef.current?.setPointerCapture(ev.pointerId)
   }
 
   const onOrderPointerMove = (ev) => {
@@ -768,114 +648,6 @@ function FieldPage({
     top: (y / 100) * fieldRect.height,
   }), [fieldRect])
 
-  // Wheel zoom and pan handlers (camera control)
-  useEffect(() => {
-    const el = fieldStageRef.current
-    if (!el) return undefined
-    const targetEl = el.querySelector?.('.field-viewport') || el
-
-    const handleWheel = (ev) => {
-      // do not zoom when using pen/pointer tools
-      if (activeTool !== 'mouse') return
-      ev.preventDefault()
-      const stageRect = el.getBoundingClientRect()
-      const mouseX = ev.clientX - stageRect.left
-      const mouseY = ev.clientY - stageRect.top
-
-      const delta = ev.deltaY < 0 ? 1 : -1
-      const factor = 1 + delta * 0.08
-      const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * factor).toFixed(3))))
-
-      // content coord under cursor (pre-zoom)
-      const contentX = (mouseX - offsetX) / zoom
-      const contentY = (mouseY - offsetY) / zoom
-
-      // compute next offset so the same content point stays under the cursor
-      const nextOffsetX = mouseX - contentX * newZoom
-      const nextOffsetY = mouseY - contentY * newZoom
-
-      const contentWidth = fieldRect.width * newZoom
-      const contentHeight = fieldRect.height * newZoom
-      const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-      const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-      const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-      const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-      const maxX = extraX
-      const maxY = extraY
-      const clampX = Math.max(minX, Math.min(nextOffsetX, maxX))
-      const clampY = Math.max(minY, Math.min(nextOffsetY, maxY))
-
-      requestAnimationFrame(() => {
-        setZoom(newZoom)
-        setOffsetX(clampX)
-        setOffsetY(clampY)
-      })
-    }
-
-    const handlePointerDown = (ev) => {
-      // only allow panning with mouse tool and left button
-      if (activeTool !== 'mouse') return
-      if (ev.button !== 0) return
-      const target = ev.target
-      // Do not start pan when interacting with markers, runners, animated ball,
-      // tool dock, or other interactive UI — only start pan on pure background
-      if (
-        target.closest &&
-        (target.closest('.player-marker') ||
-          target.closest('.animated-ball-marker') ||
-          target.closest('.runner-marker') ||
-          target.closest('.tool-dock') ||
-          target.closest('.player-tooltip'))
-      )
-        return
-
-      isPanningRef.current = true
-      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
-      el.classList.add('grabbing')
-      el.setPointerCapture?.(ev.pointerId)
-    }
-
-    const handlePointerMove = (ev) => {
-      if (!isPanningRef.current) return
-      const dx = ev.clientX - panStartRef.current.x
-      const dy = ev.clientY - panStartRef.current.y
-      requestAnimationFrame(() => {
-        const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
-        const contentWidth = fieldRect.width * zoom
-        const contentHeight = fieldRect.height * zoom
-        const extraX = Math.max(200, (stageRect.width || 0) * 0.25)
-        const extraY = Math.max(200, (stageRect.height || 0) * 0.25)
-        const minX = Math.min(0, (stageRect.width || 0) - contentWidth) - extraX
-        const minY = Math.min(0, (stageRect.height || 0) - contentHeight) - extraY
-        const maxX = extraX
-        const maxY = extraY
-        const rawX = panStartRef.current.offsetX + dx
-        const rawY = panStartRef.current.offsetY + dy
-        setOffsetX(Math.max(minX, Math.min(rawX, maxX)))
-        setOffsetY(Math.max(minY, Math.min(rawY, maxY)))
-      })
-    }
-
-    const handlePointerUp = (ev) => {
-      if (isPanningRef.current) {
-        isPanningRef.current = false
-        el.classList.remove('grabbing')
-        el.releasePointerCapture?.(ev.pointerId)
-      }
-    }
-
-    targetEl.addEventListener('wheel', handleWheel, { passive: false })
-    targetEl.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-
-    return () => {
-      targetEl.removeEventListener('wheel', handleWheel)
-      targetEl.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
 
   useLayoutEffect(() => {
     const updateFieldRect = () => {
@@ -1019,14 +791,7 @@ function FieldPage({
     onUpdateGameState((current) => {
       if (!current.runners?.[base]) return current
 
-      const nextOuts = clamp((current.outs || 0) + 1, 0, 3)
-      const sideSwitch = nextOuts >= 3
-      const nextHalf = sideSwitch
-        ? current.inningHalf === 'top'
-          ? 'bottom'
-          : 'top'
-        : current.inningHalf || 'top'
-      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+      const { nextOuts, sideSwitch, nextHalf, nextInning } = computeInningTransition(current)
 
       return {
         ...current,
@@ -1038,7 +803,7 @@ function FieldPage({
         strikes: sideSwitch ? 0 : current.strikes,
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
         inningHalf: nextHalf,
-        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        inning: nextInning,
       }
     }, `Corredor removido em ${base}`)
     if (!gameState.isAttacking && gameState.runners?.[base]) {
@@ -1115,7 +880,7 @@ function FieldPage({
         balls: safeNumber(patch.pitching?.balls ?? current?.pitching?.balls),
         pitchCount: safeNumber(patch.pitching?.pitchCount ?? current?.pitching?.pitchCount),
         hitsAllowed: safeNumber(patch.pitching?.hitsAllowed ?? current?.pitching?.hitsAllowed),
-        pitchTypes: patch.pitching?.pitchTypes ?? current?.pitching?.pitchTypes ?? { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
+        pitchTypes: patch.pitching?.pitchTypes ?? current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
       },
       defense: {
         errors: safeNumber(patch.defense?.errors ?? current?.defense?.errors),
@@ -1149,7 +914,7 @@ function FieldPage({
         balls: safeNumber(current?.pitching?.balls),
         pitchCount: safeNumber(current?.pitching?.pitchCount) + safeNumber(pitchCountDelta),
         hitsAllowed: safeNumber(current?.pitching?.hitsAllowed) + safeNumber(hitsAllowedDelta),
-        pitchTypes: current?.pitching?.pitchTypes ?? { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
+        pitchTypes: current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
       },
     }
 
@@ -1199,7 +964,7 @@ function FieldPage({
           balls: safeNumber(entry.pitching?.balls),
           pitchCount: safeNumber(entry.pitching?.pitchCount),
           hitsAllowed: safeNumber(entry.pitching?.hitsAllowed),
-          pitchTypes: entry.pitching?.pitchTypes ?? { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
+          pitchTypes: entry.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
         },
         defense: {
           errors: safeNumber(entry.defense?.errors),
@@ -1337,19 +1102,7 @@ function FieldPage({
 
         await upsertPlayerStat(pid, {
           type: currentEntry.type,
-          hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
-          pitching: {
-            inningsPitched: 0,
-            outsPitched: 0,
-            earnedRuns: 0,
-            strikeouts: 0,
-            walks: 0,
-            strikes: 0,
-            balls: 0,
-            pitchCount: 0,
-            hitsAllowed: 0,
-          },
-          defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
+          ...EMPTY_GAME_STAT,
         })
       }
 
@@ -1414,7 +1167,7 @@ function FieldPage({
       const currentIndex = Math.min(current.currentBatterIndex || 0, localOrder.length - 1)
       const nextIndex = (currentIndex + 1) % localOrder.length
       const isOut = kind === 'strikeout' || kind === 'out'
-      const outs = isOut ? clamp((current.outs || 0) + 1, 0, 3) : current.outs || 0
+      const { nextOuts: outs, sideSwitch, nextHalf, nextInning } = computeInningTransition(current, isOut ? 1 : 0)
 
       let nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
       let runs = 0
@@ -1424,14 +1177,6 @@ function FieldPage({
         nextRunners = hitResult.nextRunners
         runs = hitResult.runs
       }
-
-      const sideSwitch = outs >= 3
-      const nextHalf = sideSwitch
-        ? current.inningHalf === 'top'
-          ? 'bottom'
-          : 'top'
-        : current.inningHalf || 'top'
-      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
 
       const batterName = playersById[localOrder[currentIndex]]?.name || '?'
       const logDesc = kind === 'homerun'
@@ -1450,7 +1195,7 @@ function FieldPage({
         currentBatterIndex: nextIndex,
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
         inningHalf: nextHalf,
-        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        inning: nextInning,
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
@@ -1541,12 +1286,7 @@ function FieldPage({
         balls: 0,
         strikes: 0,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: (() => {
-          const next = { ...(current.pitchCounts || {}) }
-          const pid = current.currentPitcherId
-          if (pid) next[pid] = Number(next[pid] || 0) + 1
-          return next
-        })(),
+        pitchCounts: incrementPitcherCount(current),
         runners: hitResult.nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? hitResult.runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? hitResult.runs : 0),
@@ -1708,14 +1448,7 @@ function FieldPage({
     onUpdateGameState((current) => {
       if (current.isAttacking) return current
 
-      const nextOutsRaw = Number(current.outs || 0) + 1
-      const sideSwitch = nextOutsRaw >= 3
-      const nextHalf = sideSwitch
-        ? current.inningHalf === 'top'
-          ? 'bottom'
-          : 'top'
-        : current.inningHalf || 'top'
-      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+      const { nextOuts: nextOutsRaw, sideSwitch, nextHalf, nextInning } = computeInningTransition(current)
 
       const outLabel = outType === 'strikeout' ? 'K' : outType === 'flyout' ? 'FO' : outType === 'groundout' ? 'GO' : outType === 'lineout' ? 'LO' : 'Out'
       const logDesc = `${oppBatterLabel(current)}: ${outLabel}`
@@ -1724,17 +1457,12 @@ function FieldPage({
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: (() => {
-          const next = { ...(current.pitchCounts || {}) }
-          const pid = current.currentPitcherId
-          if (pid) next[pid] = Number(next[pid] || 0) + 1
-          return next
-        })(),
+        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
         inningHalf: nextHalf,
-        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        inning: nextInning,
         runners: sideSwitch ? { first: false, second: false, third: false } : current.runners,
         ...updateOppBatter(current, outType === 'strikeout' ? 'strikeout' : 'out'),
         ...advanceOpponentLineup(current),
@@ -1786,14 +1514,7 @@ function FieldPage({
       if (!hasRunner) return current
 
       const nextRunners = { ...(current.runners || { first: false, second: false, third: false }), [runnerBase]: false }
-      const nextOutsRaw = Number(current.outs || 0) + 2
-      const sideSwitch = nextOutsRaw >= 3
-      const nextHalf = sideSwitch
-        ? current.inningHalf === 'top'
-          ? 'bottom'
-          : 'top'
-        : current.inningHalf || 'top'
-      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
+      const { nextOuts: nextOutsRaw, sideSwitch, nextHalf, nextInning } = computeInningTransition(current, 2)
 
       const dpSide = current.isAttacking ? 'Nós' : oppBatterLabel(current)
       const logDesc = `${dpSide}: Double Play em ${runnerBase}${defenderText ? ` (${defenderText})` : ''}`
@@ -1802,18 +1523,13 @@ function FieldPage({
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: (() => {
-          const next = { ...(current.pitchCounts || {}) }
-          const pid = current.currentPitcherId
-          if (pid) next[pid] = Number(next[pid] || 0) + 1
-          return next
-        })(),
+        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
         inningHalf: nextHalf,
-        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        inning: nextInning,
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
         ...(!current.isAttacking ? advanceOpponentLineup(current) : {}),
         gameLog: [...(current.gameLog || []), makeLogEntry(current, 'double-play', logDesc)],
@@ -1881,21 +1597,13 @@ function FieldPage({
 
     onUpdateGameState((current) => {
       const hadRunnerOnThird = Boolean(current.runners?.third)
-      const nextOutsRaw = Number(current.outs || 0) + 1
-      const sideSwitch = nextOutsRaw >= 3
+      const { nextOuts: nextOutsRaw, sideSwitch, nextHalf, nextInning } = computeInningTransition(current)
 
       const nextRunners = { ...(current.runners || { first: false, second: false, third: false }) }
       if (hadRunnerOnThird) {
         nextRunners.third = false
         runScored = 1
       }
-
-      const nextHalf = sideSwitch
-        ? current.inningHalf === 'top'
-          ? 'bottom'
-          : 'top'
-        : current.inningHalf || 'top'
-      const shouldAdvanceInning = sideSwitch && current.inningHalf === 'bottom'
 
       const sfOrder = current.battingOrder || []
       const sfIdx = Math.min(current.currentBatterIndex || 0, Math.max(0, sfOrder.length - 1))
@@ -1908,18 +1616,13 @@ function FieldPage({
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: (() => {
-          const next = { ...(current.pitchCounts || {}) }
-          const pid = current.currentPitcherId
-          if (pid) next[pid] = Number(next[pid] || 0) + 1
-          return next
-        })(),
+        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
         inningHalf: nextHalf,
-        inning: shouldAdvanceInning ? Math.max(1, (current.inning || 1) + 1) : current.inning,
+        inning: nextInning,
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runScored : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runScored : 0),
@@ -1994,12 +1697,7 @@ function FieldPage({
       return {
         ...current,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: (() => {
-          const next = { ...(current.pitchCounts || {}) }
-          const pid = current.currentPitcherId
-          if (pid) next[pid] = Number(next[pid] || 0) + 1
-          return next
-        })(),
+        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -2061,12 +1759,7 @@ function FieldPage({
       return {
         ...current,
         ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: (() => {
-          const next = { ...(current.pitchCounts || {}) }
-          const pid = current.currentPitcherId
-          if (pid) next[pid] = Number(next[pid] || 0) + 1
-          return next
-        })(),
+        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -3340,8 +3033,8 @@ function FieldPage({
             <section className="player-stats-block">
               <h4>3) Ordem de rebatida</h4>
               <div
+                ref={orderListRef}
                 className="pregame-order-list"
-                style={{ touchAction: 'none' }}
                 onPointerMove={onOrderPointerMove}
                 onPointerUp={onOrderPointerUp}
                 onPointerCancel={onOrderPointerUp}
@@ -3350,21 +3043,24 @@ function FieldPage({
                   const player = playersById[id]
                   if (!player) return null
                   return (
-                    <button
+                    <div
                       key={`order-${id}`}
                       data-order-id={id}
-                      type="button"
                       className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
                       draggable
                       onDragStart={() => onBattingDragStart(id)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => onBattingDrop(id)}
-                      onPointerDown={(ev) => onOrderPointerDown(id, ev)}
                     >
                       <span>{index + 1}.</span>
                       <strong>{player.name}</strong>
                       <span>#{player.number}</span>
-                    </button>
+                      <span
+                        className="pregame-order-handle"
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(ev) => onOrderPointerDown(id, ev)}
+                      >⠿</span>
+                    </div>
                   )
                 })}
               </div>

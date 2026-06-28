@@ -1363,7 +1363,6 @@ textarea:focus-visible {
   background: var(--ctrl-bg);
   border-radius: 10px;
   padding: 8px 10px;
-  cursor: grab;
   color: var(--ink);
   transition: border-color 130ms ease, background-color 130ms ease;
 }
@@ -1371,13 +1370,14 @@ textarea:focus-visible {
   border-color: #5a4e30;
   background: #222;
 }
-/* Drag handle dots */
-.pregame-order-item::after {
-  content: '⠿';
+.pregame-order-handle {
   color: var(--muted);
   font-size: 1rem;
   opacity: 0.5;
   justify-self: end;
+  cursor: grab;
+  padding: 4px;
+  user-select: none;
 }
 
 .pregame-order-item.dragging {

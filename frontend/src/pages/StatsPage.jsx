@@ -6,17 +6,10 @@ import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import { safeNumber } from '../utils/number'
-import { avgFromEntry, avgFromValues, eraFromEntry, formatIpFromOuts, obpFromHitting, whipFromPitching, k9FromPitching } from '../utils/stats'
+import { avgFromValues, eraFromEntry, formatIpFromOuts, whipFromPitching, k9FromPitching } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
-
-
-
-const EMPTY_GAME_STAT = {
-  type: 'hitter',
-  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
-  pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
-  defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
-}
+import { EMPTY_GAME_STAT } from '../constants/stats'
+import { HITTER_COLS } from '../constants/statColumns'
 
 
 
@@ -176,9 +169,7 @@ function StatsPage({
         .map((player) => {
           const id = getPlayerId(player)
           const entry = seasonMap[id] || {
-            hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
-            pitching: { inningsPitched: 0, outsPitched: 0, earnedRuns: 0, strikeouts: 0, walks: 0, strikes: 0, balls: 0, pitchCount: 0, hitsAllowed: 0 },
-            defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
+            ...EMPTY_GAME_STAT,
             roleSummary: { hitterGames: 0, pitcherGames: 0 },
             avg: 0,
             era: 0,
@@ -537,9 +528,9 @@ function StatsPage({
                 <th>Posicao</th>
                 {statsTab === 'hitters' ? (
                   <>
-                    {[['atBats','AB'],['hits','H'],['homeRuns','HR'],['runs','R'],['rbi','RBI'],['walks','BB'],['strikeouts','SO'],['outs','OUT'],['avg','AVG'],['obp','OBP']].map(([col, label]) => (
-                      <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
-                        {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
+                    {HITTER_COLS.map(({ label, sortKey }) => (
+                      <th key={sortKey} className={`sortable-th${colSort.col === sortKey ? ' sort-active' : ''}`} onClick={() => handleColSort(sortKey)}>
+                        {label}{colSort.col === sortKey ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
                     ))}
                   </>
@@ -579,16 +570,9 @@ function StatsPage({
                     <td>{getMainPosition(player)}</td>
                     {statsTab === 'hitters' ? (
                       <>
-                        <td>{safeNumber(entry.hitting?.atBats)}</td>
-                        <td>{safeNumber(entry.hitting?.hits)}</td>
-                        <td>{safeNumber(entry.hitting?.homeRuns)}</td>
-                        <td>{safeNumber(entry.hitting?.runs)}</td>
-                        <td>{safeNumber(entry.hitting?.rbi)}</td>
-                        <td>{safeNumber(entry.hitting?.walks)}</td>
-                        <td>{safeNumber(entry.hitting?.strikeouts)}</td>
-                        <td>{safeNumber(entry.hitting?.outs)}</td>
-                        <td>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</td>
-                        <td>{obpFromHitting(entry.hitting)}</td>
+                        {HITTER_COLS.map(({ sortKey, get }) => (
+                          <td key={sortKey}>{get(entry)}</td>
+                        ))}
                       </>
                     ) : (
                       <>
@@ -623,16 +607,12 @@ function StatsPage({
                   <div className="stat-card-body">
                     {statsTab === 'hitters' ? (
                       <div className="stat-grid">
-                        <div><strong>AB</strong><div>{safeNumber(entry.hitting?.atBats)}</div></div>
-                        <div><strong>H</strong><div>{safeNumber(entry.hitting?.hits)}</div></div>
-                        <div><strong>HR</strong><div>{safeNumber(entry.hitting?.homeRuns)}</div></div>
-                        <div><strong>R</strong><div>{safeNumber(entry.hitting?.runs)}</div></div>
-                        <div><strong><StatLabel abbr="RBI" /></strong><div>{safeNumber(entry.hitting?.rbi)}</div></div>
-                        <div><strong><StatLabel abbr="BB" /></strong><div>{safeNumber(entry.hitting?.walks)}</div></div>
-                        <div><strong>SO</strong><div>{safeNumber(entry.hitting?.strikeouts)}</div></div>
-                        <div><strong>OUT</strong><div>{safeNumber(entry.hitting?.outs)}</div></div>
-                        <div><strong><StatLabel abbr="AVG" /></strong><div>{entry.avg ? Number(entry.avg).toFixed(3) : avgFromEntry(entry)}</div></div>
-                        <div><strong><StatLabel abbr="OBP" /></strong><div>{obpFromHitting(entry.hitting)}</div></div>
+                        {HITTER_COLS.map(({ label, get }) => (
+                          <div key={label}>
+                            <strong><StatLabel abbr={label} /></strong>
+                            <div>{get(entry)}</div>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="stat-grid">
