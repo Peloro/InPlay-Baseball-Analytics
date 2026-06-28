@@ -5,19 +5,31 @@ import { EMPTY_HITTING, EMPTY_PITCHING, EMPTY_DEFENSE } from '../constants/stats
 // All data lives in localStorage. The app works offline from first launch.
 // When VITE_API_URL is set and the device is online, changes sync in the background.
 
+const AUTH_KEY = 'baseball_auth_v1'
+
+export function getAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null') } catch { return null }
+}
+
+// Logical key names — the actual localStorage key is prefixed with teamId via lsKey()
 const LS = {
-  players:   'baseball_lf_players_v1',
-  games:     'baseball_lf_games_v1',
-  gameStats: 'baseball_lf_gamestats_v1',
-  syncQueue: 'baseball_lf_syncqueue_v1',
+  players:   'players',
+  games:     'games',
+  gameStats: 'gamestats',
+  syncQueue: 'syncqueue',
+}
+
+function lsKey(name) {
+  const teamId = getAuth()?.teamId || 'local'
+  return `baseball_lf_${teamId}_${name}_v1`
 }
 
 function lfGet(key) {
-  try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
+  try { return JSON.parse(localStorage.getItem(lsKey(key)) || '[]') } catch { return [] }
 }
 
 function lfSet(key, data) {
-  try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
+  try { localStorage.setItem(lsKey(key), JSON.stringify(data)) } catch {}
 }
 
 function uid() {
@@ -34,12 +46,12 @@ function safeN(v) {
   if (localStorage.getItem('_lf_v1_done')) return
   try {
     const rawPlayers = localStorage.getItem('baseball_api_v1_/players')
-    if (rawPlayers && !localStorage.getItem(LS.players)) {
-      localStorage.setItem(LS.players, rawPlayers)
+    if (rawPlayers && !localStorage.getItem(lsKey(LS.players))) {
+      localStorage.setItem(lsKey(LS.players), rawPlayers)
     }
     const rawGames = localStorage.getItem('baseball_api_v1_/games')
-    if (rawGames && !localStorage.getItem(LS.games)) {
-      localStorage.setItem(LS.games, rawGames)
+    if (rawGames && !localStorage.getItem(lsKey(LS.games))) {
+      localStorage.setItem(lsKey(LS.games), rawGames)
     }
   } catch {}
   localStorage.setItem('_lf_v1_done', '1')
@@ -52,6 +64,53 @@ const BACKEND = import.meta.env.VITE_API_URL
 const http = (BACKEND && !BACKEND.includes('YOUR_BACKEND'))
   ? axios.create({ baseURL: BACKEND, timeout: 35000 })
   : null
+
+if (http) {
+  // 2.2 — attach Bearer token to every request
+  http.interceptors.request.use(cfg => {
+    const auth = getAuth()
+    if (auth?.token) cfg.headers.Authorization = `Bearer ${auth.token}`
+    return cfg
+  })
+
+  // 2.3 — on 401 clear auth and signal the app to show login screen
+  http.interceptors.response.use(
+    res => res,
+    err => {
+      if (err?.response?.status === 401) {
+        localStorage.removeItem(AUTH_KEY)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('baseball:logout'))
+        }
+      }
+      return Promise.reject(err)
+    }
+  )
+}
+
+// ── Auth helpers ──────────────────────────────────────────────────
+
+export async function login(email, password) {
+  if (!http) throw new Error('Backend não configurado.')
+  const res = await http.post('/auth/login', { email, password })
+  localStorage.setItem(AUTH_KEY, JSON.stringify(res.data))
+  return res.data
+}
+
+export function logout() {
+  const auth = getAuth()
+  const teamId = auth?.teamId
+  if (teamId) {
+    const prefix = `baseball_lf_${teamId}_`
+    const keys = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k?.startsWith(prefix)) keys.push(k)
+    }
+    keys.forEach(k => localStorage.removeItem(k))
+  }
+  localStorage.removeItem(AUTH_KEY)
+}
 
 async function netGet(url, params) {
   if (!http) return null

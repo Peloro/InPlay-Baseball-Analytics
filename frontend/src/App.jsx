@@ -4,7 +4,8 @@ import StatsPage from './pages/StatsPage'
 const FieldPage = lazy(() => import('./pages/FieldPage'))
 const TrainingField = lazy(() => import('./pages/TrainingField'))
 const JogadoresPage = lazy(() => import('./pages/JogadoresPage'))
-import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus } from './services/api'
+import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus, getAuth, logout } from './services/api'
+import LoginPage from './pages/LoginPage'
 import { addInningRuns } from './utils/stats'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
@@ -215,6 +216,7 @@ async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
 }
 
 function App() {
+  const [auth, setAuth] = useState(getAuth)
   const [page, setPage] = useState('stats')
   const [activeTool, setActiveTool] = useState('mouse')
   const [showTrainingHud, setShowTrainingHud] = useState(true)
@@ -282,11 +284,25 @@ function App() {
     }
   }, [])
 
-  // On mount: load local data immediately, then sync with server in background
+  // On mount (and after login): load local data immediately, then sync with server
   useEffect(() => {
+    if (!auth) return
     loadPlayers()
     syncWithServer().catch(() => {})
-  }, [loadPlayers])
+  }, [loadPlayers, auth])
+
+  // Handle forced logout from 401 interceptor
+  useEffect(() => {
+    const onLogout = () => {
+      setAuth(null)
+      setPlayers([])
+      setGameState(INITIAL_GAME_STATE)
+      setActiveGame(null)
+      setPage('stats')
+    }
+    window.addEventListener('baseball:logout', onLogout)
+    return () => window.removeEventListener('baseball:logout', onLogout)
+  }, [])
 
   // React to sync events: update status indicator and re-load players after sync
   useEffect(() => {
@@ -851,6 +867,18 @@ function App() {
     window.setTimeout(() => setIsGameEntering(false), 280)
   }, [])
 
+  const handleLogout = useCallback(() => {
+    logout()
+    try { window.localStorage.removeItem(GAME_STATE_STORAGE_KEY) } catch {}
+    setAuth(null)
+    setPlayers([])
+    setGameState(INITIAL_GAME_STATE)
+    setActiveGame(null)
+    setPage('stats')
+  }, [])
+
+  if (!auth) return <LoginPage onLogin={(a) => setAuth(a)} />
+
   return (
     <main className={`app-shell ${isGameEntering ? 'app-entering-game' : ''} ${navCollapsed ? 'nav-collapsed' : ''}`}>
       {navCollapsed && (
@@ -921,6 +949,16 @@ function App() {
             <span className="nav-label-short">Stats</span>
           </button>
         </nav>
+        <button
+          type="button"
+          className="nav-logout-btn"
+          onClick={handleLogout}
+          aria-label="Sair"
+          title="Sair"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '0.75rem', padding: '0.25rem 0.5rem', borderRadius: '0.375rem' }}
+        >
+          Sair
+        </button>
         <button type="button" className="nav-toggle-btn" onClick={() => setNavCollapsed(true)} aria-label="Ocultar navegação">▲</button>
       </header>
 
