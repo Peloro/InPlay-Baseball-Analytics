@@ -4,6 +4,7 @@ const numberField = { type: Number, default: 0, min: 0 }
 
 const gameStatSchema = new mongoose.Schema(
   {
+    teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
     gameId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Game',

@@ -3,6 +3,7 @@ const { VALID_POSITIONS } = require('../constants/positions')
 
 const playerSchema = new mongoose.Schema(
   {
+    teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
     name: { type: String, required: true, trim: true },
     number: { type: Number, required: true },
     positions: {

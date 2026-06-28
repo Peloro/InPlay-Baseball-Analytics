@@ -8,7 +8,7 @@ const router = express.Router()
 
 router.get('/', async (req, res) => {
   try {
-    const players = await Player.find().sort({ number: 1 })
+    const players = await Player.find({ teamId: req.user.teamId }).sort({ number: 1 })
     const normalized = players.map((player) => {
       const source = player.toObject()
       const positions = Array.isArray(source.positions)
@@ -57,6 +57,7 @@ router.post('/', async (req, res) => {
     }
 
     const player = await Player.create({
+      teamId: req.user.teamId,
       name,
       number,
       positions: normalizedPositions,
@@ -95,15 +96,15 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'activePosition deve estar dentro de positions.' })
     }
 
-    const updated = await Player.findByIdAndUpdate(
-      req.params.id,
+    const updated = await Player.findOneAndUpdate(
+      { _id: req.params.id, teamId: req.user.teamId },
       {
         name,
         number,
         positions: normalizedPositions,
         activePosition: normalizedActivePosition,
       },
-        { returnDocument: 'after' },
+      { returnDocument: 'after' },
     )
 
     if (!updated) {
@@ -124,13 +125,13 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({ message: 'id invalido.' })
     }
 
-    const deleted = await Player.findByIdAndDelete(id)
+    const deleted = await Player.findOneAndDelete({ _id: id, teamId: req.user.teamId })
 
     if (!deleted) {
       return res.status(404).json({ message: 'Jogador nao encontrado.' })
     }
 
-    await GameStat.deleteMany({ playerId: id })
+    await GameStat.deleteMany({ playerId: id, teamId: req.user.teamId })
 
     return res.status(204).send()
   } catch (error) {

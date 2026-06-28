@@ -3,11 +3,13 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 const mongoose = require('mongoose')
 
+const authRouter = require('./routes/auth')
 const playersRouter = require('./routes/players')
 const statsRouter = require('./routes/stats')
 const gamesRouter = require('./routes/games')
 const gameStatsRouter = require('./routes/gameStats')
 const seasonStatsRouter = require('./routes/seasonStats')
+const authMiddleware = require('./middleware/auth')
 
 dotenv.config()
 
@@ -21,11 +23,13 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'baseball-api' })
 })
 
-app.use('/players', playersRouter)
-app.use('/stats', statsRouter)
-app.use('/games', gamesRouter)
-app.use('/game-stats', gameStatsRouter)
-app.use('/season-stats', seasonStatsRouter)
+app.use('/auth', authRouter)
+
+app.use('/players', authMiddleware, playersRouter)
+app.use('/stats', authMiddleware, statsRouter)
+app.use('/games', authMiddleware, gamesRouter)
+app.use('/game-stats', authMiddleware, gameStatsRouter)
+app.use('/season-stats', authMiddleware, seasonStatsRouter)
 
 async function startServer() {
   try {

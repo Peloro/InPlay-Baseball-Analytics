@@ -7,7 +7,7 @@ const router = express.Router()
 router.get('/', async (req, res) => {
   try {
     const playerFilter = req.query.playerId
-    const match = {}
+    const match = { teamId: new mongoose.Types.ObjectId(req.user.teamId) }
 
     if (playerFilter && mongoose.Types.ObjectId.isValid(playerFilter)) {
       match.playerId = new mongoose.Types.ObjectId(playerFilter)

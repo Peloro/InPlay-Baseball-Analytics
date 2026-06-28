@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const gameSchema = new mongoose.Schema(
   {
+    teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
     gameId: {
       type: String,
       default() {

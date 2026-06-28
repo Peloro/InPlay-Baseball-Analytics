@@ -6,7 +6,7 @@ const router = express.Router()
 
 router.get('/', async (req, res) => {
   try {
-    const stats = await Stat.find().sort({ updatedAt: -1 })
+    const stats = await Stat.find({ teamId: req.user.teamId }).sort({ updatedAt: -1 })
     res.json(stats)
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar estatisticas.' })
@@ -22,9 +22,10 @@ router.put('/', async (req, res) => {
     }
 
     const stat = await Stat.findOneAndUpdate(
-      { playerId },
+      { playerId, teamId: req.user.teamId },
       {
         playerId,
+        teamId: req.user.teamId,
         atBats: Number(atBats),
         hits: Number(hits),
         strikeouts: Number(strikeouts),

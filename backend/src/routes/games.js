@@ -58,6 +58,7 @@ router.post('/', async (req, res) => {
     }
 
     const game = await Game.create({
+      teamId: req.user.teamId,
       gameId: undefined,
       date: new Date(date),
       opponent: safeOpponentName,
@@ -75,7 +76,7 @@ router.post('/', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const games = await Game.find().sort({ date: -1, competition: 1 })
+    const games = await Game.find({ teamId: req.user.teamId }).sort({ date: -1, competition: 1 })
     res.json(games)
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar jogos.' })
@@ -84,7 +85,7 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const game = await Game.findById(req.params.id)
+    const game = await Game.findOne({ _id: req.params.id, teamId: req.user.teamId })
     if (!game) return res.status(404).json({ message: 'Jogo nao encontrado.' })
     res.json(game)
   } catch (error) {
@@ -109,7 +110,7 @@ router.put('/:id', async (req, res) => {
 
     Object.assign(update, setup)
 
-    const game = await Game.findByIdAndUpdate(req.params.id, update, {
+    const game = await Game.findOneAndUpdate({ _id: req.params.id, teamId: req.user.teamId }, update, {
       returnDocument: 'after',
       runValidators: true,
     })
@@ -129,10 +130,10 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({ message: 'id invalido.' })
     }
 
-    const deleted = await Game.findByIdAndDelete(id)
+    const deleted = await Game.findOneAndDelete({ _id: id, teamId: req.user.teamId })
     if (!deleted) return res.status(404).json({ message: 'Jogo nao encontrado.' })
 
-    await GameStat.deleteMany({ gameId: id })
+    await GameStat.deleteMany({ gameId: id, teamId: req.user.teamId })
 
     return res.status(204).send()
   } catch (error) {

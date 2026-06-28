@@ -81,7 +81,7 @@ function mergeStatPayload(body = {}, current = EMPTY_STATS) {
 
 router.get('/', async (req, res) => {
   try {
-    const stats = await GameStat.find().sort({ updatedAt: -1 })
+    const stats = await GameStat.find({ teamId: req.user.teamId }).sort({ updatedAt: -1 })
     res.json(stats)
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar estatisticas.' })
@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'gameId e playerId validos sao obrigatorios.' })
     }
 
-    const player = await Player.findById(playerId).select('positions position')
+    const player = await Player.findOne({ _id: playerId, teamId: req.user.teamId }).select('positions position')
     const playerPositions = Array.isArray(player?.positions)
       ? player.positions
       : player?.position
@@ -108,6 +108,7 @@ router.post('/', async (req, res) => {
 
     const update = {
       $set: {
+        teamId: req.user.teamId,
         gameId,
         playerId,
         type: detectedType,
@@ -118,7 +119,7 @@ router.post('/', async (req, res) => {
     }
 
     const stat = await GameStat.findOneAndUpdate(
-      { gameId, playerId },
+      { gameId, playerId, teamId: req.user.teamId },
       update,
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     )
@@ -137,12 +138,12 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'id invalido.' })
     }
 
-    const existing = await GameStat.findById(id)
+    const existing = await GameStat.findOne({ _id: id, teamId: req.user.teamId })
     if (!existing) {
       return res.status(404).json({ message: 'Estatistica nao encontrada.' })
     }
 
-    const player = await Player.findById(existing.playerId).select('positions position')
+    const player = await Player.findOne({ _id: existing.playerId, teamId: req.user.teamId }).select('positions position')
     const playerPositions = Array.isArray(player?.positions)
       ? player.positions
       : player?.position
@@ -168,7 +169,7 @@ router.put('/:id', async (req, res) => {
       delete update.$set
     }
 
-    const stat = await GameStat.findByIdAndUpdate(id, update, { returnDocument: 'after' })
+    const stat = await GameStat.findOneAndUpdate({ _id: id, teamId: req.user.teamId }, update, { returnDocument: 'after' })
 
     res.json(stat)
   } catch (error) {
@@ -185,7 +186,7 @@ router.get('/:gameId', async (req, res) => {
     }
 
     const playerId = req.query.playerId
-    const filter = { gameId }
+    const filter = { gameId, teamId: req.user.teamId }
 
     if (playerId && mongoose.Types.ObjectId.isValid(playerId)) {
       filter.playerId = playerId
