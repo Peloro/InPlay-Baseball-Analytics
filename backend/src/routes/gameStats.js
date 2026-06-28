@@ -6,7 +6,7 @@ const Player = require('../models/Player')
 const router = express.Router()
 
 const EMPTY_STATS = {
-  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0 },
+  hitting: { atBats: 0, hits: 0, strikeouts: 0, outs: 0, walks: 0, runs: 0, rbi: 0, homeRuns: 0 },
   pitching: {
     inningsPitched: 0,
     outsPitched: 0,
@@ -16,6 +16,8 @@ const EMPTY_STATS = {
     strikes: 0,
     balls: 0,
     pitchCount: 0,
+    hitsAllowed: 0,
+    pitchTypes: { FB: 0, CV: 0, SL: 0, CH: 0, SI: 0, CT: 0, other: 0 },
   },
   defense: { errors: 0, doublePlays: 0, flyOuts: 0, groundOuts: 0, lineOuts: 0 },
 }
@@ -28,25 +30,39 @@ function toSafeStatValue(value) {
 
 function mergeStatPayload(body = {}, current = EMPTY_STATS) {
   const hitting = {
-    atBats: toSafeStatValue(body.hitting?.atBats ?? body.atBats ?? current.hitting.atBats),
-    hits: toSafeStatValue(body.hitting?.hits ?? body.hits ?? current.hitting.hits),
-    strikeouts: toSafeStatValue(
-      body.hitting?.strikeouts ?? body.strikeouts ?? current.hitting.strikeouts,
-    ),
-    outs: toSafeStatValue(body.hitting?.outs ?? body.outs ?? current.hitting.outs),
+    atBats:     toSafeStatValue(body.hitting?.atBats     ?? body.atBats     ?? current.hitting.atBats),
+    hits:       toSafeStatValue(body.hitting?.hits       ?? body.hits       ?? current.hitting.hits),
+    strikeouts: toSafeStatValue(body.hitting?.strikeouts ?? body.strikeouts ?? current.hitting.strikeouts),
+    outs:       toSafeStatValue(body.hitting?.outs       ?? body.outs       ?? current.hitting.outs),
+    walks:      toSafeStatValue(body.hitting?.walks      ?? current.hitting.walks),
+    runs:       toSafeStatValue(body.hitting?.runs       ?? current.hitting.runs),
+    rbi:        toSafeStatValue(body.hitting?.rbi        ?? current.hitting.rbi),
+    homeRuns:   toSafeStatValue(body.hitting?.homeRuns   ?? current.hitting.homeRuns),
+  }
+
+  const curPitchTypes = current.pitching?.pitchTypes || {}
+  const bodyPitchTypes = body.pitching?.pitchTypes || {}
+  const pitchTypes = {
+    FB:    toSafeStatValue(bodyPitchTypes.FB    ?? curPitchTypes.FB),
+    CV:    toSafeStatValue(bodyPitchTypes.CV    ?? curPitchTypes.CV),
+    SL:    toSafeStatValue(bodyPitchTypes.SL    ?? curPitchTypes.SL),
+    CH:    toSafeStatValue(bodyPitchTypes.CH    ?? curPitchTypes.CH),
+    SI:    toSafeStatValue(bodyPitchTypes.SI    ?? curPitchTypes.SI),
+    CT:    toSafeStatValue(bodyPitchTypes.CT    ?? curPitchTypes.CT),
+    other: toSafeStatValue(bodyPitchTypes.other ?? curPitchTypes.other),
   }
 
   const pitching = {
-    inningsPitched: toSafeStatValue(
-      body.pitching?.inningsPitched ?? current.pitching.inningsPitched,
-    ),
-    outsPitched: toSafeStatValue(body.pitching?.outsPitched ?? current.pitching.outsPitched),
-    earnedRuns: toSafeStatValue(body.pitching?.earnedRuns ?? current.pitching.earnedRuns),
-    strikeouts: toSafeStatValue(body.pitching?.strikeouts ?? current.pitching.strikeouts),
-    walks: toSafeStatValue(body.pitching?.walks ?? current.pitching.walks),
-    strikes: toSafeStatValue(body.pitching?.strikes ?? current.pitching.strikes),
-    balls: toSafeStatValue(body.pitching?.balls ?? current.pitching.balls),
-    pitchCount: toSafeStatValue(body.pitching?.pitchCount ?? current.pitching.pitchCount),
+    inningsPitched: toSafeStatValue(body.pitching?.inningsPitched ?? current.pitching.inningsPitched),
+    outsPitched:    toSafeStatValue(body.pitching?.outsPitched    ?? current.pitching.outsPitched),
+    earnedRuns:     toSafeStatValue(body.pitching?.earnedRuns     ?? current.pitching.earnedRuns),
+    strikeouts:     toSafeStatValue(body.pitching?.strikeouts     ?? current.pitching.strikeouts),
+    walks:          toSafeStatValue(body.pitching?.walks          ?? current.pitching.walks),
+    strikes:        toSafeStatValue(body.pitching?.strikes        ?? current.pitching.strikes),
+    balls:          toSafeStatValue(body.pitching?.balls          ?? current.pitching.balls),
+    pitchCount:     toSafeStatValue(body.pitching?.pitchCount     ?? current.pitching.pitchCount),
+    hitsAllowed:    toSafeStatValue(body.pitching?.hitsAllowed    ?? current.pitching.hitsAllowed),
+    pitchTypes,
   }
 
   // Keep pitchCount coherent with pitch-by-pitch counters.

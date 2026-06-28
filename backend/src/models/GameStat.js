@@ -27,6 +27,10 @@ const gameStatSchema = new mongoose.Schema(
       hits: numberField,
       strikeouts: numberField,
       outs: numberField,
+      walks: numberField,
+      runs: numberField,
+      rbi: numberField,
+      homeRuns: numberField,
     },
     pitching: {
       inningsPitched: numberField,
@@ -37,6 +41,16 @@ const gameStatSchema = new mongoose.Schema(
       strikes: numberField,
       balls: numberField,
       pitchCount: numberField,
+      hitsAllowed: numberField,
+      pitchTypes: {
+        FB: numberField,
+        CV: numberField,
+        SL: numberField,
+        CH: numberField,
+        SI: numberField,
+        CT: numberField,
+        other: numberField,
+      },
     },
     defense: {
       errors: numberField,
