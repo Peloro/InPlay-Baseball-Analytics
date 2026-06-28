@@ -66,7 +66,7 @@ async function netWrite(method, url, data) {
     const res = method === 'delete'
       ? await http.delete(url)
       : await http[method](url, data)
-    return res.data
+    return res.data || {}  // 204 No Content → res.data="" (falsy) → treat as success
   } catch (e) {
     // 4xx = permanent client error, no point retrying (404 DELETE = already gone)
     if (e?.response?.status >= 400 && e?.response?.status < 500) return {}
