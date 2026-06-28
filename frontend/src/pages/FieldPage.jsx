@@ -256,6 +256,7 @@ function FieldPage({
   const [invalidFeedback, setInvalidFeedback] = useState('')
   const [pendingEndGame, setPendingEndGame] = useState(false)
   const [pendingRemoveRunner, setPendingRemoveRunner] = useState(null)
+  const [pendingSwap, setPendingSwap] = useState(null)
   const [pendingAutoEnd, setPendingAutoEnd] = useState(null)
   const [showGameSummary, setShowGameSummary] = useState(false)
   const [gameSummarySnapshot, setGameSummarySnapshot] = useState(null)
@@ -1231,6 +1232,79 @@ function FieldPage({
     await captureUndoSnapshot()
     onPitchAction?.(kind, { pitchType: selectedPitchType })
   }, [captureUndoSnapshot, gameState.currentPitcherId, onPitchAction, selectedPitchType, showInvalidAction])
+
+  const handlePitcherSelect = useCallback((nextId) => {
+    if (!nextId) return
+    const nextPitcher = playersById[nextId]
+    if (!nextPitcher) return
+
+    const fieldIdSet = new Set(gameState.onFieldPlayerIds || [])
+    const isOnField = fieldIdSet.has(nextId)
+    const pitcherCoord = getDefaultFieldPosition('P')
+
+    setPlayers(current =>
+      current.map(p => getPlayerId(p) === nextId ? { ...p, x: pitcherCoord.x, y: pitcherCoord.y } : p)
+    )
+
+    if (isOnField) {
+      onUpdateGameState(current => {
+        const nextPitchCounts = { ...(current.pitchCounts || {}) }
+        if (!Number.isFinite(nextPitchCounts[nextId])) nextPitchCounts[nextId] = 0
+        const nextLineup = (current.lineup || []).map(l =>
+          l.playerId === nextId ? { ...l, position: 'P' } : l
+        )
+        return { ...current, currentPitcherId: nextId, pitchCounts: nextPitchCounts, lineup: nextLineup }
+      }, 'Arremessador alterado')
+    } else {
+      const oldPitcherId = gameState.currentPitcherId
+      onUpdateGameState(current => {
+        const currentOnField = current.onFieldPlayerIds || []
+        const nextOnField = [...currentOnField.filter(id => id !== oldPitcherId), nextId]
+        const nextPitchCounts = { ...(current.pitchCounts || {}) }
+        if (!Number.isFinite(nextPitchCounts[nextId])) nextPitchCounts[nextId] = 0
+        const battingOrder = [...(current.battingOrder || [])]
+        if (oldPitcherId) {
+          const idx = battingOrder.findIndex(id => id === oldPitcherId)
+          if (idx >= 0) battingOrder[idx] = nextId
+          else if (!battingOrder.includes(nextId)) battingOrder.push(nextId)
+        } else if (!battingOrder.includes(nextId)) {
+          battingOrder.push(nextId)
+        }
+        const nextLineup = [
+          ...(current.lineup || []).filter(l => l.playerId !== oldPitcherId && l.playerId !== nextId),
+          { playerId: nextId, position: 'P' },
+        ]
+        const bench = players.map(p => getPlayerId(p)).filter(id => !nextOnField.includes(id))
+        const oldPitcherName = oldPitcherId ? (playersById[oldPitcherId]?.name || '?') : null
+        const subRecord = {
+          id: `sub_${Date.now()}`,
+          ts: Date.now(),
+          inning: current.inning || 1,
+          half: current.inningHalf || 'top',
+          playerInId: nextId,
+          playerInName: nextPitcher?.name || '',
+          position: 'P',
+          playerOutId: oldPitcherId || null,
+          playerOutName: oldPitcherName || '',
+        }
+        return {
+          ...current,
+          onFieldPlayerIds: Array.from(new Set(nextOnField)),
+          battingOrder,
+          lineup: nextLineup,
+          bench,
+          participantPlayerIds: [...nextOnField, ...bench],
+          currentPitcherId: nextId,
+          pitchCounts: nextPitchCounts,
+          substitutions: [...(current.substitutions || []), subRecord],
+          gameLog: [
+            ...(current.gameLog || []),
+            makeLogEntry(current, 'sub', `Sub pitcher: ${nextPitcher?.name || '?'}${oldPitcherName ? ` → ${oldPitcherName}` : ''}`),
+          ],
+        }
+      }, `${nextPitcher?.name || 'Jogador'} entrou como pitcher`)
+    }
+  }, [playersById, gameState.onFieldPlayerIds, gameState.currentPitcherId, players, setPlayers, onUpdateGameState, getPlayerId])
 
   const handleUndo = useCallback(async () => {
     const latest = undoStack[undoStack.length - 1]
@@ -2388,12 +2462,6 @@ function FieldPage({
         }
 
         if (drag.source === 'field' && inBench) {
-          if (gameState.preGameConfigured && currentOnField.length <= 9) {
-            showInvalidAction('Faça uma substituição em vez de remover o jogador')
-            setDragPreview(null)
-            setDropTarget(null)
-            return
-          }
           onUpdateGameState((current) => {
             const nextOnField = (current.onFieldPlayerIds || []).filter((id) => id !== drag.playerId)
             const battingOrder = (current.battingOrder || []).filter((id) => id !== drag.playerId)
@@ -2401,6 +2469,7 @@ function FieldPage({
             const bench = players
               .map((item) => getPlayerId(item))
               .filter((id) => !nextOnField.includes(id))
+            const nextCurrentPitcherId = drag.playerId === current.currentPitcherId ? null : current.currentPitcherId
 
             return {
               ...current,
@@ -2409,6 +2478,7 @@ function FieldPage({
               lineup,
               bench,
               participantPlayerIds: [...nextOnField, ...bench],
+              currentPitcherId: nextCurrentPitcherId,
             }
           }, `${player?.name || 'Jogador'} foi para o banco`)
         }
@@ -2421,7 +2491,7 @@ function FieldPage({
           const draggedId = drag.playerId
           const swapTarget = fieldPlayers.find(p => {
             const id = getPlayerId(p)
-            return id !== draggedId && Math.hypot(p.x - point.x, p.y - point.y) < 10
+            return id !== draggedId && Math.hypot(p.x - point.x, p.y - point.y) < 4
           })
           if (swapTarget) {
             const targetId = getPlayerId(swapTarget)
@@ -2432,28 +2502,33 @@ function FieldPage({
               const tp = targetLineupEntry.position
               const dpCoord = getDefaultFieldPosition(dp)
               const tpCoord = getDefaultFieldPosition(tp)
-              setPlayers((current) =>
-                current.map((p) => {
-                  const id = getPlayerId(p)
-                  if (id === draggedId) return { ...p, x: tpCoord.x, y: tpCoord.y }
-                  if (id === targetId) return { ...p, x: dpCoord.x, y: dpCoord.y }
-                  return p
-                }),
-              )
-              onUpdateGameState((current) => {
-                const nextLineup = (current.lineup || []).map(l => {
-                  if (l.playerId === draggedId) return { ...l, position: tp }
-                  if (l.playerId === targetId) return { ...l, position: dp }
-                  return l
-                })
-                const draggedName = playersById[draggedId]?.name || '?'
-                const targetName = swapTarget?.name || '?'
-                return {
-                  ...current,
-                  lineup: nextLineup,
-                  gameLog: [...(current.gameLog || []), makeLogEntry(current, 'swap', `Troca: ${draggedName} ↔ ${targetName}`)],
-                }
-              }, `Troca de posição`)
+              const draggedName = playersById[draggedId]?.name || '?'
+              const targetName = swapTarget?.name || '?'
+              setPendingSwap({
+                message: `Trocar ${draggedName} (${dp}) com ${targetName} (${tp})?`,
+                execute: () => {
+                  setPlayers((current) =>
+                    current.map((p) => {
+                      const id = getPlayerId(p)
+                      if (id === draggedId) return { ...p, x: tpCoord.x, y: tpCoord.y }
+                      if (id === targetId) return { ...p, x: dpCoord.x, y: dpCoord.y }
+                      return p
+                    }),
+                  )
+                  onUpdateGameState((current) => {
+                    const nextLineup = (current.lineup || []).map(l => {
+                      if (l.playerId === draggedId) return { ...l, position: tp }
+                      if (l.playerId === targetId) return { ...l, position: dp }
+                      return l
+                    })
+                    return {
+                      ...current,
+                      lineup: nextLineup,
+                      gameLog: [...(current.gameLog || []), makeLogEntry(current, 'swap', `Troca: ${draggedName} ↔ ${targetName}`)],
+                    }
+                  }, `Troca de posição`)
+                },
+              })
             }
           }
         }
@@ -2515,6 +2590,8 @@ function FieldPage({
 
   const focusedPlayer = focusedPlayerId ? playersById[focusedPlayerId] : null
   const pitchersOnField = pitchersFromHook || fieldPlayers.filter((player) => getMainPosition(player) === 'P')
+  const allPitchers = players.filter(p => Array.isArray(p.positions) && p.positions.includes('P'))
+  const onFieldIdSet = new Set(gameState.onFieldPlayerIds || [])
   const battingOrder = gameState.battingOrder || []
   const currentBatterId = battingOrder.length
     ? battingOrder[Math.min(gameState.currentBatterIndex || 0, battingOrder.length - 1)]
@@ -2769,19 +2846,17 @@ function FieldPage({
                 <select
                   className="acoes-pitcher-select"
                   value={gameState.currentPitcherId || ''}
-                  onChange={(event) => {
-                    const nextId = event.target.value || null
-                    onUpdateGameState((current) => {
-                      const nextPitchCounts = { ...(current.pitchCounts || {}) }
-                      if (nextId && !Number.isFinite(nextPitchCounts[nextId])) nextPitchCounts[nextId] = 0
-                      return { ...current, currentPitcherId: nextId, pitchCounts: nextPitchCounts }
-                    }, 'Arremessador alterado')
-                  }}
+                  onChange={(event) => handlePitcherSelect(event.target.value || null)}
                 >
-                  {!pitchersOnField.length && <option value="">Sem pitcher</option>}
-                  {pitchersOnField.map((player) => (
+                  {!allPitchers.length && <option value="">Sem pitcher</option>}
+                  {allPitchers.filter(p => onFieldIdSet.has(getPlayerId(p))).map(player => (
                     <option key={getPlayerId(player)} value={getPlayerId(player)}>
                       {player.name} #{player.number}
+                    </option>
+                  ))}
+                  {allPitchers.filter(p => !onFieldIdSet.has(getPlayerId(p))).map(player => (
+                    <option key={getPlayerId(player)} value={getPlayerId(player)}>
+                      {player.name} #{player.number} (banco)
                     </option>
                   ))}
                 </select>
@@ -3334,6 +3409,15 @@ function FieldPage({
           danger
           onConfirm={() => { const b = pendingRemoveRunner; setPendingRemoveRunner(null); removeRunner(b) }}
           onCancel={() => setPendingRemoveRunner(null)}
+        />
+      )}
+
+      {pendingSwap && (
+        <ConfirmModal
+          message={pendingSwap.message}
+          confirmLabel="Confirmar troca"
+          onConfirm={() => { pendingSwap.execute(); setPendingSwap(null) }}
+          onCancel={() => setPendingSwap(null)}
         />
       )}
 
