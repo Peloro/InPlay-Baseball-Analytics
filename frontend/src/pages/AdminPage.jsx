@@ -140,9 +140,9 @@ export default function AdminPage() {
     setCreateError('')
     setCreating(true)
     try {
-      const res = await api.post('/admin/teams', createForm)
-      setTeams(prev => [res.data, ...prev])
+      await api.post('/admin/teams', createForm)
       setCreateForm({ teamName: '', email: '', password: '' })
+      await loadTeams()
     } catch (err) {
       setCreateError(err.response?.data?.message || 'Erro ao criar equipe.')
     } finally {
@@ -278,10 +278,10 @@ export default function AdminPage() {
               }}
             >
               <div style={{ flex: 1, minWidth: '160px' }}>
-                <p style={{ fontWeight: 600 }}>{team.name}</p>
-                <p style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>{team.coachEmail}</p>
+                <p style={{ fontWeight: 600 }}>{team.name || '(sem nome)'}</p>
+                <p style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>{team.coachEmail || '—'}</p>
                 <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                  {new Date(team.createdAt).toLocaleDateString('pt-BR')}
+                  {team.createdAt ? new Date(team.createdAt).toLocaleDateString('pt-BR') : '—'}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>

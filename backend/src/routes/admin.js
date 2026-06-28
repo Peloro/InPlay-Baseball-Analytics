@@ -61,18 +61,18 @@ router.delete('/users/:id', async (req, res) => {
 router.get('/teams', async (req, res) => {
   try {
     const teams = await Team.find().sort({ createdAt: -1 }).lean()
-    const coaches = await User.find({ role: 'coach' }).select('email teamId').lean()
-    const coachByTeam = {}
-    for (const c of coaches) coachByTeam[String(c.teamId)] = c.email
+    const users = await User.find().select('email teamId').lean()
+    const emailByTeam = {}
+    for (const u of users) emailByTeam[String(u.teamId)] = u.email
 
     res.json(teams.map(t => ({
       _id: t._id,
-      name: t.name,
-      status: t.status,
-      billingStatus: t.billingStatus,
-      billingNotes: t.billingNotes,
-      createdAt: t.createdAt,
-      coachEmail: coachByTeam[String(t._id)] || '—',
+      name: t.name || '—',
+      status: t.status || 'active',
+      billingStatus: t.billingStatus || 'trial',
+      billingNotes: t.billingNotes || '',
+      createdAt: t.createdAt || null,
+      coachEmail: emailByTeam[String(t._id)] || '—',
     })))
   } catch {
     res.status(500).json({ message: 'Erro ao listar equipes.' })
