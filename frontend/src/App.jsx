@@ -233,11 +233,14 @@ function App() {
   const isOffline = syncStatus === 'offline'
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
-    } catch {
-      // QuotaExceededError — state remains in memory; localStorage full
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState))
+      } catch {
+        // QuotaExceededError — state remains in memory; localStorage full
+      }
+    }, 350)
+    return () => window.clearTimeout(timer)
   }, [gameState])
 
   // Load players from local storage into React state

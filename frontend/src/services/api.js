@@ -295,7 +295,7 @@ export const gamesApi = {
         const idx = list.findIndex(g => g._id === id || g.id === id)
         if (idx !== -1) { list[idx] = data; lfSet(LS.games, list) }
         else lfSet(LS.games, [...list, data])
-      })
+      }).catch(() => {})
     }
     return { data: game }
   },
@@ -398,7 +398,8 @@ export const gameStatsApi = {
 export const seasonStatsApi = {
   list(playerId) {
     const all = lfGet(LS.gameStats)
-    const source = playerId ? all.filter(s => s.playerId === playerId) : all
+    const normPid = playerId ? String(playerId?._id || playerId) : null
+    const source = normPid ? all.filter(s => String(s.playerId?._id || s.playerId) === normPid) : all
 
     const byPlayer = {}
     for (const stat of source) {
@@ -407,7 +408,7 @@ export const seasonStatsApi = {
         byPlayer[pid] = {
           playerId: pid,
           hitting:  { ...EMPTY_HITTING },
-          pitching: { ...EMPTY_PITCHING },
+          pitching: { ...EMPTY_PITCHING, pitchTypes: { ...EMPTY_PITCHING.pitchTypes } },
           defense:  { ...EMPTY_DEFENSE },
           roleSummary: { hitterGames: 0, pitcherGames: 0 },
         }

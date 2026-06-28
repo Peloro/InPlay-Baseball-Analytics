@@ -3523,6 +3523,90 @@ html {
 .pitch-limit-alert--near { background: rgba(90,60,0,0.7); color: #ffcc66; border: 1px solid #7a5500; }
 .pitch-limit-alert--over { background: rgba(100,10,10,0.85); color: #ff9999; border: 1px solid #8a1010; animation: sync-pulse 0.8s ease-in-out infinite; }
 
+/* ── Current batter season-stats panel ────────────────────────────── */
+.acoes-batter-stats {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.acoes-batter-stats-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--ink);
+  text-align: left;
+}
+
+.acoes-batter-stats-name {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acoes-batter-stats-name em {
+  font-style: normal;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.acoes-batter-stats-avg {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #d2a100;
+  letter-spacing: 0.03em;
+}
+
+.acoes-batter-stats-arrow {
+  font-size: 0.6rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.acoes-batter-stats-grid {
+  display: flex;
+  gap: 8px;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  padding: 4px 10px 6px;
+  border-top: 1px solid #222;
+}
+
+.acoes-batter-stats-grid > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.acoes-batter-stats-grid span {
+  font-size: 0.6rem;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.acoes-batter-stats-grid strong {
+  font-size: 0.85rem;
+  color: #f5f5f5;
+  font-weight: 700;
+}
+
+.acoes-batter-ondeck {
+  font-size: 0.65rem;
+  color: var(--muted);
+  padding: 3px 10px 5px;
+  border-top: 1px solid #1e1e1e;
+}
+
 /* Pitch type selector row */
 .pitch-type-selector {
   display: flex;

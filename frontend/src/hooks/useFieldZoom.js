@@ -20,12 +20,23 @@ export default function useFieldZoom({ fieldRect, fieldStageRef, activeTool }) {
   const [offsetX, setOffsetX] = useState(0)
   const [offsetY, setOffsetY] = useState(0)
 
+  // Mirror state into refs so the wheel/pointer handlers inside useEffect always
+  // read the current value without needing zoom/offsetX/offsetY in the dep array.
+  // Without this, every pan or zoom frame would tear down and re-add all 4 listeners.
+  const zoomRef = useRef(0.85)
+  const offsetXRef = useRef(0)
+  const offsetYRef = useRef(0)
+  zoomRef.current = zoom
+  offsetXRef.current = offsetX
+  offsetYRef.current = offsetY
+
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 })
   const isPinchingRef = useRef(false)
   const pinchRef = useRef({ initialDistance: 0, initialScale: 1, centerClientX: 0, centerClientY: 0, offsetX: 0, offsetY: 0 })
 
   // Touch (mobile) — pinch-to-zoom + one-finger pan
+  // These are recreated each render so they always close over fresh state values.
   const handleTouchStartMobile = (ev) => {
     if (!ev.touches) return
     if (ev.touches.length === 2) {
@@ -100,6 +111,7 @@ export default function useFieldZoom({ fieldRect, fieldStageRef, activeTool }) {
   }
 
   // Wheel zoom + pointer pan (desktop)
+  // Dep array excludes zoom/offsetX/offsetY — handlers read from refs instead.
   useEffect(() => {
     const el = fieldStageRef.current
     if (!el) return undefined
@@ -112,11 +124,14 @@ export default function useFieldZoom({ fieldRect, fieldStageRef, activeTool }) {
       const mouseX = ev.clientX - stageRect.left
       const mouseY = ev.clientY - stageRect.top
 
+      const curZoom = zoomRef.current
+      const curOffsetX = offsetXRef.current
+      const curOffsetY = offsetYRef.current
       const delta = ev.deltaY < 0 ? 1 : -1
-      const newZoom = Math.max(0.5, Math.min(2.5, Number((zoom * (1 + delta * 0.08)).toFixed(3))))
+      const newZoom = Math.max(0.5, Math.min(2.5, Number((curZoom * (1 + delta * 0.08)).toFixed(3))))
 
-      const contentX = (mouseX - offsetX) / zoom
-      const contentY = (mouseY - offsetY) / zoom
+      const contentX = (mouseX - curOffsetX) / curZoom
+      const contentY = (mouseY - curOffsetY) / curZoom
       const nextOffsetX = mouseX - contentX * newZoom
       const nextOffsetY = mouseY - contentY * newZoom
 
@@ -139,7 +154,7 @@ export default function useFieldZoom({ fieldRect, fieldStageRef, activeTool }) {
           ev.target.closest('.player-tooltip'))
       ) return
       isPanningRef.current = true
-      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX, offsetY }
+      panStartRef.current = { x: ev.clientX, y: ev.clientY, offsetX: offsetXRef.current, offsetY: offsetYRef.current }
       el.classList.add('grabbing')
       el.setPointerCapture?.(ev.pointerId)
     }
@@ -150,8 +165,8 @@ export default function useFieldZoom({ fieldRect, fieldStageRef, activeTool }) {
       const dy = ev.clientY - panStartRef.current.y
       requestAnimationFrame(() => {
         const stageRect = fieldStageRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
-        setOffsetX(clampOffset(panStartRef.current.offsetX + dx, stageRect.width, fieldRect.width * zoom))
-        setOffsetY(clampOffset(panStartRef.current.offsetY + dy, stageRect.height, fieldRect.height * zoom))
+        setOffsetX(clampOffset(panStartRef.current.offsetX + dx, stageRect.width, fieldRect.width * zoomRef.current))
+        setOffsetY(clampOffset(panStartRef.current.offsetY + dy, stageRect.height, fieldRect.height * zoomRef.current))
       })
     }
 
@@ -174,7 +189,7 @@ export default function useFieldZoom({ fieldRect, fieldStageRef, activeTool }) {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
     }
-  }, [fieldStageRef, zoom, offsetX, offsetY, activeTool, fieldRect])
+  }, [fieldStageRef, activeTool, fieldRect])
 
   return {
     zoom,

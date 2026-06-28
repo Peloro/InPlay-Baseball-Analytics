@@ -264,6 +264,7 @@ function FieldPage({
   const [pendingAutoEnd, setPendingAutoEnd] = useState(null)
   const [showGameSummary, setShowGameSummary] = useState(false)
   const [gameSummarySnapshot, setGameSummarySnapshot] = useState(null)
+  const [batterStatsCollapsed, setBatterStatsCollapsed] = useState(false)
   const autoEndShownRef = useRef(null)
   const [showFieldContainer] = useState(true)
   const [showScoreboard, setShowScoreboard] = useState(false)
@@ -2346,6 +2347,14 @@ function FieldPage({
     [defensivePlayers, getPlayerId, getMainPosition],
   )
 
+  const batterSeasonStats = useMemo(() => {
+    if (!currentBatterId || !gameState.isAttacking) return null
+    const { data } = seasonStatsApi.list()
+    return data.find(s => s.playerId === currentBatterId) || null
+  // statsRefreshKey ensures the memo updates after any stat write completes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBatterId, gameState.isAttacking, statsRefreshKey])
+
   return (
       <section className={`field-layout ${showFieldContainer ? '' : 'mode-hidden'}`} ref={layoutRef}>
         <div
@@ -2768,6 +2777,45 @@ function FieldPage({
                 </>
               )}
             </div>
+
+            {gameState.isAttacking && currentBatter && (() => {
+              const h = batterSeasonStats?.hitting || {}
+              const avg = batterSeasonStats?.avg
+              const kPct = h.atBats ? Math.round(safeNumber(h.strikeouts) / h.atBats * 100) : null
+              const fmtAvg = avg != null ? avg.toFixed(3).replace(/^0/, '') : '---'
+              return (
+                <div className="acoes-batter-stats">
+                  <button
+                    type="button"
+                    className="acoes-batter-stats-toggle"
+                    onClick={() => setBatterStatsCollapsed(c => !c)}
+                  >
+                    <span className="acoes-batter-stats-name">
+                      {currentBatter.name} <em>#{currentBatter.number}</em>
+                    </span>
+                    <span className="acoes-batter-stats-avg">{fmtAvg}</span>
+                    <span className="acoes-batter-stats-arrow">{batterStatsCollapsed ? '▶' : '▼'}</span>
+                  </button>
+                  {!batterStatsCollapsed && (
+                    <>
+                      <div className="acoes-batter-stats-grid">
+                        <div><span>AVG</span><strong>{fmtAvg}</strong></div>
+                        <div><span>HR</span><strong>{safeNumber(h.homeRuns)}</strong></div>
+                        <div><span>RBI</span><strong>{safeNumber(h.rbi)}</strong></div>
+                        <div><span>K%</span><strong>{kPct !== null ? `${kPct}%` : '---'}</strong></div>
+                        <div><span>H</span><strong>{safeNumber(h.hits)}</strong></div>
+                        <div><span>AB</span><strong>{safeNumber(h.atBats)}</strong></div>
+                      </div>
+                      {onDeckBatter && onDeckBatter !== currentBatter && (
+                        <div className="acoes-batter-ondeck">
+                          On deck: {onDeckBatter.name} #{onDeckBatter.number}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })()}
 
             {!gameState.isAttacking && (() => {
               const pitcherPitches = gameState.currentPitcherId && gameState.pitchCounts
