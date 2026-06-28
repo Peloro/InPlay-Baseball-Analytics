@@ -29,33 +29,8 @@ function sanitizeSetupPayload(body = {}) {
     payload.bench = body.bench.map((id) => String(id || '').trim()).filter(Boolean)
   }
 
-  if (body.gameState && typeof body.gameState === 'object') {
-    const state = body.gameState
-    payload.gameState = {
-      inning: Number(state.inning || 1),
-      inningHalf: state.inningHalf === 'bottom' ? 'bottom' : 'top',
-      outs: Number(state.outs || 0),
-      balls: Number(state.balls || 0),
-      strikes: Number(state.strikes || 0),
-      pitchCount: Number(state.pitchCount || 0),
-      homeScore: Number(state.homeScore || 0),
-      awayScore: Number(state.awayScore || 0),
-      isAttacking: typeof state.isAttacking === 'boolean' ? state.isAttacking : true,
-      onFieldPlayerIds: Array.isArray(state.onFieldPlayerIds)
-        ? state.onFieldPlayerIds.map((id) => String(id || '').trim()).filter(Boolean)
-        : [],
-      participantPlayerIds: Array.isArray(state.participantPlayerIds)
-        ? state.participantPlayerIds.map((id) => String(id || '').trim()).filter(Boolean)
-        : [],
-      currentBatterIndex: Number(state.currentBatterIndex || 0),
-      currentPitcherId: String(state.currentPitcherId || '').trim(),
-      runners: {
-        first: Boolean(state.runners?.first),
-        second: Boolean(state.runners?.second),
-        third: Boolean(state.runners?.third),
-      },
-      preGameConfigured: Boolean(state.preGameConfigured),
-    }
+  if (body.gameState && typeof body.gameState === 'object' && !Array.isArray(body.gameState)) {
+    payload.gameState = body.gameState
   }
 
   if (typeof body.isFinished === 'boolean') {

@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
               0,
               {
                 $divide: [
-                  { $multiply: ['$pitchingEarnedRuns', 21] },
+                  { $multiply: ['$pitchingEarnedRuns', 27] },
                   '$pitchingOutsPitched',
                 ],
               },

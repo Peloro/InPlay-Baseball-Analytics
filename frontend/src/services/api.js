@@ -370,11 +370,8 @@ export const gameStatsApi = {
       all[idx] = record
       lfSet(LS.gameStats, all)
       const id = record._id
-      // netWrite never rejects (catches internally, returns null on failure),
-      // so .catch() is unreachable — use .then() to detect null (offline) result.
       netWrite('put', `/game-stats/${id}`, payload)
         .then(synced => { if (!synced) queueSync('put', `/game-stats/${id}`, payload, id) })
-        .catch(() => queueSync('put', `/game-stats/${id}`, payload, id))
     } else {
       record = { _id: uid(), gameId, playerId: pid, ...payload }
       const localId = record._id
@@ -389,7 +386,6 @@ export const gameStatsApi = {
             queueSync('post', '/game-stats', { gameId, playerId: pid, ...payload }, localId)
           }
         })
-        .catch(() => queueSync('post', '/game-stats', { gameId, playerId: pid, ...payload }, localId))
     }
 
     return { data: record }
