@@ -7,6 +7,7 @@ const JogadoresPage = lazy(() => import('./pages/JogadoresPage'))
 import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus, getAuth, logout } from './services/api'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
+import AdminPage from './pages/AdminPage'
 import { addInningRuns } from './utils/stats'
 import { VALID_POSITIONS } from './data/positions'
 import './App.css'
@@ -14,6 +15,15 @@ import Button from './components/ui/Button'
 import { getPlayerId } from './utils/player'
 
 const GAME_STATE_STORAGE_KEY = 'baseball_game_state_v2'
+
+function decodeRole(auth) {
+  try {
+    if (!auth?.token) return null
+    return JSON.parse(atob(auth.token.split('.')[1])).role || null
+  } catch {
+    return null
+  }
+}
 
 function advanceOpponentLineup(current) {
   const lineup = Array.isArray(current.opponentLineup) ? [...current.opponentLineup] : []
@@ -218,6 +228,7 @@ async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
 
 function App() {
   const [auth, setAuth] = useState(getAuth)
+  const role = decodeRole(auth)
   const [page, setPage] = useState('stats')
   const [activeTool, setActiveTool] = useState('mouse')
   const [showTrainingHud, setShowTrainingHud] = useState(true)
@@ -958,6 +969,17 @@ function App() {
             <span className="nav-label-full">Ajustes</span>
             <span className="nav-label-short">Ajustes</span>
           </button>
+          {role === 'admin' && (
+            <button
+              type="button"
+              className={page === 'admin' ? 'active' : ''}
+              aria-selected={page === 'admin'}
+              onClick={() => setPage('admin')}
+            >
+              <span className="nav-label-full">Admin</span>
+              <span className="nav-label-short">Admin</span>
+            </button>
+          )}
         </nav>
         <button
           type="button"
@@ -1036,6 +1058,8 @@ function App() {
         />
       ) : page === 'settings' ? (
         <SettingsPage onLogout={handleLogout} />
+      ) : page === 'admin' && role === 'admin' ? (
+        <AdminPage />
       ) : (
         <StatsPage
           players={players}

@@ -37,15 +37,9 @@ router.post('/register', authLimiter, registerRules, validate, async (req, res) 
 
     const team = await Team.create({ name: teamName })
     const passwordHash = await bcrypt.hash(password, 12)
-    const user = await User.create({ email, passwordHash, teamId: team._id, role: 'coach' })
+    await User.create({ email, passwordHash, teamId: team._id, role: 'coach', status: 'pending' })
 
-    const token = jwt.sign(
-      { userId: user._id, teamId: team._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
-    )
-
-    res.status(201).json({ token, teamId: team._id, teamName: team.name, email: user.email })
+    res.status(201).json({ message: 'Conta criada! Aguardando aprovação do administrador.' })
   } catch (error) {
     res.status(500).json({ message: 'Erro ao registrar.' })
   }
@@ -60,6 +54,10 @@ router.post('/login', authLimiter, loginRules, validate, async (req, res) => {
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ message: 'Credenciais invalidas.' })
+
+    if (user.status === 'pending') {
+      return res.status(403).json({ message: 'Conta aguardando aprovação do administrador.' })
+    }
 
     const team = await Team.findById(user.teamId).select('name')
 

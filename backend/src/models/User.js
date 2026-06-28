@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
     role: { type: String, enum: ['coach', 'admin'], default: 'coach' },
+    status: { type: String, enum: ['pending', 'active'], default: 'pending' },
   },
   { timestamps: true }
 )

@@ -97,6 +97,12 @@ export async function login(email, password) {
   return res.data
 }
 
+export async function register(teamName, email, password) {
+  if (!http) throw new Error('Backend não configurado.')
+  const res = await http.post('/auth/register', { teamName, email, password })
+  return res.data
+}
+
 export function logout() {
   const auth = getAuth()
   const teamId = auth?.teamId
