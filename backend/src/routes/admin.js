@@ -1,5 +1,4 @@
 const express = require('express')
-const bcrypt = require('bcrypt')
 const Team = require('../models/Team')
 const User = require('../models/User')
 const Player = require('../models/Player')
@@ -76,37 +75,6 @@ router.get('/teams', async (req, res) => {
     })))
   } catch {
     res.status(500).json({ message: 'Erro ao listar equipes.' })
-  }
-})
-
-router.post('/teams', async (req, res) => {
-  try {
-    const { teamName, email, password } = req.body
-    if (!teamName || !email || !password) {
-      return res.status(400).json({ message: 'teamName, email e password sao obrigatorios.' })
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Senha deve ter no minimo 8 caracteres.' })
-    }
-
-    const existing = await User.findOne({ email })
-    if (existing) return res.status(409).json({ message: 'Email ja cadastrado.' })
-
-    const team = await Team.create({ name: teamName })
-    const passwordHash = await bcrypt.hash(password, 12)
-    await User.create({ email, passwordHash, teamId: team._id, role: 'coach' })
-
-    res.status(201).json({
-      _id: team._id,
-      name: team.name,
-      status: team.status,
-      billingStatus: team.billingStatus,
-      billingNotes: team.billingNotes,
-      createdAt: team.createdAt,
-      coachEmail: email,
-    })
-  } catch {
-    res.status(500).json({ message: 'Erro ao criar equipe.' })
   }
 })
 

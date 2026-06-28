@@ -76,10 +76,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [createForm, setCreateForm] = useState({ teamName: '', email: '', password: '' })
-  const [createError, setCreateError] = useState('')
-  const [creating, setCreating] = useState(false)
-
   const [billingTeam, setBillingTeam] = useState(null)
   const [billingForm, setBillingForm] = useState({ billingStatus: 'trial', billingNotes: '' })
   const [savingBilling, setSavingBilling] = useState(false)
@@ -132,21 +128,6 @@ export default function AdminPage() {
       setPending(prev => prev.filter(u => u._id !== user._id))
     } catch {
       alert('Erro ao rejeitar.')
-    }
-  }
-
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    setCreateError('')
-    setCreating(true)
-    try {
-      await api.post('/admin/teams', createForm)
-      setCreateForm({ teamName: '', email: '', password: '' })
-      await loadTeams()
-    } catch (err) {
-      setCreateError(err.response?.data?.message || 'Erro ao criar equipe.')
-    } finally {
-      setCreating(false)
     }
   }
 
@@ -220,40 +201,6 @@ export default function AdminPage() {
           </div>
         </section>
       )}
-
-      <section style={{ background: '#1f2937', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Nova Equipe</h3>
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
-          <input
-            placeholder="Nome do time"
-            value={createForm.teamName}
-            onChange={e => setCreateForm(f => ({ ...f, teamName: e.target.value }))}
-            required
-            style={inputStyle}
-          />
-          <input
-            placeholder="Email do coach"
-            type="email"
-            value={createForm.email}
-            onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-            required
-            style={inputStyle}
-          />
-          <input
-            placeholder="Senha (min 8 chars)"
-            type="password"
-            value={createForm.password}
-            onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-            required
-            minLength={8}
-            style={inputStyle}
-          />
-          <button type="submit" disabled={creating} style={btnStyle('#3b82f6')}>
-            {creating ? 'Criando...' : 'Criar'}
-          </button>
-        </form>
-        {createError && <p style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.875rem' }}>{createError}</p>}
-      </section>
 
       {loading ? (
         <p style={{ color: '#9ca3af' }}>Carregando...</p>
