@@ -52,6 +52,7 @@ export default function Field({
   onTouchStartMobile,
   onTouchMoveMobile,
   onTouchEndMobile,
+  benchHoverTargetId = null,
 }) {
   const scale = fieldRect && fieldRect.width ? Math.max(FIELD_MIN_SCALE, Math.min(FIELD_MAX_SCALE, fieldRect.width / FIELD_BASE_WIDTH)) : 1
   // Invert marker scaling vs. camera zoom: when zoom increases markers get smaller
@@ -118,7 +119,7 @@ export default function Field({
             id={id}
               isOpponent={isOpponent}
               // Always use training-player sizing so both teams match training mode
-              className={'training-player'}
+              className={`training-player${benchHoverTargetId === id ? ' sub-target' : ''}`}
             screen={screen}
             tooltipId={selectedId}
             selectedId={selectedId}

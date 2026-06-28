@@ -215,6 +215,7 @@ function FieldPage({
   const longPressTimerRef = useRef(null)
   const dragStartRef = useRef(null)
   const suppressModalUntilRef = useRef(0)
+  const benchHoverTargetIdRef = useRef(null)
 
   const [selectedId, setSelectedId] = useState(null)
   const [, setTooltipId] = useState(null)
@@ -231,6 +232,7 @@ function FieldPage({
   const [recentlyDroppedId, setRecentlyDroppedId] = useState(null)
   const [dragSource, setDragSource] = useState(null)
   const [dropMessage, setDropMessage] = useState('')
+  const [benchHoverTargetId, setBenchHoverTargetId] = useState(null)
   const [runnerDrag, setRunnerDrag] = useState(null)
   const [animatedBall, setAnimatedBall] = useState({ visible: false, x: 50, y: 87 })
   const [editingPlayerId, setEditingPlayerId] = useState(null)
@@ -1926,7 +1928,19 @@ function FieldPage({
     setDragSource(source)
     setDraggingPlayerId(playerId)
     setSelectedId(playerId)
-    setDragPreview({ x: event.clientX, y: event.clientY, label: playersById[playerId]?.name || 'Jogador' })
+    {
+      const draggedPlayer = playersById[playerId]
+      const isBench = source === 'bench'
+      setDragPreview({
+        x: event.clientX,
+        y: event.clientY,
+        label: isBench
+          ? (draggedPlayer?.activePosition || draggedPlayer?.positions?.[0] || 'DH')
+          : (draggedPlayer?.name || 'Jogador'),
+        playerName: isBench ? (draggedPlayer?.name || '') : null,
+        playerNumber: isBench ? (draggedPlayer?.number ?? '') : null,
+      })
+    }
 
     // mark dragging state to disable transitions
     setIsDragging(true)
@@ -2020,13 +2034,35 @@ function FieldPage({
         if (drag.source === 'field' && inBench) {
           setDropMessage('Soltar para adicionar ao banco')
         } else if (drag.source === 'bench' && inField) {
-          const draggedPlayer = playersById[drag.playerId]
-          const hasConflict = (gameState.onFieldPlayerIds || []).some((id) => {
-            const existing = playersById[id]
-            return existing && draggedPlayer && getMainPosition(existing) === getMainPosition(draggedPlayer)
-          })
-          setDropMessage(hasConflict ? 'Confirmar substituicao' : 'Soltar para colocar no campo')
+          if (point) {
+            let nearest = null
+            let nearestDist = Infinity
+            for (const fp of fieldPlayers) {
+              const dist = Math.hypot(fp.x - point.x, fp.y - point.y)
+              if (dist < nearestDist) { nearestDist = dist; nearest = getPlayerId(fp) }
+            }
+            const hoverId = nearestDist <= 5 ? nearest : null
+            benchHoverTargetIdRef.current = hoverId
+            setBenchHoverTargetId(hoverId)
+            if (hoverId) {
+              const hoverPlayer = playersById[hoverId]
+              const targetEntry = (gameState.lineup || []).find((l) => l.playerId === hoverId)
+              const targetPos = targetEntry?.position || getMainPosition(hoverPlayer)
+              const isRec = playerPrefersPosition(drag.playerId, targetPos)
+              setDropMessage(`Substituir ${hoverPlayer?.name || '?'} (${targetPos})${isRec ? ' ★' : ''}`)
+            } else {
+              setDropMessage((gameState.onFieldPlayerIds || []).length < 9 ? 'Soltar para colocar no campo' : 'Arraste sobre um jogador para substituir')
+            }
+          } else {
+            benchHoverTargetIdRef.current = null
+            setBenchHoverTargetId(null)
+            setDropMessage('Soltar para colocar no campo')
+          }
         } else {
+          if (drag.source === 'bench') {
+            benchHoverTargetIdRef.current = null
+            setBenchHoverTargetId(null)
+          }
           setDropMessage('')
         }
       }
@@ -2069,21 +2105,22 @@ function FieldPage({
         const currentOnField = gameState.onFieldPlayerIds || []
 
         if (drag.source === 'bench' && inField && point) {
-          const defaultPosition = getDefaultFieldPosition(player?.activePosition)
+          const hoveredId = benchHoverTargetIdRef.current
 
-          const duplicateId = currentOnField.find((id) => {
-            const existing = playersById[id]
-            return existing && getMainPosition(existing) === getMainPosition(player)
-          })
+          const executeSubstitution = (incomingPlayer, replacedId, onField, overridePosition = null) => {
+            let positionToUse = overridePosition
+            if (!positionToUse) {
+              const currentLineup = (gameState.lineup || []).filter(
+                (item) => onField.includes(item.playerId) && item.playerId !== replacedId,
+              )
+              const usedPositions = new Set(currentLineup.map((item) => item.position))
+              const enteringPosition = getMainPosition(incomingPlayer)
+              positionToUse = !usedPositions.has(enteringPosition)
+                ? enteringPosition
+                : DEFENSIVE_POSITIONS.find((position) => !usedPositions.has(position)) || enteringPosition
+            }
+            const targetCoord = getDefaultFieldPosition(positionToUse)
 
-          // Only block adding when field is full AND there's no position to swap with
-          if (currentOnField.length >= 9 && !duplicateId) {
-            setDragPreview(null)
-            setDropTarget(null)
-            return
-          }
-
-          const executeSubstitution = (incomingPlayer, replacedId, onField) => {
             const nextOnField = replacedId
               ? [...onField.filter((id) => id !== replacedId), drag.playerId]
               : [...onField, drag.playerId]
@@ -2091,7 +2128,7 @@ function FieldPage({
             setPlayers((current) =>
               current.map((item) =>
                 getPlayerId(item) === drag.playerId
-                  ? { ...item, x: defaultPosition.x, y: defaultPosition.y }
+                  ? { ...item, x: targetCoord.x, y: targetCoord.y }
                   : item,
               ),
             )
@@ -2106,13 +2143,6 @@ function FieldPage({
               }
 
               const lineup = (current.lineup || []).filter((item) => nextOnField.includes(item.playerId))
-              const usedPositions = new Set(lineup.map((item) => item.position))
-
-              const enteringPosition = getMainPosition(incomingPlayer)
-              const positionToUse = !usedPositions.has(enteringPosition)
-                ? enteringPosition
-                : DEFENSIVE_POSITIONS.find((position) => !usedPositions.has(position)) || enteringPosition
-
               const lineupWithoutDuplicate = replacedId
                 ? lineup.filter((item) => item.playerId !== replacedId)
                 : lineup
@@ -2158,26 +2188,33 @@ function FieldPage({
                 currentPitcherId: nextCurrentPitcherId,
               }
             }, replacedId
-              ? `${incomingPlayer?.name || 'Jogador'} substituiu jogador em ${getMainPosition(incomingPlayer)}`
-              : `${incomingPlayer?.name || 'Jogador'} entrou em campo`)
+              ? `${incomingPlayer?.name || 'Jogador'} substituiu ${playersById[replacedId]?.name || '?'} em ${positionToUse}`
+              : `${incomingPlayer?.name || 'Jogador'} entrou em campo (${positionToUse})`)
           }
 
-          if (duplicateId) {
-            const replaced = playersById[duplicateId]
+          if (hoveredId) {
+            const replaced = playersById[hoveredId]
+            const targetEntry = (gameState.lineup || []).find((l) => l.playerId === hoveredId)
+            const targetPosition = targetEntry?.position || getMainPosition(replaced)
+            const isRecommended = playerPrefersPosition(drag.playerId, targetPosition)
             setPendingSubstitution({
               player,
               replaced,
-              duplicateId,
+              isRecommended,
+              targetPosition,
               currentOnField,
-              execute: () => executeSubstitution(player, duplicateId, currentOnField),
+              execute: () => executeSubstitution(player, hoveredId, currentOnField, targetPosition),
             })
-            setDragPreview(null)
-            setDropTarget(null)
-            setDropMessage('')
-            return
+          } else if (currentOnField.length < 9) {
+            executeSubstitution(player, null, currentOnField)
           }
 
-          executeSubstitution(player, null, currentOnField)
+          benchHoverTargetIdRef.current = null
+          setBenchHoverTargetId(null)
+          setDragPreview(null)
+          setDropTarget(null)
+          setDropMessage('')
+          return
         }
 
         if (drag.source === 'field' && inBench) {
@@ -2304,6 +2341,8 @@ function FieldPage({
       setDropMessage('')
       setRunnerDrag(null)
       setDropTarget(null)
+      setBenchHoverTargetId(null)
+      benchHoverTargetIdRef.current = null
     },
   })
 
@@ -2467,6 +2506,7 @@ function FieldPage({
         onTouchStartMobile={handleTouchStartMobile}
         onTouchMoveMobile={handleTouchMoveMobile}
         onTouchEndMobile={handleTouchEndMobile}
+        benchHoverTargetId={benchHoverTargetId}
       />}
 
       {gameSubView === 'campo' && (
@@ -3379,7 +3419,12 @@ function FieldPage({
 
       {pendingSubstitution && (
         <ConfirmModal
-          message={`${pendingSubstitution.player?.name || 'Jogador'} entra e ${pendingSubstitution.replaced?.name || 'jogador'} vai para o banco?`}
+          message={`${pendingSubstitution.player?.name || 'Jogador'} entra${pendingSubstitution.targetPosition ? ` em ${pendingSubstitution.targetPosition}` : ''} e ${pendingSubstitution.replaced?.name || 'jogador'} vai para o banco.`}
+          detail={pendingSubstitution.isRecommended !== undefined ? (
+            <div className={`sub-recommendation ${pendingSubstitution.isRecommended ? 'sub-recommendation--yes' : 'sub-recommendation--no'}`}>
+              {pendingSubstitution.isRecommended ? '★ Posição recomendada para este jogador' : '⚠ Fora da posição preferida deste jogador'}
+            </div>
+          ) : null}
           confirmLabel="Confirmar substituição"
           onConfirm={() => {
             pendingSubstitution.execute()
@@ -3480,7 +3525,18 @@ function FieldPage({
         </Modal>
       )}
 
-      {dragPreview && (
+      {dragPreview && dragSource === 'bench' && (
+        <div
+          className="player-marker team-defense-marker bench-drag-ball"
+          style={{ left: `${dragPreview.x}px`, top: `${dragPreview.y}px` }}
+        >
+          <span>{dragPreview.label}</span>
+          {dragPreview.playerName && (
+            <div className="bench-drag-name">{dragPreview.playerName} #{dragPreview.playerNumber}</div>
+          )}
+        </div>
+      )}
+      {dragPreview && dragSource !== 'bench' && (
         <div
           className="drag-preview"
           style={{ left: `${dragPreview.x + 12}px`, top: `${dragPreview.y + 12}px` }}

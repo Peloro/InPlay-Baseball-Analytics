@@ -4172,3 +4172,55 @@ html {
   color: #8a9bb0;
   line-height: 1.4;
 }
+
+/* ── Bench drag ball — follows cursor during bench-to-field drag ── */
+.bench-drag-ball {
+  position: fixed !important;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.92;
+}
+
+.bench-drag-name {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.65rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.78);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+/* ── Field player highlighted as substitution target ── */
+.player-marker.sub-target {
+  outline: 3px solid #e8c840;
+  outline-offset: 2px;
+  animation: sub-target-pulse 0.65s ease-in-out infinite alternate;
+}
+
+@keyframes sub-target-pulse {
+  from { box-shadow: 0 0 0 3px rgba(232, 200, 64, 0.25); }
+  to   { box-shadow: 0 0 0 8px rgba(232, 200, 64, 0.5); }
+}
+
+/* ── Substitution recommendation badge in modal ── */
+.sub-recommendation {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sub-recommendation--yes {
+  background: rgba(47, 157, 88, 0.15);
+  color: #1a7a40;
+}
+
+.sub-recommendation--no {
+  background: rgba(200, 140, 0, 0.14);
+  color: #7a5000;
+}
