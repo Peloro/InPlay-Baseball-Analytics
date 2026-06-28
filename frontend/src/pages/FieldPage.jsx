@@ -1221,6 +1221,10 @@ function FieldPage({
       showInvalidAction('Selecione o arremessador antes de registrar pitches')
       return
     }
+    if ((gameState.onFieldPlayerIds || []).length < 9) {
+      showInvalidAction('É necessário ter 9 jogadores em campo para arremessar')
+      return
+    }
     if (isProcessingRef.current) return
     isProcessingRef.current = true
     window.setTimeout(() => { isProcessingRef.current = false }, 700)
@@ -2274,16 +2278,17 @@ function FieldPage({
         if (drag.source === 'bench' && inField && point) {
           const defaultPosition = getDefaultFieldPosition(player?.activePosition)
 
-          if (currentOnField.length >= 9) {
-            setDragPreview(null)
-            setDropTarget(null)
-            return
-          }
-
           const duplicateId = currentOnField.find((id) => {
             const existing = playersById[id]
             return existing && getMainPosition(existing) === getMainPosition(player)
           })
+
+          // Only block adding when field is full AND there's no position to swap with
+          if (currentOnField.length >= 9 && !duplicateId) {
+            setDragPreview(null)
+            setDropTarget(null)
+            return
+          }
 
           const executeSubstitution = (incomingPlayer, replacedId, onField) => {
             const nextOnField = replacedId
@@ -2409,7 +2414,10 @@ function FieldPage({
         }
 
         // Field-to-field: drop a field player onto another field player → swap their positions
-        if (drag.source === 'field' && inField && point) {
+        // Only trigger on an actual drag (not a click), by checking pointer movement
+        const dragStart = dragStartRef.current
+        const didDrag = dragStart && (Math.abs(ev.clientX - dragStart.x) > 8 || Math.abs(ev.clientY - dragStart.y) > 8)
+        if (drag.source === 'field' && inField && point && didDrag) {
           const draggedId = drag.playerId
           const swapTarget = fieldPlayers.find(p => {
             const id = getPlayerId(p)
