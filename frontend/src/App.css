@@ -305,6 +305,8 @@ textarea:focus-visible {
 .nav-actions {
   display: flex;
   gap: 8px;
+  flex: 1;
+  justify-content: center;
 }
 
 .nav-actions button {
