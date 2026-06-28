@@ -59,7 +59,10 @@ router.post('/login', authLimiter, loginRules, validate, async (req, res) => {
       return res.status(403).json({ message: 'Conta aguardando aprovação do administrador.' })
     }
 
-    const team = await Team.findById(user.teamId).select('name')
+    const team = await Team.findById(user.teamId).select('name status')
+    if (!team || team.status === 'blocked') {
+      return res.status(403).json({ message: 'Equipe bloqueada. Contate o administrador.' })
+    }
 
     const token = jwt.sign(
       { userId: user._id, teamId: user.teamId, role: user.role },

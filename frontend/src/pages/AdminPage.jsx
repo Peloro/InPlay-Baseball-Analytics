@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import api from '../services/api'
+import { adminApi } from '../services/api'
 
 const BILLING_LABELS = { trial: 'Trial', paid: 'Pago', unpaid: 'Inadimplente' }
 const BILLING_COLORS = { trial: '#f59e0b', paid: '#22c55e', unpaid: '#ef4444' }
@@ -87,8 +87,8 @@ export default function AdminPage() {
   const loadPending = useCallback(async () => {
     try {
       setLoadingPending(true)
-      const res = await api.get('/admin/pending')
-      setPending(res.data)
+      const data = await adminApi.getPending()
+      setPending(data)
     } catch {
       setPending([])
     } finally {
@@ -99,8 +99,8 @@ export default function AdminPage() {
   const loadTeams = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await api.get('/admin/teams')
-      setTeams(res.data)
+      const data = await adminApi.getTeams()
+      setTeams(data)
       setError('')
     } catch {
       setError('Erro ao carregar equipes.')
@@ -113,7 +113,7 @@ export default function AdminPage() {
 
   const handleApprove = async (user) => {
     try {
-      await api.patch(`/admin/users/${user._id}/approve`)
+      await adminApi.approveUser(user._id)
       setPending(prev => prev.filter(u => u._id !== user._id))
       loadTeams()
     } catch {
@@ -124,7 +124,7 @@ export default function AdminPage() {
   const handleReject = async (user) => {
     if (!window.confirm(`Rejeitar e deletar a conta de ${user.email}?`)) return
     try {
-      await api.delete(`/admin/users/${user._id}`)
+      await adminApi.rejectUser(user._id)
       setPending(prev => prev.filter(u => u._id !== user._id))
     } catch {
       alert('Erro ao rejeitar.')
@@ -134,7 +134,7 @@ export default function AdminPage() {
   const handleToggleStatus = async (team) => {
     const next = team.status === 'active' ? 'blocked' : 'active'
     try {
-      await api.patch(`/admin/teams/${team._id}/status`, { status: next })
+      await adminApi.setTeamStatus(team._id, next)
       setTeams(prev => prev.map(t => t._id === team._id ? { ...t, status: next } : t))
     } catch {
       alert('Erro ao atualizar status.')
@@ -150,7 +150,7 @@ export default function AdminPage() {
     if (!billingTeam) return
     setSavingBilling(true)
     try {
-      await api.patch(`/admin/teams/${billingTeam._id}/billing`, billingForm)
+      await adminApi.saveBilling(billingTeam._id, billingForm)
       setTeams(prev => prev.map(t => t._id === billingTeam._id ? { ...t, ...billingForm } : t))
       setBillingTeam(null)
     } catch {
@@ -164,7 +164,7 @@ export default function AdminPage() {
     if (!deleteTeam || deleteConfirm !== deleteTeam.name) return
     setDeleting(true)
     try {
-      await api.delete(`/admin/teams/${deleteTeam._id}`)
+      await adminApi.deleteTeam(deleteTeam._id)
       setTeams(prev => prev.filter(t => t._id !== deleteTeam._id))
       setDeleteTeam(null)
       setDeleteConfirm('')

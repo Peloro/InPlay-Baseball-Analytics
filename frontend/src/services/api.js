@@ -573,3 +573,31 @@ const api = {
 }
 
 export default api
+
+// ── Admin API (direct HTTP — no localStorage layer) ───────────────
+
+export const adminApi = {
+  async getPending() {
+    const res = await http.get('/admin/pending')
+    return res.data
+  },
+  async getTeams() {
+    const res = await http.get('/admin/teams')
+    return res.data
+  },
+  async approveUser(id) {
+    await http.patch(`/admin/users/${id}/approve`)
+  },
+  async rejectUser(id) {
+    await http.delete(`/admin/users/${id}`)
+  },
+  async setTeamStatus(teamId, status) {
+    await http.patch(`/admin/teams/${teamId}/status`, { status })
+  },
+  async saveBilling(teamId, data) {
+    await http.patch(`/admin/teams/${teamId}/billing`, data)
+  },
+  async deleteTeam(teamId) {
+    await http.delete(`/admin/teams/${teamId}`)
+  },
+}
