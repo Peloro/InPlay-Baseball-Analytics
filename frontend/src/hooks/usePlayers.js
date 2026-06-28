@@ -44,11 +44,13 @@ export default function usePlayers({ players, setPlayers, gameState }) {
 
   const setupAvailablePlayers = useMemo(() => players, [players])
 
-  const playerCanPlayPosition = useCallback((playerId, position) => {
+  // All players can play any position; returns true always so existing callers still compile.
+  const playerCanPlayPosition = useCallback((_playerId, _position) => true, [])
+
+  const playerPrefersPosition = useCallback((playerId, position) => {
     const player = playersById[playerId]
     if (!player) return false
-    const allowed = Array.isArray(player.positions) ? player.positions : []
-    return allowed.includes(position)
+    return Array.isArray(player.positions) && player.positions.includes(position)
   }, [playersById])
 
   const pitchersOnField = useMemo(() => {
@@ -63,6 +65,7 @@ export default function usePlayers({ players, setPlayers, gameState }) {
     benchPlayers,
     setupAvailablePlayers,
     playerCanPlayPosition,
+    playerPrefersPosition,
     pitchersOnField,
     getPlayerId,
     getMainPosition,

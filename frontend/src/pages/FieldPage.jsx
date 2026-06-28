@@ -290,6 +290,7 @@ function FieldPage({
     benchPlayers,
     setupAvailablePlayers,
     playerCanPlayPosition,
+    playerPrefersPosition,
     pitchersOnField: pitchersFromHook,
     getPlayerId,
     getMainPosition,
@@ -493,7 +494,6 @@ function FieldPage({
     if (starters.length !== 9) return
     if (new Set(starterIds).size !== 9) return
     if (new Set(starters.map((item) => item.position)).size !== 9) return
-    if (!starters.every((item) => playerCanPlayPosition(item.playerId, item.position))) return
     if (setupBattingOrder.length !== 9) return
     if (new Set(setupBattingOrder).size !== 9) return
     if (!setupBattingOrder.every((id) => starterIds.includes(id))) return
@@ -575,8 +575,6 @@ function FieldPage({
   }
 
   const assignStarter = (position, playerId) => {
-    if (playerId && !playerCanPlayPosition(playerId, position)) return
-
     setSetupStarters((current) => {
       const next = current.map((item) => (item.position === position ? { ...item, playerId } : item))
       const ids = next.map((item) => item.playerId).filter(Boolean)
@@ -722,15 +720,26 @@ function FieldPage({
     const onField = gameState.onFieldPlayerIds || []
     if (!onField.length) return
 
-    // Keep the most recently added player in a duplicated position.
+    // Use gameState.lineup as the position source (always in sync with onFieldPlayerIds).
+    // Reading player.activePosition here causes false conflicts because activePosition is a
+    // derived UI property that can lag behind by one render after a substitution.
+    const lineupPositions = {}
+    for (const item of Array.isArray(gameState.lineup) ? gameState.lineup : []) {
+      if (item?.playerId && item?.position) lineupPositions[item.playerId] = item.position
+    }
+
     const seen = new Set()
     const keepReversed = []
 
     for (let index = onField.length - 1; index >= 0; index -= 1) {
       const id = onField[index]
-      const player = playersById[id]
-      if (!player) continue
-      const position = getMainPosition(player)
+      if (!playersById[id]) continue
+      const position = lineupPositions[id]
+      if (!position) {
+        // Player on field but not in lineup (e.g. DH): keep without conflict check.
+        keepReversed.push(id)
+        continue
+      }
       if (seen.has(position)) continue
       seen.add(position)
       keepReversed.push(id)
@@ -741,19 +750,19 @@ function FieldPage({
       onUpdateGameState((current) => {
         const unique = Array.from(new Set(keep))
         const battingOrder = (current.battingOrder || []).filter((id) => unique.includes(id))
-        const lineup = (current.lineup || []).filter((item) => unique.includes(item.playerId))
+        const nextLineup = (current.lineup || []).filter((item) => unique.includes(item.playerId))
         const bench = players.map((item) => getPlayerId(item)).filter((id) => !unique.includes(id))
         return {
           ...current,
           onFieldPlayerIds: unique,
           battingOrder,
-          lineup,
+          lineup: nextLineup,
           bench,
           participantPlayerIds: [...unique, ...bench],
         }
       }, 'Conflito de posicao resolvido: jogador anterior enviado ao banco')
     }
-  }, [gameState.onFieldPlayerIds, onUpdateGameState, players, playersById, getPlayerId, getMainPosition])
+  }, [gameState.onFieldPlayerIds, gameState.lineup, onUpdateGameState, players, playersById, getPlayerId])
   
 
   const advanceRunner = useCallback((base) => {
@@ -1017,7 +1026,7 @@ function FieldPage({
     const pitcherCoord = getDefaultFieldPosition('P')
 
     setPlayers(current =>
-      current.map(p => getPlayerId(p) === nextId ? { ...p, x: pitcherCoord.x, y: pitcherCoord.y } : p)
+      current.map(p => getPlayerId(p) === nextId ? { ...p, x: pitcherCoord.x, y: pitcherCoord.y, activePosition: 'P' } : p)
     )
 
     if (isOnField) {
@@ -3113,20 +3122,35 @@ function FieldPage({
                             {selectedPlayer.name} #{selectedPlayer.number}
                           </option>
                         )}
-                        {setupAvailablePlayers
-                          .filter((player) => {
-                            const id = getPlayerId(player)
-                            const allowed = Array.isArray(player.positions) ? player.positions : []
-                            return !selectedIds.includes(id) && allowed.includes(slot.position)
-                          })
-                          .map((player) => {
+                        {(() => {
+                          const available = setupAvailablePlayers.filter(
+                            (player) => !selectedIds.includes(getPlayerId(player))
+                          )
+                          const preferred = available.filter((p) => playerPrefersPosition(getPlayerId(p), slot.position))
+                          const others = available.filter((p) => !playerPrefersPosition(getPlayerId(p), slot.position))
+                          const makeOption = (player, prefix = '') => {
                             const id = getPlayerId(player)
                             return (
                               <option key={`setup-player-${slot.position}-${id}`} value={id}>
-                                {player.name} #{player.number}
+                                {prefix}{player.name} #{player.number}
                               </option>
                             )
-                          })}
+                          }
+                          return (
+                            <>
+                              {preferred.length > 0 && (
+                                <optgroup label="Recomendados">
+                                  {preferred.map((p) => makeOption(p, '★ '))}
+                                </optgroup>
+                              )}
+                              {others.length > 0 && (
+                                <optgroup label="Outros">
+                                  {others.map((p) => makeOption(p))}
+                                </optgroup>
+                              )}
+                            </>
+                          )
+                        })()}
                       </select>
                     </div>
                   )
