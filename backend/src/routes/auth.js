@@ -59,6 +59,15 @@ router.post('/login', authLimiter, loginRules, validate, async (req, res) => {
       return res.status(403).json({ message: 'Conta aguardando aprovação do administrador.' })
     }
 
+    if (user.role === 'admin') {
+      const token = jwt.sign(
+        { userId: user._id, teamId: null, role: 'admin' },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
+      )
+      return res.json({ token, teamId: null, teamName: '', email: user.email })
+    }
+
     const team = await Team.findById(user.teamId).select('name status')
     if (!team || team.status === 'blocked') {
       return res.status(403).json({ message: 'Equipe bloqueada. Contate o administrador.' })

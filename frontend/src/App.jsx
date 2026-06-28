@@ -229,7 +229,7 @@ async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
 function App() {
   const [auth, setAuth] = useState(getAuth)
   const role = decodeRole(auth)
-  const [page, setPage] = useState('stats')
+  const [page, setPage] = useState(() => decodeRole(getAuth()) === 'admin' ? 'admin' : 'stats')
   const [activeTool, setActiveTool] = useState('mouse')
   const [showTrainingHud, setShowTrainingHud] = useState(true)
   const [clearDrawVersion, setClearDrawVersion] = useState(0)
@@ -299,9 +299,10 @@ function App() {
   // On mount (and after login): load local data immediately, then sync with server
   useEffect(() => {
     if (!auth) return
+    if (role === 'admin') return
     loadPlayers()
     syncWithServer().catch(() => {})
-  }, [loadPlayers, auth])
+  }, [loadPlayers, auth, role])
 
   // Handle forced logout from 401 interceptor
   useEffect(() => {
@@ -889,7 +890,13 @@ function App() {
     setPage('stats')
   }, [])
 
-  if (!auth) return <LoginPage onLogin={(a) => setAuth(a)} />
+  if (!auth) return (
+    <LoginPage onLogin={(a) => {
+      setAuth(a)
+      const r = decodeRole(a)
+      setPage(r === 'admin' ? 'admin' : 'stats')
+    }} />
+  )
 
   return (
     <main className={`app-shell ${isGameEntering ? 'app-entering-game' : ''} ${navCollapsed ? 'nav-collapsed' : ''}`}>
@@ -918,57 +925,61 @@ function App() {
           )}
         </div>
         <nav className="nav-actions" role="navigation" aria-label="Navegação principal">
-          <button
-            type="button"
-            className={`${page === 'game' ? 'active' : ''} ${!gameState.currentGameId ? 'nav-no-game' : ''}`}
-            aria-selected={page === 'game'}
-            onClick={() => {
-              setGameAccessNotice('')
-              setPage('game')
-            }}
-          >
-            <span className="nav-label-full">{gameState.currentGameId ? 'Jogo' : 'Novo Jogo'}</span>
-            <span className="nav-label-short">{gameState.currentGameId ? 'Jogo' : 'Novo'}</span>
-          </button>
-          <button
-            type="button"
-            className={page === 'training' ? 'active' : ''}
-            aria-selected={page === 'training'}
-            onClick={() => setPage('training')}
-          >
-            <span className="nav-label-full">Treino</span>
-            <span className="nav-label-short">Treino</span>
-          </button>
-          <button
-            type="button"
-            className={page === 'jogadores' ? 'active' : ''}
-            aria-selected={page === 'jogadores'}
-            onClick={() => setPage('jogadores')}
-          >
-            <span className="nav-label-full">Jogadores</span>
-            <span className="nav-label-short">Jogadores</span>
-          </button>
-          <button
-            type="button"
-            className={page === 'stats' ? 'active' : ''}
-            aria-selected={page === 'stats'}
-            onClick={() => {
-              setGameAccessNotice('')
-              setPage('stats')
-            }}
-          >
-            <span className="nav-label-full">Stats</span>
-            <span className="nav-label-short">Stats</span>
-          </button>
-          <button
-            type="button"
-            className={page === 'settings' ? 'active' : ''}
-            aria-selected={page === 'settings'}
-            onClick={() => setPage('settings')}
-          >
-            <span className="nav-label-full">Ajustes</span>
-            <span className="nav-label-short">Ajustes</span>
-          </button>
+          {role !== 'admin' && (
+            <>
+              <button
+                type="button"
+                className={`${page === 'game' ? 'active' : ''} ${!gameState.currentGameId ? 'nav-no-game' : ''}`}
+                aria-selected={page === 'game'}
+                onClick={() => {
+                  setGameAccessNotice('')
+                  setPage('game')
+                }}
+              >
+                <span className="nav-label-full">{gameState.currentGameId ? 'Jogo' : 'Novo Jogo'}</span>
+                <span className="nav-label-short">{gameState.currentGameId ? 'Jogo' : 'Novo'}</span>
+              </button>
+              <button
+                type="button"
+                className={page === 'training' ? 'active' : ''}
+                aria-selected={page === 'training'}
+                onClick={() => setPage('training')}
+              >
+                <span className="nav-label-full">Treino</span>
+                <span className="nav-label-short">Treino</span>
+              </button>
+              <button
+                type="button"
+                className={page === 'jogadores' ? 'active' : ''}
+                aria-selected={page === 'jogadores'}
+                onClick={() => setPage('jogadores')}
+              >
+                <span className="nav-label-full">Jogadores</span>
+                <span className="nav-label-short">Jogadores</span>
+              </button>
+              <button
+                type="button"
+                className={page === 'stats' ? 'active' : ''}
+                aria-selected={page === 'stats'}
+                onClick={() => {
+                  setGameAccessNotice('')
+                  setPage('stats')
+                }}
+              >
+                <span className="nav-label-full">Stats</span>
+                <span className="nav-label-short">Stats</span>
+              </button>
+              <button
+                type="button"
+                className={page === 'settings' ? 'active' : ''}
+                aria-selected={page === 'settings'}
+                onClick={() => setPage('settings')}
+              >
+                <span className="nav-label-full">Ajustes</span>
+                <span className="nav-label-short">Ajustes</span>
+              </button>
+            </>
+          )}
           {role === 'admin' && (
             <button
               type="button"

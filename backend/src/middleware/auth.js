@@ -11,9 +11,11 @@ module.exports = async function authMiddleware(req, res, next) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET)
 
-    const team = await Team.findById(payload.teamId).select('status')
-    if (!team || team.status === 'blocked') {
-      return res.status(403).json({ message: 'Equipe bloqueada. Contate o administrador.' })
+    if (payload.role !== 'admin') {
+      const team = await Team.findById(payload.teamId).select('status')
+      if (!team || team.status === 'blocked') {
+        return res.status(403).json({ message: 'Equipe bloqueada. Contate o administrador.' })
+      }
     }
 
     req.user = { userId: payload.userId, teamId: payload.teamId, role: payload.role }
