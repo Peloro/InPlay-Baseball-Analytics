@@ -193,6 +193,17 @@ function replaceIdInStores(postUrl, localId, serverId, serverRecord) {
   }
 }
 
+function removeOrphanedRecord(postUrl, localId) {
+  if (postUrl === '/players') {
+    lfSet(LS.players, lfGet(LS.players).filter(p => p._id !== localId))
+  } else if (postUrl === '/games') {
+    lfSet(LS.games, lfGet(LS.games).filter(g => g._id !== localId))
+    lfSet(LS.gameStats, lfGet(LS.gameStats).filter(s => s.gameId !== localId))
+  } else if (postUrl === '/game-stats') {
+    lfSet(LS.gameStats, lfGet(LS.gameStats).filter(s => s._id !== localId))
+  }
+}
+
 export async function flushWriteQueue() {
   const queue = lfGet(LS.syncQueue)
   if (!queue.length) return
@@ -208,9 +219,15 @@ export async function flushWriteQueue() {
     const ok = await netWrite(item.method, url, item.data)
     if (!ok) {
       failed.push(item)
-    } else if (item.method === 'post' && item.localId && ok?._id) {
-      idMap[item.localId] = ok._id
-      replaceIdInStores(item.url, item.localId, ok._id, ok)
+    } else if (item.method === 'post' && item.localId) {
+      if (ok._id) {
+        idMap[item.localId] = ok._id
+        replaceIdInStores(item.url, item.localId, ok._id, ok)
+      } else {
+        // 4xx permanent failure — server rejected the create; remove the local-only record
+        console.warn('[sync] discarding failed POST, removing orphaned record:', item.url, item.localId)
+        removeOrphanedRecord(item.url, item.localId)
+      }
     }
   }
 
