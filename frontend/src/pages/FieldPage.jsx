@@ -20,6 +20,10 @@ import { detectPlayerType, getPlayerId, getMainPosition } from '../utils/player'
 import { EMPTY_GAME_STAT, EMPTY_PITCHING } from '../constants/stats'
 import { incrementPitcherCount, computeInningTransition } from '../utils/gameState'
 import StatLabel from '../components/ui/StatLabel'
+import { Haptics, ImpactStyle } from '@capacitor/haptics'
+import { KeepAwake } from '@capacitor-community/keep-awake'
+
+function haptic(style) { Haptics.impact({ style }).catch(() => {}) }
 
 const LONG_PRESS_MS = 450
 const DEFENSIVE_POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF']
@@ -271,6 +275,9 @@ function FieldPage({
   const [gameSubView, setGameSubView] = useState('campo')
   const touchStartRef = useRef(null)
   const isProcessingRef = useRef(false)
+  const [sideSwitchBanner, setSideSwitchBanner] = useState(null)
+  const sideSwitchTimerRef = useRef(null)
+  const prevIsAttackingRef = useRef(null)
 
   const { zoom, offsetX, offsetY, handleTouchStartMobile, handleTouchMoveMobile, handleTouchEndMobile } =
     useFieldZoom({ fieldRect, fieldStageRef, activeTool })
@@ -997,6 +1004,7 @@ function FieldPage({
     window.setTimeout(() => { isProcessingRef.current = false }, 700)
     await captureUndoSnapshot()
     onPitchAction?.(kind, { pitchType: selectedPitchType })
+    haptic(ImpactStyle.Light)
   }, [captureUndoSnapshot, gameState.currentPitcherId, onPitchAction, selectedPitchType, showInvalidAction])
 
   const handlePitcherSelect = useCallback((nextId) => {
@@ -1190,6 +1198,7 @@ function FieldPage({
 
       return {
         ...current,
+        opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
         outs: sideSwitch ? 0 : outs,
         balls: 0,
         strikes: 0,
@@ -1204,6 +1213,7 @@ function FieldPage({
         gameLog: [...(current.gameLog || []), makeLogEntry(current, isHit ? `hit-${kind}` : 'out', logDesc)],
       }
     }, `Acao de bastao: ${kind}`)
+    haptic(isHit ? ImpactStyle.Light : ImpactStyle.Medium)
 
     if (isHit) setAnimatedBall({ visible: false, x: 50, y: 87 })
 
@@ -1412,6 +1422,7 @@ function FieldPage({
         gameLog: newLog,
       }
     }, `Contagem no ataque: ${kind}`)
+    haptic(didStrikeout ? ImpactStyle.Medium : ImpactStyle.Light)
 
     // Auto-record batter stats when count produces K or BB
     if ((didStrikeout || didWalk) && batterId && gameState.currentGameId) {
@@ -1470,6 +1481,7 @@ function FieldPage({
         gameLog: [...(current.gameLog || []), makeLogEntry(current, 'def-out', logDesc)],
       }
     }, `Out defensivo: ${outType}`)
+    haptic(ImpactStyle.Medium)
 
     try {
       await syncDefensivePitcherEvent({
@@ -1522,9 +1534,10 @@ function FieldPage({
 
       return {
         ...current,
+        ...(current.isAttacking
+          ? { opponentPitchCount: Number(current.opponentPitchCount || 0) + 1 }
+          : { ourPitchCount: Number(current.ourPitchCount || 0) + 1, pitchCounts: incrementPitcherCount(current) }),
         outs: sideSwitch ? 0 : nextOutsRaw,
-        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -1536,6 +1549,7 @@ function FieldPage({
         gameLog: [...(current.gameLog || []), makeLogEntry(current, 'double-play', logDesc)],
       }
     }, `Double play em ${runnerBase}${defenderText}`)
+    haptic(ImpactStyle.Medium)
 
     try {
       if (!gameState.isAttacking) {
@@ -1615,9 +1629,10 @@ function FieldPage({
 
       return {
         ...current,
+        ...(current.isAttacking
+          ? { opponentPitchCount: Number(current.opponentPitchCount || 0) + 1 }
+          : { ourPitchCount: Number(current.ourPitchCount || 0) + 1, pitchCounts: incrementPitcherCount(current) }),
         outs: sideSwitch ? 0 : nextOutsRaw,
-        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
-        pitchCounts: incrementPitcherCount(current),
         balls: 0,
         strikes: 0,
         currentBatterIndex: getNextBatterIndexFromState(current),
@@ -1633,6 +1648,7 @@ function FieldPage({
         gameLog: [...(current.gameLog || []), makeLogEntry(current, 'sac-fly', sfLogDesc)],
       }
     }, 'Sac fly')
+    haptic(ImpactStyle.Medium)
 
     try {
       if (!gameState.isAttacking) {
@@ -2355,6 +2371,27 @@ function FieldPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBatterId, gameState.isAttacking, statsRefreshKey])
 
+  // Keep the screen on while a game is in progress
+  useEffect(() => {
+    if (!gameState.currentGameId) return
+    KeepAwake.keepAwake().catch(() => {})
+    return () => { KeepAwake.allowSleep().catch(() => {}) }
+  }, [gameState.currentGameId])
+
+  // Side-switch banner: fires when isAttacking flips as result of 3 outs (outs reset to 0)
+  useEffect(() => {
+    const prev = prevIsAttackingRef.current
+    prevIsAttackingRef.current = gameState.isAttacking
+    if (prev === null || prev === gameState.isAttacking) return
+    if (gameState.outs !== 0) return
+    const label = gameState.isAttacking ? 'ATACANDO' : 'DEFENDENDO'
+    setSideSwitchBanner(label)
+    haptic(ImpactStyle.Heavy)
+    if (sideSwitchTimerRef.current) clearTimeout(sideSwitchTimerRef.current)
+    sideSwitchTimerRef.current = setTimeout(() => setSideSwitchBanner(null), 2500)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.isAttacking, gameState.outs])
+
   return (
       <section className={`field-layout ${showFieldContainer ? '' : 'mode-hidden'}`} ref={layoutRef}>
         <div
@@ -2366,6 +2403,11 @@ function FieldPage({
           {`Inning ${gameState.inning || 1} ${gameState.inningHalf === 'top' ? 'topo' : 'parte baixa'}, ${gameState.outs || 0} out${(gameState.outs || 0) !== 1 ? 's' : ''}, CAASO ${gameState.homeScore || 0} x ${gameState.awayScore || 0} ${opponentName || 'Adversário'}`}
         </div>
         <Scoreboard gameState={gameState} opponentName={opponentName} visible={gameSubView === 'campo' && showScoreboard} />
+        {sideSwitchBanner && (
+          <div className={`side-switch-banner side-switch-banner--${gameState.isAttacking ? 'attack' : 'defense'}`}>
+            TROCA DE LADO — {sideSwitchBanner}
+          </div>
+        )}
 
       {gameSubView === 'campo' && <Field
         fieldStageRef={fieldStageRef}
@@ -2589,7 +2631,7 @@ function FieldPage({
                   <div className="acoes-opp-batter-row">
                     <input
                       type="text"
-                      className="acoes-opp-batter-num"
+                      className={`acoes-opp-batter-num${knownCount === 9 ? ' acoes-input-prefilled' : ''}`}
                       placeholder="#"
                       maxLength={3}
                       value={gameState.currentOpponentBatter?.number || ''}
@@ -2600,7 +2642,7 @@ function FieldPage({
                     />
                     <input
                       type="text"
-                      className="acoes-opp-batter-name"
+                      className={`acoes-opp-batter-name${knownCount === 9 ? ' acoes-input-prefilled' : ''}`}
                       placeholder="Nome (opcional)"
                       value={gameState.currentOpponentBatter?.name || ''}
                       onChange={(e) => {
@@ -2716,9 +2758,15 @@ function FieldPage({
                     <span className={`acoes-base-badge ${gameState.runners?.[base] ? 'occupied' : ''}`}>
                       {base === 'first' ? '1ª' : base === 'second' ? '2ª' : '3ª'}
                     </span>
-                    <button type="button" className="acoes-runner-btn" onClick={() => onUpdateGameState((current) => ({ ...current, runners: { ...current.runners, [base]: true } }), `Corredor em ${base}`)}>+</button>
-                    <button type="button" className="acoes-runner-btn" onClick={() => advanceRunner(base)}>Av</button>
-                    <button type="button" className="acoes-runner-btn" onClick={() => setPendingRemoveRunner(base)}>Out</button>
+                    {!gameState.runners?.[base] && (
+                      <button type="button" className="acoes-runner-btn" onClick={() => onUpdateGameState((current) => ({ ...current, runners: { ...current.runners, [base]: true } }), `Corredor em ${base}`)}>+</button>
+                    )}
+                    {gameState.runners?.[base] && (
+                      <>
+                        <button type="button" className="acoes-runner-btn" onClick={() => advanceRunner(base)}>Av</button>
+                        <button type="button" className="acoes-runner-btn" onClick={() => setPendingRemoveRunner(base)}>Out</button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2744,8 +2792,12 @@ function FieldPage({
                   <button type="button" className="acoes-btn acoes-2b" onClick={() => applyPlateAppearance('double')}>DUPLA</button>
                   <button type="button" className="acoes-btn acoes-3b" onClick={() => applyPlateAppearance('triple')}>TRIPLA</button>
                   <button type="button" className="acoes-btn acoes-hr" onClick={() => applyPlateAppearance('homerun')}>HOME RUN</button>
-                  <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
-                  <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
+                  {(gameState.runners?.first || gameState.runners?.second || gameState.runners?.third) && gameState.outs < 2 && (
+                    <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
+                  )}
+                  {gameState.runners?.third && gameState.outs < 2 && (
+                    <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
+                  )}
                   <button type="button" className="acoes-btn acoes-erro" onClick={() => applyErrorEvent('')}>ERRO</button>
                   <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
                 </>
@@ -2770,8 +2822,12 @@ function FieldPage({
                   <button type="button" className="acoes-btn acoes-2b" onClick={() => applyDefensiveHit('double')}>DOUBLE</button>
                   <button type="button" className="acoes-btn acoes-3b" onClick={() => applyDefensiveHit('triple')}>TRIPLE</button>
                   <button type="button" className="acoes-btn acoes-hr" onClick={() => applyDefensiveHit('homerun')}>HOME RUN</button>
-                  <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
-                  <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
+                  {(gameState.runners?.first || gameState.runners?.second || gameState.runners?.third) && gameState.outs < 2 && (
+                    <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
+                  )}
+                  {gameState.runners?.third && gameState.outs < 2 && (
+                    <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
+                  )}
                   <button type="button" className="acoes-btn acoes-erro" onClick={() => { setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || ''); setPendingDefenseError(true) }}>ERRO</button>
                   <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
                 </>

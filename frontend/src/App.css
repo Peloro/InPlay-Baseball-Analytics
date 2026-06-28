@@ -3405,6 +3405,49 @@ html {
   background: #333;
 }
 
+/* ── Side-switch banner ── */
+.side-switch-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 18px 16px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  animation: ssb-in 0.25s ease, ssb-out 0.4s ease 2.1s forwards;
+}
+
+.side-switch-banner--attack {
+  background: #8a5e00;
+  border-bottom: 2px solid #d2a100;
+}
+
+.side-switch-banner--defense {
+  background: #1a3a6a;
+  border-bottom: 2px solid #2f6db5;
+}
+
+@keyframes ssb-in {
+  from { opacity: 0; transform: translateY(-100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ssb-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── Opponent batter pre-filled from lineup ── */
+.acoes-input-prefilled {
+  border-color: #2f6040 !important;
+  background: rgba(47, 157, 88, 0.12) !important;
+}
+
 .acoes-end-row {
   display: flex;
   gap: 6px;
