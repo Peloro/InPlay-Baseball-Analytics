@@ -13,6 +13,7 @@ const GLOSSARY = {
   RBI:   { name: 'Runs Batted In',      desc: 'Corridas marcadas como resultado de uma rebatida do jogador.' },
   BB:    { name: 'Base on Balls',       desc: 'Caminhada: 4 arremessos fora da zona garantem passagem à 1ª base.' },
   AVG:   { name: 'Batting Average',     desc: 'Média de rebatidas: hits divididos pelo total de at-bats (H / AB).' },
+  E:     { name: 'Error',                desc: 'Erro defensivo: falha que prolonga o turno do rebatedor ou permite avanço de corredor.' },
   DP:    { name: 'Double Play',         desc: 'Jogada que elimina dois corredores no mesmo lance.' },
   FO:    { name: 'Fly Out',             desc: 'Out por bola aérea capturada pelo defensor.' },
   GO:    { name: 'Ground Out',          desc: 'Out por bola rasteira antes de chegar à base.' },

@@ -560,12 +560,12 @@ function StatsPage({
                 return (
                   <>
                     <div className="kpi"><strong><StatLabel abbr="FLD%" /></strong><span>{fldPct}</span></div>
-                    <div className="kpi"><strong>E</strong><span>{seasonTotals.defErrors}</span></div>
-                    <div className="kpi"><strong>DP</strong><span>{seasonTotals.defDoublePlays}</span></div>
-                    <div className="kpi"><strong>TC</strong><span>{tc}</span></div>
-                    <div className="kpi"><strong>FO</strong><span>{seasonTotals.defFlyOuts}</span></div>
-                    <div className="kpi"><strong>GO</strong><span>{seasonTotals.defGroundOuts}</span></div>
-                    <div className="kpi"><strong>LO</strong><span>{seasonTotals.defLineOuts}</span></div>
+                    <div className="kpi"><strong><StatLabel abbr="E" /></strong><span>{seasonTotals.defErrors}</span></div>
+                    <div className="kpi"><strong><StatLabel abbr="DP" /></strong><span>{seasonTotals.defDoublePlays}</span></div>
+                    <div className="kpi"><strong><StatLabel abbr="TC" /></strong><span>{tc}</span></div>
+                    <div className="kpi"><strong><StatLabel abbr="FO" /></strong><span>{seasonTotals.defFlyOuts}</span></div>
+                    <div className="kpi"><strong><StatLabel abbr="GO" /></strong><span>{seasonTotals.defGroundOuts}</span></div>
+                    <div className="kpi"><strong><StatLabel abbr="LO" /></strong><span>{seasonTotals.defLineOuts}</span></div>
                   </>
                 )
               })()}
@@ -598,7 +598,7 @@ function StatsPage({
                   <>
                     {[['errors','E'],['doublePlays','DP'],['flyOuts','FO'],['groundOuts','GO'],['lineOuts','LO'],['totalChances','TC'],['fieldingPct','FLD%']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
-                        {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
+                        <StatLabel abbr={label} />{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
                     ))}
                   </>
@@ -717,12 +717,12 @@ function StatsPage({
                       const fldPct = tc ? ((tc - safeNumber(entry.defense?.errors)) / tc).toFixed(3) : '1.000'
                       return (
                         <div className="stat-grid">
-                          <div><strong>E</strong><div>{safeNumber(entry.defense?.errors)}</div></div>
-                          <div><strong>DP</strong><div>{safeNumber(entry.defense?.doublePlays)}</div></div>
-                          <div><strong>FO</strong><div>{safeNumber(entry.defense?.flyOuts)}</div></div>
-                          <div><strong>GO</strong><div>{safeNumber(entry.defense?.groundOuts)}</div></div>
-                          <div><strong>LO</strong><div>{safeNumber(entry.defense?.lineOuts)}</div></div>
-                          <div><strong>TC</strong><div>{tc}</div></div>
+                          <div><strong><StatLabel abbr="E" /></strong><div>{safeNumber(entry.defense?.errors)}</div></div>
+                          <div><strong><StatLabel abbr="DP" /></strong><div>{safeNumber(entry.defense?.doublePlays)}</div></div>
+                          <div><strong><StatLabel abbr="FO" /></strong><div>{safeNumber(entry.defense?.flyOuts)}</div></div>
+                          <div><strong><StatLabel abbr="GO" /></strong><div>{safeNumber(entry.defense?.groundOuts)}</div></div>
+                          <div><strong><StatLabel abbr="LO" /></strong><div>{safeNumber(entry.defense?.lineOuts)}</div></div>
+                          <div><strong><StatLabel abbr="TC" /></strong><div>{tc}</div></div>
                           <div><strong><StatLabel abbr="FLD%" /></strong><div>{fldPct}</div></div>
                         </div>
                       )
