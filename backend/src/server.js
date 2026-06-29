@@ -33,6 +33,7 @@ app.get('/', (req, res) => {
 })
 
 app.use('/auth', authRouter)
+app.get('/auth/ping', authMiddleware, (req, res) => res.json({ ok: true }))
 
 app.use('/players', authMiddleware, playersRouter)
 app.use('/stats', authMiddleware, statsRouter)

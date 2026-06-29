@@ -100,6 +100,11 @@ function getTokenExpiry(token) {
   } catch { return null }
 }
 
+export async function checkStatus() {
+  if (!http) return
+  try { await http.get('/auth/ping') } catch { /* interceptor handles 401/403 */ }
+}
+
 export async function refreshTokenIfNeeded() {
   if (!http) return
   const auth = getAuth()

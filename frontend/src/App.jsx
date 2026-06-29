@@ -4,7 +4,7 @@ import StatsPage from './pages/StatsPage'
 const FieldPage = lazy(() => import('./pages/FieldPage'))
 const TrainingField = lazy(() => import('./pages/TrainingField'))
 const JogadoresPage = lazy(() => import('./pages/JogadoresPage'))
-import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus, getAuth, logout } from './services/api'
+import api, { gameStatsApi, gamesApi, syncWithServer, getSyncStatus, getAuth, logout, checkStatus } from './services/api'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
 import AdminPage from './pages/AdminPage'
@@ -304,7 +304,16 @@ function App() {
     syncWithServer().catch(() => {})
   }, [loadPlayers, auth, role])
 
-  // Handle forced logout from 401 interceptor
+  // Poll /auth/ping every 30s while app is open — detects team block instantly when online
+  useEffect(() => {
+    if (!auth || role === 'admin') return
+    const id = window.setInterval(() => {
+      if (navigator.onLine) checkStatus().catch(() => {})
+    }, 30_000)
+    return () => window.clearInterval(id)
+  }, [auth, role])
+
+  // Handle forced logout from 401/403 interceptor
   useEffect(() => {
     const onLogout = () => {
       setAuth(null)
