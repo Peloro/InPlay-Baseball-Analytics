@@ -201,6 +201,9 @@ function StatsPage({
       obp:         (e) => { const ab = safeNumber(e.hitting?.atBats); const bb = safeNumber(e.hitting?.walks); const h = safeNumber(e.hitting?.hits); return (ab + bb) ? (h + bb) / (ab + bb) : 0 },
     }
     const pitcherMetrics = {
+      wins:           (e) => safeNumber(e.pitching?.wins),
+      losses:         (e) => safeNumber(e.pitching?.losses),
+      saves:          (e) => safeNumber(e.pitching?.saves),
       inningsPitched: (e) => safeNumber(e.pitching?.inningsPitched),
       era:            (e) => safeNumber(e.era),
       whip:           (e) => { const o = safeNumber(e.pitching?.outsPitched); return o ? (safeNumber(e.pitching?.walks) + safeNumber(e.pitching?.hitsAllowed)) / (o / 3) : 0 },
@@ -258,30 +261,29 @@ function StatsPage({
     return visibleSeasonRows.reduce((acc, item) => ({
       atBats: acc.atBats + safeNumber(item.entry.hitting?.atBats),
       hits: acc.hits + safeNumber(item.entry.hitting?.hits),
+      doubles: acc.doubles + safeNumber(item.entry.hitting?.doubles),
+      triples: acc.triples + safeNumber(item.entry.hitting?.triples),
       homeRuns: acc.homeRuns + safeNumber(item.entry.hitting?.homeRuns),
       runs: acc.runs + safeNumber(item.entry.hitting?.runs),
       rbi: acc.rbi + safeNumber(item.entry.hitting?.rbi),
       hittingStrikeouts: acc.hittingStrikeouts + safeNumber(item.entry.hitting?.strikeouts),
       walks: acc.walks + safeNumber(item.entry.hitting?.walks),
+      stolenBases: acc.stolenBases + safeNumber(item.entry.hitting?.stolenBases),
       // Sum raw outs so IP is computed correctly (decimal IP values can't be added directly)
       outsPitched: acc.outsPitched + safeNumber(item.entry.pitching?.outsPitched),
       earnedRuns: acc.earnedRuns + safeNumber(item.entry.pitching?.earnedRuns),
       hitsAllowed: acc.hitsAllowed + safeNumber(item.entry.pitching?.hitsAllowed),
       pitchingStrikeouts: acc.pitchingStrikeouts + safeNumber(item.entry.pitching?.strikeouts),
       pitchingWalks: acc.pitchingWalks + safeNumber(item.entry.pitching?.walks),
+      wins: acc.wins + safeNumber(item.entry.pitching?.wins),
+      losses: acc.losses + safeNumber(item.entry.pitching?.losses),
+      saves: acc.saves + safeNumber(item.entry.pitching?.saves),
     }), {
-      atBats: 0,
-      hits: 0,
-      homeRuns: 0,
-      runs: 0,
-      rbi: 0,
-      hittingStrikeouts: 0,
-      walks: 0,
-      outsPitched: 0,
-      earnedRuns: 0,
-      hitsAllowed: 0,
-      pitchingStrikeouts: 0,
-      pitchingWalks: 0,
+      atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0,
+      runs: 0, rbi: 0, hittingStrikeouts: 0, walks: 0, stolenBases: 0,
+      outsPitched: 0, earnedRuns: 0, hitsAllowed: 0,
+      pitchingStrikeouts: 0, pitchingWalks: 0,
+      wins: 0, losses: 0, saves: 0,
     })
   }, [visibleSeasonRows])
 
@@ -401,8 +403,8 @@ function StatsPage({
     setShowGameDetail(false)
   }
 
-  const hitterColCount = 11   // Jogador, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
-  const pitcherColCount = 11  // Jogador, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
+  const hitterColCount = 16   // Jogador, AB, H, 2B, 3B, HR, R, RBI, BB, SO, SB, OUT, AVG, OBP, SLG, OPS
+  const pitcherColCount = 14  // Jogador, W, L, SV, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
 
   return (
     <section className="stats-page stats-page-full">
@@ -490,6 +492,14 @@ function StatsPage({
           ) : (
             <>
               <div className="kpi">
+                <strong>W-L</strong>
+                <span>{seasonTotals.wins}-{seasonTotals.losses}</span>
+              </div>
+              <div className="kpi">
+                <strong>SV</strong>
+                <span>{seasonTotals.saves}</span>
+              </div>
+              <div className="kpi">
                 <strong><StatLabel abbr="IP" /></strong>
                 <span>{formatIpFromOuts(seasonTotals.outsPitched)}</span>
               </div>
@@ -513,10 +523,6 @@ function StatsPage({
                 <strong><StatLabel abbr="BB" /></strong>
                 <span>{seasonTotals.pitchingWalks}</span>
               </div>
-              <div className="kpi">
-                <strong><StatLabel abbr="ER" /></strong>
-                <span>{seasonTotals.earnedRuns}</span>
-              </div>
             </>
           )}
         </div>
@@ -536,7 +542,7 @@ function StatsPage({
                   </>
                 ) : (
                   <>
-                    {[['inningsPitched','IP'],['era','ERA'],['whip','WHIP'],['k9','K/9'],['strikeouts_p','SO'],['walks_p','BB'],['hitsAllowed','H'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
+                    {[['wins','W'],['losses','L'],['saves','SV'],['inningsPitched','IP'],['era','ERA'],['whip','WHIP'],['k9','K/9'],['strikeouts_p','SO'],['walks_p','BB'],['hitsAllowed','H'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
                         {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
@@ -574,6 +580,9 @@ function StatsPage({
                       </>
                     ) : (
                       <>
+                        <td>{safeNumber(entry.pitching?.wins)}</td>
+                        <td>{safeNumber(entry.pitching?.losses)}</td>
+                        <td>{safeNumber(entry.pitching?.saves)}</td>
                         <td>{formatIpFromOuts(entry.pitching?.outsPitched)}</td>
                         <td>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</td>
                         <td>{whipFromPitching(entry.pitching)}</td>
@@ -616,6 +625,9 @@ function StatsPage({
                       </div>
                     ) : (
                       <div className="stat-grid">
+                        <div><strong>W</strong><div>{safeNumber(entry.pitching?.wins)}</div></div>
+                        <div><strong>L</strong><div>{safeNumber(entry.pitching?.losses)}</div></div>
+                        <div><strong>SV</strong><div>{safeNumber(entry.pitching?.saves)}</div></div>
                         <div><strong><StatLabel abbr="IP" /></strong><div>{formatIpFromOuts(entry.pitching?.outsPitched)}</div></div>
                         <div><strong><StatLabel abbr="ERA" /></strong><div>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</div></div>
                         <div><strong><StatLabel abbr="WHIP" /></strong><div>{whipFromPitching(entry.pitching)}</div></div>

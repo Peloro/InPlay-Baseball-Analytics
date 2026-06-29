@@ -48,6 +48,15 @@ function PitchingBlock({ row, onQuickEvent }) {
       <Stepper label="BAL" value={row.pitching.balls}
         onMinus={() => onQuickEvent(row.playerId, 'pitching', 'balls', -1)}
         onPlus={() => onQuickEvent(row.playerId, 'pitching', 'balls', 1)} />
+      <Stepper label="W" value={row.pitching.wins || 0}
+        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'wins', -1)}
+        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'wins', 1)} />
+      <Stepper label="L" value={row.pitching.losses || 0}
+        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'losses', -1)}
+        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'losses', 1)} />
+      <Stepper label="SV" value={row.pitching.saves || 0}
+        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'saves', -1)}
+        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'saves', 1)} />
     </div>
   )
 }
@@ -114,7 +123,7 @@ function generateTextReport(game, rows) {
   lines.push('BATTING')
   lines.push(sep)
   lines.push(
-    `${pad('Jogador', 18, true)}${pad('AB', 4)}${pad('H', 4)}${pad('HR', 4)}${pad('R', 4)}${pad('RBI', 4)}${pad('BB', 4)}${pad('SO', 4)}${pad('OUT', 4)}  AVG`
+    `${pad('Jogador', 18, true)}${pad('AB', 4)}${pad('H', 4)}${pad('2B', 4)}${pad('3B', 4)}${pad('HR', 4)}${pad('R', 4)}${pad('RBI', 4)}${pad('BB', 4)}${pad('SO', 4)}${pad('SB', 4)}${pad('OUT', 4)}  AVG`
   )
   lines.push(sep)
 
@@ -124,7 +133,7 @@ function generateTextReport(game, rows) {
     const hits = safeNumber(h.hits)
     const avg = ab ? (hits / ab).toFixed(3) : '.000'
     lines.push(
-      `${pad(row.player.name, 18, true)}${pad(ab, 4)}${pad(hits, 4)}${pad(safeNumber(h.homeRuns), 4)}${pad(safeNumber(h.runs), 4)}${pad(safeNumber(h.rbi), 4)}${pad(safeNumber(h.walks), 4)}${pad(safeNumber(h.strikeouts), 4)}${pad(safeNumber(h.outs), 4)}  ${avg}`
+      `${pad(row.player.name, 18, true)}${pad(ab, 4)}${pad(hits, 4)}${pad(safeNumber(h.doubles), 4)}${pad(safeNumber(h.triples), 4)}${pad(safeNumber(h.homeRuns), 4)}${pad(safeNumber(h.runs), 4)}${pad(safeNumber(h.rbi), 4)}${pad(safeNumber(h.walks), 4)}${pad(safeNumber(h.strikeouts), 4)}${pad(safeNumber(h.stolenBases), 4)}${pad(safeNumber(h.outs), 4)}  ${avg}`
     )
   }
 
@@ -194,7 +203,7 @@ function generateHtmlReport(game, rows) {
     const ab = safeNumber(h.atBats)
     const hits = safeNumber(h.hits)
     const avg = ab ? (hits / ab).toFixed(3) : '.000'
-    return `<tr><td>${row.player.name}</td><td>#${row.player.number}</td><td>${getMainPosition(row.player)}</td><td>${ab}</td><td>${hits}</td><td>${safeNumber(h.homeRuns)}</td><td>${safeNumber(h.runs)}</td><td>${safeNumber(h.rbi)}</td><td>${safeNumber(h.walks)}</td><td>${safeNumber(h.strikeouts)}</td><td>${safeNumber(h.outs)}</td><td>${avg}</td></tr>`
+    return `<tr><td>${row.player.name}</td><td>#${row.player.number}</td><td>${getMainPosition(row.player)}</td><td>${ab}</td><td>${hits}</td><td>${safeNumber(h.doubles)}</td><td>${safeNumber(h.triples)}</td><td>${safeNumber(h.homeRuns)}</td><td>${safeNumber(h.runs)}</td><td>${safeNumber(h.rbi)}</td><td>${safeNumber(h.walks)}</td><td>${safeNumber(h.strikeouts)}</td><td>${safeNumber(h.stolenBases)}</td><td>${safeNumber(h.outs)}</td><td>${avg}</td></tr>`
   }).join('')
 
   const pitchers = rows.filter((r) => r.type === 'pitcher')
@@ -272,7 +281,7 @@ function generateHtmlReport(game, rows) {
 ${linescoreHtml}
 <h2>Batting</h2>
 <table>
-  <thead><tr><th>Jogador</th><th>N</th><th>Pos</th><th>AB</th><th>H</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>SO</th><th>OUT</th><th>AVG</th></tr></thead>
+  <thead><tr><th>Jogador</th><th>N</th><th>Pos</th><th>AB</th><th>H</th><th>2B</th><th>3B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>SO</th><th>SB</th><th>OUT</th><th>AVG</th></tr></thead>
   <tbody>${battingRows}</tbody>
 </table>
 ${pitchers.length ? `<h2>Pitching</h2><table><thead><tr><th>Pitcher</th><th>IP</th><th>ER</th><th>ERA</th><th>H</th><th>SO</th><th>BB</th><th>PC</th></tr></thead><tbody>${pitchingRows}</tbody></table>` : ''}
@@ -423,6 +432,12 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
               <Stepper label="H" value={row.hitting.hits}
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'hits', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'hits', 1)} />
+              <Stepper label="2B" value={row.hitting.doubles || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'doubles', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'doubles', 1)} />
+              <Stepper label="3B" value={row.hitting.triples || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'triples', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'triples', 1)} />
               <Stepper label="HR" value={row.hitting.homeRuns || 0}
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'homeRuns', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'homeRuns', 1)} />
@@ -438,6 +453,9 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
               <Stepper label="SO" value={row.hitting.strikeouts}
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'strikeouts', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'strikeouts', 1)} />
+              <Stepper label="SB" value={row.hitting.stolenBases || 0}
+                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'stolenBases', -1)}
+                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'stolenBases', 1)} />
               <Stepper label="OUT" value={row.hitting.outs}
                 onMinus={() => onQuickEvent(row.playerId, 'hitting', 'outs', -1)}
                 onPlus={() => onQuickEvent(row.playerId, 'hitting', 'outs', 1)} />

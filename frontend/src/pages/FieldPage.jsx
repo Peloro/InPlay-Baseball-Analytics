@@ -270,6 +270,9 @@ function FieldPage({
   const [pendingAutoEnd, setPendingAutoEnd] = useState(null)
   const [showGameSummary, setShowGameSummary] = useState(false)
   const [gameSummarySnapshot, setGameSummarySnapshot] = useState(null)
+  const [summaryWP, setSummaryWP] = useState('')
+  const [summaryLP, setSummaryLP] = useState('')
+  const [summarySV, setSummarySV] = useState('')
   const [batterStatsCollapsed, setBatterStatsCollapsed] = useState(false)
   const autoEndShownRef = useRef(null)
   const [showFieldContainer] = useState(true)
@@ -839,32 +842,38 @@ function FieldPage({
     const payload = {
       type: detectPlayerType(playersById[playerId]),
       hitting: {
-        atBats: safeNumber(patch.hitting?.atBats ?? current?.hitting?.atBats),
-        hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
-        strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
-        outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
-        walks: safeNumber(patch.hitting?.walks ?? current?.hitting?.walks),
-        runs: safeNumber(patch.hitting?.runs ?? current?.hitting?.runs),
-        rbi: safeNumber(patch.hitting?.rbi ?? current?.hitting?.rbi),
-        homeRuns: safeNumber(patch.hitting?.homeRuns ?? current?.hitting?.homeRuns),
+        atBats:      safeNumber(patch.hitting?.atBats      ?? current?.hitting?.atBats),
+        hits:        safeNumber(patch.hitting?.hits        ?? current?.hitting?.hits),
+        doubles:     safeNumber(patch.hitting?.doubles     ?? current?.hitting?.doubles),
+        triples:     safeNumber(patch.hitting?.triples     ?? current?.hitting?.triples),
+        homeRuns:    safeNumber(patch.hitting?.homeRuns    ?? current?.hitting?.homeRuns),
+        strikeouts:  safeNumber(patch.hitting?.strikeouts  ?? current?.hitting?.strikeouts),
+        outs:        safeNumber(patch.hitting?.outs        ?? current?.hitting?.outs),
+        walks:       safeNumber(patch.hitting?.walks       ?? current?.hitting?.walks),
+        runs:        safeNumber(patch.hitting?.runs        ?? current?.hitting?.runs),
+        rbi:         safeNumber(patch.hitting?.rbi         ?? current?.hitting?.rbi),
+        stolenBases: safeNumber(patch.hitting?.stolenBases ?? current?.hitting?.stolenBases),
       },
       pitching: {
         inningsPitched: safeNumber(current?.pitching?.inningsPitched),
-        outsPitched: safeNumber(current?.pitching?.outsPitched),
-        earnedRuns: safeNumber(current?.pitching?.earnedRuns),
-        strikeouts: safeNumber(current?.pitching?.strikeouts),
-        walks: safeNumber(current?.pitching?.walks),
-        strikes: safeNumber(current?.pitching?.strikes),
-        balls: safeNumber(current?.pitching?.balls),
-        pitchCount: safeNumber(current?.pitching?.pitchCount),
-        hitsAllowed: safeNumber(current?.pitching?.hitsAllowed),
+        outsPitched:    safeNumber(current?.pitching?.outsPitched),
+        earnedRuns:     safeNumber(current?.pitching?.earnedRuns),
+        strikeouts:     safeNumber(current?.pitching?.strikeouts),
+        walks:          safeNumber(current?.pitching?.walks),
+        strikes:        safeNumber(current?.pitching?.strikes),
+        balls:          safeNumber(current?.pitching?.balls),
+        pitchCount:     safeNumber(current?.pitching?.pitchCount),
+        hitsAllowed:    safeNumber(current?.pitching?.hitsAllowed),
+        wins:           safeNumber(current?.pitching?.wins),
+        losses:         safeNumber(current?.pitching?.losses),
+        saves:          safeNumber(current?.pitching?.saves),
       },
       defense: {
-        errors: safeNumber(current?.defense?.errors),
+        errors:      safeNumber(current?.defense?.errors),
         doublePlays: safeNumber(current?.defense?.doublePlays),
-        flyOuts: safeNumber(current?.defense?.flyOuts),
-        groundOuts: safeNumber(current?.defense?.groundOuts),
-        lineOuts: safeNumber(current?.defense?.lineOuts),
+        flyOuts:     safeNumber(current?.defense?.flyOuts),
+        groundOuts:  safeNumber(current?.defense?.groundOuts),
+        lineOuts:    safeNumber(current?.defense?.lineOuts),
       },
     }
 
@@ -880,33 +889,39 @@ function FieldPage({
     const payload = {
       type: detectPlayerType(playersById[playerId]),
       hitting: {
-        atBats: safeNumber(patch.hitting?.atBats ?? current?.hitting?.atBats),
-        hits: safeNumber(patch.hitting?.hits ?? current?.hitting?.hits),
-        strikeouts: safeNumber(patch.hitting?.strikeouts ?? current?.hitting?.strikeouts),
-        outs: safeNumber(patch.hitting?.outs ?? current?.hitting?.outs),
-        walks: safeNumber(patch.hitting?.walks ?? current?.hitting?.walks),
-        runs: safeNumber(patch.hitting?.runs ?? current?.hitting?.runs),
-        rbi: safeNumber(patch.hitting?.rbi ?? current?.hitting?.rbi),
-        homeRuns: safeNumber(patch.hitting?.homeRuns ?? current?.hitting?.homeRuns),
+        atBats:      safeNumber(patch.hitting?.atBats      ?? current?.hitting?.atBats),
+        hits:        safeNumber(patch.hitting?.hits        ?? current?.hitting?.hits),
+        doubles:     safeNumber(patch.hitting?.doubles     ?? current?.hitting?.doubles),
+        triples:     safeNumber(patch.hitting?.triples     ?? current?.hitting?.triples),
+        homeRuns:    safeNumber(patch.hitting?.homeRuns    ?? current?.hitting?.homeRuns),
+        strikeouts:  safeNumber(patch.hitting?.strikeouts  ?? current?.hitting?.strikeouts),
+        outs:        safeNumber(patch.hitting?.outs        ?? current?.hitting?.outs),
+        walks:       safeNumber(patch.hitting?.walks       ?? current?.hitting?.walks),
+        runs:        safeNumber(patch.hitting?.runs        ?? current?.hitting?.runs),
+        rbi:         safeNumber(patch.hitting?.rbi         ?? current?.hitting?.rbi),
+        stolenBases: safeNumber(patch.hitting?.stolenBases ?? current?.hitting?.stolenBases),
       },
       pitching: {
         inningsPitched: safeNumber(patch.pitching?.inningsPitched ?? current?.pitching?.inningsPitched),
-        outsPitched: safeNumber(patch.pitching?.outsPitched ?? current?.pitching?.outsPitched),
-        earnedRuns: safeNumber(patch.pitching?.earnedRuns ?? current?.pitching?.earnedRuns),
-        strikeouts: safeNumber(patch.pitching?.strikeouts ?? current?.pitching?.strikeouts),
-        walks: safeNumber(patch.pitching?.walks ?? current?.pitching?.walks),
-        strikes: safeNumber(patch.pitching?.strikes ?? current?.pitching?.strikes),
-        balls: safeNumber(patch.pitching?.balls ?? current?.pitching?.balls),
-        pitchCount: safeNumber(patch.pitching?.pitchCount ?? current?.pitching?.pitchCount),
-        hitsAllowed: safeNumber(patch.pitching?.hitsAllowed ?? current?.pitching?.hitsAllowed),
-        pitchTypes: patch.pitching?.pitchTypes ?? current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
+        outsPitched:    safeNumber(patch.pitching?.outsPitched    ?? current?.pitching?.outsPitched),
+        earnedRuns:     safeNumber(patch.pitching?.earnedRuns     ?? current?.pitching?.earnedRuns),
+        strikeouts:     safeNumber(patch.pitching?.strikeouts     ?? current?.pitching?.strikeouts),
+        walks:          safeNumber(patch.pitching?.walks          ?? current?.pitching?.walks),
+        strikes:        safeNumber(patch.pitching?.strikes        ?? current?.pitching?.strikes),
+        balls:          safeNumber(patch.pitching?.balls          ?? current?.pitching?.balls),
+        pitchCount:     safeNumber(patch.pitching?.pitchCount     ?? current?.pitching?.pitchCount),
+        hitsAllowed:    safeNumber(patch.pitching?.hitsAllowed    ?? current?.pitching?.hitsAllowed),
+        wins:           safeNumber(patch.pitching?.wins           ?? current?.pitching?.wins),
+        losses:         safeNumber(patch.pitching?.losses         ?? current?.pitching?.losses),
+        saves:          safeNumber(patch.pitching?.saves          ?? current?.pitching?.saves),
+        pitchTypes:     patch.pitching?.pitchTypes ?? current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
       },
       defense: {
-        errors: safeNumber(patch.defense?.errors ?? current?.defense?.errors),
+        errors:      safeNumber(patch.defense?.errors      ?? current?.defense?.errors),
         doublePlays: safeNumber(patch.defense?.doublePlays ?? current?.defense?.doublePlays),
-        flyOuts: safeNumber(patch.defense?.flyOuts ?? current?.defense?.flyOuts),
-        groundOuts: safeNumber(patch.defense?.groundOuts ?? current?.defense?.groundOuts),
-        lineOuts: safeNumber(patch.defense?.lineOuts ?? current?.defense?.lineOuts),
+        flyOuts:     safeNumber(patch.defense?.flyOuts     ?? current?.defense?.flyOuts),
+        groundOuts:  safeNumber(patch.defense?.groundOuts  ?? current?.defense?.groundOuts),
+        lineOuts:    safeNumber(patch.defense?.lineOuts    ?? current?.defense?.lineOuts),
       },
     }
 
@@ -1249,9 +1264,11 @@ function FieldPage({
         hitting: {
           atBats:    safeNumber(current?.hitting?.atBats)    + 1,
           hits:      safeNumber(current?.hitting?.hits)      + (isHitKind ? 1 : 0),
+          doubles:   safeNumber(current?.hitting?.doubles)   + (kind === 'double'  ? 1 : 0),
+          triples:   safeNumber(current?.hitting?.triples)   + (kind === 'triple'  ? 1 : 0),
+          homeRuns:  safeNumber(current?.hitting?.homeRuns)  + (isHomeRun ? 1 : 0),
           strikeouts:safeNumber(current?.hitting?.strikeouts)+ (kind === 'strikeout' ? 1 : 0),
           outs:      safeNumber(current?.hitting?.outs)      + (endedAsOut ? 1 : 0),
-          homeRuns:  safeNumber(current?.hitting?.homeRuns)  + (isHomeRun ? 1 : 0),
           rbi:       safeNumber(current?.hitting?.rbi)       + rbiCredit,
           runs:      safeNumber(current?.hitting?.runs)      + batterRuns,
         },
@@ -3341,8 +3358,57 @@ function FieldPage({
                 </tbody>
               </table>
             </div>
+
+            {(() => {
+              const participantIds = new Set(gameState.participantPlayerIds || [])
+              const pitchers = players.filter(p => detectPlayerType(p) === 'pitcher' && (participantIds.size === 0 || participantIds.has(getPlayerId(p))))
+              if (!pitchers.length) return null
+              return (
+                <div className="game-summary-wlsv">
+                  <h4>Decisão (opcional)</h4>
+                  <div className="game-summary-wlsv-row">
+                    <label>
+                      W
+                      <select value={summaryWP} onChange={e => setSummaryWP(e.target.value)}>
+                        <option value="">—</option>
+                        {pitchers.map(p => <option key={getPlayerId(p)} value={getPlayerId(p)}>{p.name}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      L
+                      <select value={summaryLP} onChange={e => setSummaryLP(e.target.value)}>
+                        <option value="">—</option>
+                        {pitchers.map(p => <option key={getPlayerId(p)} value={getPlayerId(p)}>{p.name}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      SV
+                      <select value={summarySV} onChange={e => setSummarySV(e.target.value)}>
+                        <option value="">—</option>
+                        {pitchers.map(p => <option key={getPlayerId(p)} value={getPlayerId(p)}>{p.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              )
+            })()}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-              <Button variant="primary" onClick={() => { setShowGameSummary(false); onEndGame?.() }}>
+              <Button variant="primary" onClick={async () => {
+                const saves = [
+                  summaryWP ? { id: summaryWP, field: 'wins' }   : null,
+                  summaryLP ? { id: summaryLP, field: 'losses' } : null,
+                  summarySV ? { id: summarySV, field: 'saves' }  : null,
+                ].filter(Boolean)
+                for (const { id, field } of saves) {
+                  const found = await gameStatsApi.listByGame(gameState.currentGameId, id)
+                  const cur = found.data?.[0]
+                  await upsertPlayerStat(id, { pitching: { [field]: safeNumber(cur?.pitching?.[field]) + 1 } })
+                }
+                setSummaryWP(''); setSummaryLP(''); setSummarySV('')
+                setShowGameSummary(false)
+                onEndGame?.()
+              }}>
                 Ver Estatísticas
               </Button>
             </div>

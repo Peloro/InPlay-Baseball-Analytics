@@ -93,6 +93,30 @@ export function obpFromHitting(hitting) {
   return ((h + bb) / denom).toFixed(3)
 }
 
+export function slgFromHitting(hitting) {
+  const ab = toNum(hitting?.atBats)
+  if (!ab) return '---'
+  const h  = toNum(hitting?.hits)
+  const d  = toNum(hitting?.doubles)
+  const t  = toNum(hitting?.triples)
+  const hr = toNum(hitting?.homeRuns)
+  // TB = H + 2B + 2×3B + 3×HR  (singles count once, already in H)
+  return ((h + d + t * 2 + hr * 3) / ab).toFixed(3)
+}
+
+export function opsFromHitting(hitting) {
+  const ab = toNum(hitting?.atBats)
+  const bb = toNum(hitting?.walks)
+  if (!(ab + bb)) return '---'
+  const h  = toNum(hitting?.hits)
+  const d  = toNum(hitting?.doubles)
+  const t  = toNum(hitting?.triples)
+  const hr = toNum(hitting?.homeRuns)
+  const obp = (h + bb) / (ab + bb)
+  const slg = ab ? (h + d + t * 2 + hr * 3) / ab : 0
+  return (obp + slg).toFixed(3)
+}
+
 export function whipFromPitching(pitching) {
   const outs = toNum(pitching?.outsPitched)
   if (!outs) return '---'

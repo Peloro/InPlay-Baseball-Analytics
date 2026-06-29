@@ -1853,14 +1853,15 @@ html, body {
 }
 
 .stats-table-wrap {
-  overflow: visible;
+  overflow-x: auto;
   max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stats-table {
-  width: 100%;
+  min-width: 820px;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .stats-table th,
@@ -1868,8 +1869,15 @@ html, body {
   border-bottom: 1px solid var(--line);
   padding: 8px;
   text-align: left;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.stats-table th:first-child,
+.stats-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 2;
 }
 
 .pitcher-stat-grid {
@@ -4121,6 +4129,45 @@ html {
   border-left: 1px solid #333;
   padding-left: 8px !important;
   text-align: center;
+}
+
+.game-summary-wlsv {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.game-summary-wlsv h4 {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.game-summary-wlsv-row {
+  display: flex;
+  gap: 12px;
+}
+
+.game-summary-wlsv-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  flex: 1;
+}
+
+.game-summary-wlsv-row select {
+  background: var(--input-bg, #222);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: #fff;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  width: 100%;
 }
 
 /* ── StatLabel tooltip ─────────────────────────────────────────── */
