@@ -19,7 +19,11 @@ dotenv.config()
 const app = express()
 const port = process.env.PORT || 4000
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }))
+const allowedOrigins = process.env.FRONTEND_URL
+  ? [process.env.FRONTEND_URL, 'https://localhost', 'capacitor://localhost', 'http://localhost']
+  : true
+
+app.use(cors({ origin: allowedOrigins }))
 app.use(express.json({ limit: '100kb' }))
 
 app.get('/', (req, res) => {
