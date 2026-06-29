@@ -9,12 +9,13 @@ import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
 import AdminPage from './pages/AdminPage'
 import { addInningRuns } from './utils/stats'
-import { VALID_POSITIONS } from './data/positions'
 import './App.css'
 import Button from './components/ui/Button'
-import { getPlayerId } from './utils/player'
-
-const GAME_STATE_STORAGE_KEY = 'baseball_game_state_v2'
+import { getPlayerId, normalizePlayer } from './utils/player'
+import {
+  GAME_STATE_STORAGE_KEY, INITIAL_GAME_STATE, getSavedGameState, advanceOnWalk,
+} from './utils/gameState'
+import { advanceOpponentLineup } from './utils/fieldGame'
 
 function decodeRole(auth) {
   try {
@@ -23,165 +24,6 @@ function decodeRole(auth) {
   } catch {
     return null
   }
-}
-
-function advanceOpponentLineup(current) {
-  const lineup = Array.isArray(current.opponentLineup) ? [...current.opponentLineup] : []
-  while (lineup.length < 9) lineup.push(null)
-  const idx = (typeof current.opponentLineupIndex === 'number' ? current.opponentLineupIndex : 0) % 9
-  const batter = current.currentOpponentBatter || { number: '', name: '' }
-  if (batter.number?.trim()) {
-    lineup[idx] = { number: batter.number.trim(), name: batter.name?.trim() || '' }
-  }
-  const nextIdx = (idx + 1) % 9
-  const nextBatter = lineup[nextIdx]
-  return {
-    opponentLineup: lineup,
-    opponentLineupIndex: nextIdx,
-    currentOpponentBatter: nextBatter || { number: '', name: '' },
-  }
-}
-
-const INITIAL_GAME_STATE = {
-  inning: 1,
-  inningHalf: 'top',
-  outs: 0,
-  balls: 0,
-  strikes: 0,
-  pitchCount: 0,
-  ourPitchCount: 0,
-  opponentPitchCount: 0,
-  pitchCounts: {},
-  homeScore: 0,
-  awayScore: 0,
-  inningScores: { home: [], away: [] },
-  isAttacking: true,
-  score: { home: 0, away: 0 },
-  onFieldPlayerIds: [],
-  participantPlayerIds: [],
-  battingOrder: [],
-  lineup: [],
-  bench: [],
-  currentBatterIndex: 0,
-  runners: { first: false, second: false, third: false },
-  currentPitcherId: null,
-  currentGameId: null,
-  preGameConfigured: false,
-  gameLog: [],
-  substitutions: [],
-  currentOpponentBatter: { number: '', name: '' },
-  opposingBatters: {},
-  opponentLineup: [],
-  opponentLineupIndex: 0,
-  opposingPitcher: { number: '', name: '' },
-  maxInnings: 0,
-}
-
-
-
-function normalizePlayer(player) {
-  const rawPositions = Array.isArray(player?.positions)
-    ? player.positions
-    : player?.position
-      ? [player.position]
-      : []
-
-  const positions = rawPositions
-    .map((item) => String(item || '').trim().toUpperCase())
-    .filter((item) => VALID_POSITIONS.includes(item))
-
-  const safePositions = positions.length ? positions : ['DH']
-  const activePosition = safePositions.includes(player?.activePosition)
-    ? player.activePosition
-    : safePositions[0]
-
-  return {
-    ...player,
-    positions: safePositions,
-    activePosition,
-    pitchCountLimit: Number.isFinite(player?.pitchCountLimit) ? player.pitchCountLimit : null,
-    x: Number.isFinite(player?.x) ? player.x : 50,
-    y: Number.isFinite(player?.y) ? player.y : 50,
-  }
-}
-
-function getSavedGameState() {
-  try {
-    const raw = window.localStorage.getItem(GAME_STATE_STORAGE_KEY)
-    if (!raw) return INITIAL_GAME_STATE
-
-    const parsed = JSON.parse(raw)
-
-    // No active game → discard any stale progress fields entirely
-    if (!parsed?.currentGameId) return INITIAL_GAME_STATE
-
-    return {
-      ...INITIAL_GAME_STATE,
-      ...parsed,
-      // migrate legacy `pitchCount` to `ourPitchCount` when needed
-      ourPitchCount: Number.isFinite(parsed?.ourPitchCount)
-        ? parsed.ourPitchCount
-        : Number.isFinite(parsed?.pitchCount)
-          ? parsed.pitchCount
-          : 0,
-      opponentPitchCount: Number.isFinite(parsed?.opponentPitchCount) ? parsed.opponentPitchCount : 0,
-      pitchCounts: parsed?.pitchCounts || {},
-      homeScore: Number.isFinite(parsed?.homeScore)
-        ? parsed.homeScore
-        : Number.isFinite(parsed?.score?.home)
-          ? parsed.score.home
-          : 0,
-      awayScore: Number.isFinite(parsed?.awayScore)
-        ? parsed.awayScore
-        : Number.isFinite(parsed?.score?.away)
-          ? parsed.score.away
-          : 0,
-      inningScores: parsed?.inningScores || { home: [], away: [] },
-      score: { ...INITIAL_GAME_STATE.score, ...(parsed?.score || {}) },
-      runners: { ...INITIAL_GAME_STATE.runners, ...(parsed?.runners || {}) },
-      onFieldPlayerIds: Array.isArray(parsed?.onFieldPlayerIds) ? parsed.onFieldPlayerIds : [],
-      participantPlayerIds: Array.isArray(parsed?.participantPlayerIds) ?
-        parsed.participantPlayerIds
-        : [],
-      battingOrder: Array.isArray(parsed?.battingOrder) ? parsed.battingOrder : [],
-      lineup: Array.isArray(parsed?.lineup) ? parsed.lineup : [],
-      bench: Array.isArray(parsed?.bench) ? parsed.bench : [],
-      currentBatterIndex: Number.isFinite(parsed?.currentBatterIndex) ? parsed.currentBatterIndex : 0,
-      inningHalf: parsed?.inningHalf === 'bottom' ? 'bottom' : 'top',
-      isAttacking: typeof parsed?.isAttacking === 'boolean' ? parsed.isAttacking : true,
-      preGameConfigured: Boolean(parsed?.preGameConfigured),
-      gameLog: Array.isArray(parsed?.gameLog) ? parsed.gameLog : [],
-      substitutions: Array.isArray(parsed?.substitutions) ? parsed.substitutions : [],
-      currentOpponentBatter: parsed?.currentOpponentBatter || { number: '', name: '' },
-      opposingBatters: (parsed?.opposingBatters && typeof parsed.opposingBatters === 'object' && !Array.isArray(parsed.opposingBatters)) ? parsed.opposingBatters : {},
-      opponentLineup: Array.isArray(parsed?.opponentLineup) ? parsed.opponentLineup : [],
-      opponentLineupIndex: typeof parsed?.opponentLineupIndex === 'number' ? parsed.opponentLineupIndex : 0,
-      opposingPitcher: parsed?.opposingPitcher || { number: '', name: '' },
-      maxInnings: typeof parsed?.maxInnings === 'number' ? parsed.maxInnings : 0,
-    }
-  } catch {
-    return INITIAL_GAME_STATE
-  }
-}
-
-function advanceOnWalk(runners) {
-  const next = { ...(runners || { first: false, second: false, third: false }) }
-  let runs = 0
-
-  if (!next.first) {
-    next.first = true
-    return { runners: next, runs }
-  }
-
-  if (next.second && next.third) {
-    runs += 1
-  }
-
-  next.third = next.second ? true : next.third
-  next.second = true
-  next.first = true
-
-  return { runners: next, runs }
 }
 
 async function upsertPitcherStatRecord({ gameId, pitcherId, current, patch }) {
