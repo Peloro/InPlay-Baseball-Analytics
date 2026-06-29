@@ -104,9 +104,12 @@ router.post('/', gameStatRules, validate, async (req, res) => {
     }
 
     const player = await Player.findOne({ _id: playerId, teamId: req.user.teamId }).select('positions position')
-    const playerPositions = Array.isArray(player?.positions)
+    if (!player) {
+      return res.status(404).json({ message: 'Jogador nao encontrado.' })
+    }
+    const playerPositions = Array.isArray(player.positions)
       ? player.positions
-      : player?.position
+      : player.position
         ? [player.position]
         : []
     const detectedType = playerPositions.includes('P') ? 'pitcher' : 'hitter'

@@ -90,6 +90,28 @@ if (http) {
 
 // ── Auth helpers ──────────────────────────────────────────────────
 
+function getTokenExpiry(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.exp ? payload.exp * 1000 : null
+  } catch { return null }
+}
+
+export async function refreshTokenIfNeeded() {
+  if (!http) return
+  const auth = getAuth()
+  if (!auth?.token) return
+  const exp = getTokenExpiry(auth.token)
+  if (!exp) return
+  const now = Date.now()
+  if (exp <= now) return // already expired — 401 interceptor will handle it
+  if (exp - now > 7 * 24 * 60 * 60 * 1000) return // more than 7 days left, skip
+  try {
+    const res = await http.post('/auth/refresh')
+    localStorage.setItem(AUTH_KEY, JSON.stringify({ ...auth, token: res.data.token }))
+  } catch { /* silent — actual expiry is handled by the 401 interceptor */ }
+}
+
 export async function login(email, password) {
   if (!http) throw new Error('Backend não configurado.')
   const res = await http.post('/auth/login', { email, password })
@@ -275,6 +297,7 @@ export async function syncWithServer() {
 
   emitStatus('syncing')
   try {
+    await refreshTokenIfNeeded()
     // Push pending local writes first so the server pull reflects them
     await flushWriteQueue()
 

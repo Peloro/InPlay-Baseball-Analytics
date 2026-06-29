@@ -92,6 +92,9 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'id invalido.' })
+    }
     const game = await Game.findOne({ _id: req.params.id, teamId: req.user.teamId })
     if (!game) return res.status(404).json({ message: 'Jogo nao encontrado.' })
     res.json(game)
@@ -102,6 +105,9 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'id invalido.' })
+    }
     const setup = sanitizeSetupPayload(req.body)
     const update = {}
 

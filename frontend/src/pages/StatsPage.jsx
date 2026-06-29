@@ -203,6 +203,8 @@ function StatsPage({
     const pitcherMetrics = {
       inningsPitched: (e) => safeNumber(e.pitching?.inningsPitched),
       era:            (e) => safeNumber(e.era),
+      whip:           (e) => { const o = safeNumber(e.pitching?.outsPitched); return o ? (safeNumber(e.pitching?.walks) + safeNumber(e.pitching?.hitsAllowed)) / (o / 3) : 0 },
+      k9:             (e) => { const o = safeNumber(e.pitching?.outsPitched); return o ? (safeNumber(e.pitching?.strikeouts) * 9) / (o / 3) : 0 },
       strikeouts_p:   (e) => safeNumber(e.pitching?.strikeouts),
       walks_p:        (e) => safeNumber(e.pitching?.walks),
       hitsAllowed:    (e) => safeNumber(e.pitching?.hitsAllowed),
@@ -399,8 +401,8 @@ function StatsPage({
     setShowGameDetail(false)
   }
 
-  const hitterColCount = 13  // Jogador, N, Pos, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
-  const pitcherColCount = 11 // Jogador, N, Pos, IP, ERA, SO, BB, H, PC, STR, BAL
+  const hitterColCount = 13   // Jogador, N, Pos, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
+  const pitcherColCount = 13  // Jogador, N, Pos, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
 
   return (
     <section className="stats-page stats-page-full">
@@ -536,7 +538,7 @@ function StatsPage({
                   </>
                 ) : (
                   <>
-                    {[['inningsPitched','IP'],['era','ERA'],['strikeouts_p','SO'],['walks_p','BB'],['hitsAllowed','H'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
+                    {[['inningsPitched','IP'],['era','ERA'],['whip','WHIP'],['k9','K/9'],['strikeouts_p','SO'],['walks_p','BB'],['hitsAllowed','H'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
                         {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
@@ -578,6 +580,8 @@ function StatsPage({
                       <>
                         <td>{formatIpFromOuts(entry.pitching?.outsPitched)}</td>
                         <td>{entry.era ? Number(entry.era).toFixed(2) : eraFromEntry(entry)}</td>
+                        <td>{whipFromPitching(entry.pitching)}</td>
+                        <td>{k9FromPitching(entry.pitching)}</td>
                         <td>{safeNumber(entry.pitching?.strikeouts)}</td>
                         <td>{safeNumber(entry.pitching?.walks)}</td>
                         <td>{safeNumber(entry.pitching?.hitsAllowed)}</td>

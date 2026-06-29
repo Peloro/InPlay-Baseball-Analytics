@@ -6,6 +6,9 @@ const router = express.Router()
 
 router.get('/', async (req, res) => {
   try {
+    if (!req.user.teamId) {
+      return res.status(403).json({ message: 'Acesso negado.' })
+    }
     const playerFilter = req.query.playerId
     const match = { teamId: new mongoose.Types.ObjectId(req.user.teamId) }
 

@@ -85,4 +85,38 @@ router.post('/login', authLimiter, loginRules, validate, async (req, res) => {
   }
 })
 
+router.post('/refresh', async (req, res) => {
+  const header = req.headers.authorization
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Token ausente.' })
+  }
+  const token = header.slice(7)
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET)
+
+    if (payload.role === 'admin') {
+      const newToken = jwt.sign(
+        { userId: payload.userId, teamId: null, role: 'admin' },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
+      )
+      return res.json({ token: newToken })
+    }
+
+    const team = await Team.findById(payload.teamId).select('name status')
+    if (!team || team.status === 'blocked') {
+      return res.status(403).json({ message: 'Equipe bloqueada. Contate o administrador.' })
+    }
+
+    const newToken = jwt.sign(
+      { userId: payload.userId, teamId: payload.teamId, role: payload.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    )
+    res.json({ token: newToken, teamId: payload.teamId, teamName: team.name })
+  } catch {
+    return res.status(401).json({ message: 'Token invalido.' })
+  }
+})
+
 module.exports = router
