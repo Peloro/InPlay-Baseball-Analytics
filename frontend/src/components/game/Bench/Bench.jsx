@@ -104,6 +104,8 @@ const Bench = React.forwardRef(function Bench({
   setPlayers,
   gameState,
   onUpdateGameState,
+  collapsed = false,
+  onToggleCollapse,
 }, ref) {
   const [localSearch, setLocalSearch] = useState(benchSearch)
   const debounceRef = useRef(null)
@@ -119,46 +121,61 @@ const Bench = React.forwardRef(function Bench({
   return (
     <aside
       ref={ref}
-      className={`bench-panel ${dropTarget === 'bench' ? 'drop-ready' : ''}`}
+      className={`bench-panel ${dropTarget === 'bench' ? 'drop-ready' : ''} ${collapsed ? 'bench-panel--collapsed' : ''}`}
       aria-label="Banco de reservas"
     >
-      <div className="bench-head">
-        <div className="bench-head-row">
-          <h3>Banco</h3>
-          <span className="bench-field-count">{fieldCount} em campo</span>
-        </div>
-        <Input
-          placeholder="Buscar jogador"
-          value={localSearch}
-          onChange={(event) => setLocalSearch(event.target.value)}
-          aria-label="Buscar jogador no banco"
-        />
-      </div>
+      <button
+        type="button"
+        className="bench-collapse-tab"
+        onClick={() => onToggleCollapse?.()}
+        aria-label={collapsed ? 'Expandir banco' : 'Recolher banco'}
+        title={collapsed ? 'Expandir banco' : 'Recolher banco'}
+      >
+        {collapsed ? '◀' : '▶'}
+        {collapsed && <span className="bench-collapse-count">{benchPlayers.length}</span>}
+      </button>
 
-      <div className="bench-list">
-        {dropMessage && dropTarget === 'bench' && <div className="drop-hint">{dropMessage}</div>}
-        {benchPlayers.map((player) => {
-          const id = getPlayerId(player)
-          return (
-            <BenchCard
-              key={id}
-              player={player}
-              id={id}
-              isSelected={selectedId === id}
-              startDragPlayer={startDragPlayer}
-              openPlayerDetails={openPlayerDetails}
-              openEditModal={openEditModal}
-              getPlayerId={getPlayerId}
-              getMainPosition={getMainPosition}
-              playersById={playersById}
-              setPlayers={setPlayers}
-              gameState={gameState}
-              onUpdateGameState={onUpdateGameState}
-              setSelectedId={setSelectedId}
+      {!collapsed && (
+        <>
+          <div className="bench-head">
+            <div className="bench-head-row">
+              <h3>Banco</h3>
+              <span className="bench-field-count">{fieldCount} em campo</span>
+            </div>
+            <Input
+              placeholder="Buscar jogador"
+              value={localSearch}
+              onChange={(event) => setLocalSearch(event.target.value)}
+              aria-label="Buscar jogador no banco"
             />
-          )
-        })}
-      </div>
+          </div>
+
+          <div className="bench-list">
+            {dropMessage && dropTarget === 'bench' && <div className="drop-hint">{dropMessage}</div>}
+            {benchPlayers.map((player) => {
+              const id = getPlayerId(player)
+              return (
+                <BenchCard
+                  key={id}
+                  player={player}
+                  id={id}
+                  isSelected={selectedId === id}
+                  startDragPlayer={startDragPlayer}
+                  openPlayerDetails={openPlayerDetails}
+                  openEditModal={openEditModal}
+                  getPlayerId={getPlayerId}
+                  getMainPosition={getMainPosition}
+                  playersById={playersById}
+                  setPlayers={setPlayers}
+                  gameState={gameState}
+                  onUpdateGameState={onUpdateGameState}
+                  setSelectedId={setSelectedId}
+                />
+              )
+            })}
+          </div>
+        </>
+      )}
     </aside>
   )
 })

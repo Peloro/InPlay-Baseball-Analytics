@@ -249,8 +249,10 @@ function FieldPage({
   })
   const [setupDraggingId, setSetupDraggingId] = useState(null)
   const [opponentDefense, setOpponentDefense] = useState(makeOpponentMarkers)
-  const [modePendingConfirm, setModePendingConfirm] = useState(false)
-  const modePendingTimerRef = useRef(null)
+  const [showModeConfirmModal, setShowModeConfirmModal] = useState(false)
+  const [benchCollapsed, setBenchCollapsed] = useState(false)
+  const [runnerBasePopover, setRunnerBasePopover] = useState(null)
+  const [pregameStep, setPregameStep] = useState(0)
   const [pendingSubstitution, setPendingSubstitution] = useState(null)
   const [pendingDefenseError, setPendingDefenseError] = useState(false)
   const [selectedErrorDefenderId, setSelectedErrorDefenderId] = useState('')
@@ -381,6 +383,7 @@ function FieldPage({
       setSetupStarters(starters)
       setSetupBattingOrder([])
       setShowPreGameSetup(true)
+      setPregameStep(0)
     }, 0)
 
     return () => window.clearTimeout(timer)
@@ -2564,6 +2567,8 @@ function FieldPage({
         setPlayers={setPlayers}
         gameState={gameState}
         onUpdateGameState={onUpdateGameState}
+        collapsed={benchCollapsed}
+        onToggleCollapse={() => setBenchCollapsed(c => !c)}
       />
       )}
 
@@ -2636,22 +2641,10 @@ function FieldPage({
               </span>
               <button
                 type="button"
-                className={`hud-mode-toggle-btn${modePendingConfirm ? ' hud-mode-toggle-pending' : ''}`}
-                onClick={() => {
-                  if (!modePendingConfirm) {
-                    setModePendingConfirm(true)
-                    if (modePendingTimerRef.current) clearTimeout(modePendingTimerRef.current)
-                    modePendingTimerRef.current = window.setTimeout(() => setModePendingConfirm(false), 2000)
-                    return
-                  }
-                  clearTimeout(modePendingTimerRef.current)
-                  setModePendingConfirm(false)
-                  onUpdateGameState((current) => ({
-                    ...current, isAttacking: !current.isAttacking, balls: 0, strikes: 0,
-                  }), 'Modo alternado manualmente')
-                }}
+                className="hud-mode-toggle-btn"
+                onClick={() => setShowModeConfirmModal(true)}
               >
-                {modePendingConfirm ? 'Confirmar?' : 'Trocar'}
+                Trocar
               </button>
             </div>
 
@@ -2823,98 +2816,190 @@ function FieldPage({
             </div>
 
             <div className="acoes-runners-section">
-              <svg viewBox="0 0 100 100" className="acoes-diamond-svg" aria-hidden="true">
-                <line x1="50" y1="16" x2="84" y2="50" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="84" y1="50" x2="50" y2="84" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="50" y1="84" x2="16" y2="50" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="16" y1="50" x2="50" y2="16" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
-                <rect x="43" y="9" width="14" height="14" transform="rotate(45 50 16)"
-                  fill={gameState.runners?.second ? '#d2a100' : '#1e1e1e'} stroke={gameState.runners?.second ? '#e8b800' : '#484848'} strokeWidth="1.5"/>
-                <rect x="77" y="43" width="14" height="14" transform="rotate(45 84 50)"
-                  fill={gameState.runners?.first ? '#d2a100' : '#1e1e1e'} stroke={gameState.runners?.first ? '#e8b800' : '#484848'} strokeWidth="1.5"/>
-                <rect x="9" y="43" width="14" height="14" transform="rotate(45 16 50)"
-                  fill={gameState.runners?.third ? '#d2a100' : '#1e1e1e'} stroke={gameState.runners?.third ? '#e8b800' : '#484848'} strokeWidth="1.5"/>
-                <polygon points="44,78 56,78 59,84 50,89 41,84"
-                  fill="#1e1e1e" stroke="#484848" strokeWidth="1.5"/>
-              </svg>
-              <div className="acoes-runners-grid">
-                {['first', 'second', 'third'].map((base) => (
-                  <div key={base} className="acoes-runner-item">
-                    <span className={`acoes-base-badge ${gameState.runners?.[base] ? 'occupied' : ''}`}>
-                      {base === 'first' ? '1ª' : base === 'second' ? '2ª' : '3ª'}
+              <div className="acoes-diamond-wrap">
+                <svg viewBox="0 0 100 100" className="acoes-diamond-svg" aria-label="Diamante — toque uma base para gerenciar corredor">
+                  <line x1="50" y1="16" x2="84" y2="50" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="84" y1="50" x2="50" y2="84" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="50" y1="84" x2="16" y2="50" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="16" y1="50" x2="50" y2="16" stroke="#3a3a3a" strokeWidth="2" strokeLinecap="round"/>
+                  {/* 2ª base (topo) */}
+                  <rect x="43" y="9" width="14" height="14" transform="rotate(45 50 16)"
+                    fill={gameState.runners?.second ? '#d2a100' : '#1e1e1e'}
+                    stroke={runnerBasePopover === 'second' ? '#fff' : (gameState.runners?.second ? '#e8b800' : '#484848')}
+                    strokeWidth={runnerBasePopover === 'second' ? '2.5' : '1.5'}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setRunnerBasePopover(p => p === 'second' ? null : 'second')}
+                  />
+                  <text x="50" y="19" textAnchor="middle" fontSize="5" fill={gameState.runners?.second ? '#1b1b1b' : '#666'} style={{ pointerEvents: 'none' }}>2</text>
+                  {/* 1ª base (direita) */}
+                  <rect x="77" y="43" width="14" height="14" transform="rotate(45 84 50)"
+                    fill={gameState.runners?.first ? '#d2a100' : '#1e1e1e'}
+                    stroke={runnerBasePopover === 'first' ? '#fff' : (gameState.runners?.first ? '#e8b800' : '#484848')}
+                    strokeWidth={runnerBasePopover === 'first' ? '2.5' : '1.5'}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setRunnerBasePopover(p => p === 'first' ? null : 'first')}
+                  />
+                  <text x="84" y="53" textAnchor="middle" fontSize="5" fill={gameState.runners?.first ? '#1b1b1b' : '#666'} style={{ pointerEvents: 'none' }}>1</text>
+                  {/* 3ª base (esquerda) */}
+                  <rect x="9" y="43" width="14" height="14" transform="rotate(45 16 50)"
+                    fill={gameState.runners?.third ? '#d2a100' : '#1e1e1e'}
+                    stroke={runnerBasePopover === 'third' ? '#fff' : (gameState.runners?.third ? '#e8b800' : '#484848')}
+                    strokeWidth={runnerBasePopover === 'third' ? '2.5' : '1.5'}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setRunnerBasePopover(p => p === 'third' ? null : 'third')}
+                  />
+                  <text x="16" y="53" textAnchor="middle" fontSize="5" fill={gameState.runners?.third ? '#1b1b1b' : '#666'} style={{ pointerEvents: 'none' }}>3</text>
+                  <polygon points="44,78 56,78 59,84 50,89 41,84" fill="#1e1e1e" stroke="#484848" strokeWidth="1.5"/>
+                </svg>
+                <p className="acoes-diamond-hint">Toque uma base</p>
+              </div>
+
+              {runnerBasePopover && (
+                <div className="runner-popover">
+                  <div className="runner-popover-header">
+                    {runnerBasePopover === 'first' ? '1ª Base' : runnerBasePopover === 'second' ? '2ª Base' : '3ª Base'}
+                    <span className={`runner-popover-status ${gameState.runners?.[runnerBasePopover] ? 'occupied' : ''}`}>
+                      {gameState.runners?.[runnerBasePopover] ? 'ocupada' : 'vazia'}
                     </span>
-                    {!gameState.runners?.[base] && (
-                      <button type="button" className="acoes-runner-btn" onClick={() => onUpdateGameState((current) => ({ ...current, runners: { ...current.runners, [base]: true } }), `Corredor em ${base}`)}>+</button>
-                    )}
-                    {gameState.runners?.[base] && (
+                  </div>
+                  <div className="runner-popover-btns">
+                    {!gameState.runners?.[runnerBasePopover] ? (
+                      <button type="button" className="runner-popover-btn runner-popover-btn--add"
+                        onClick={() => {
+                          onUpdateGameState((current) => ({ ...current, runners: { ...current.runners, [runnerBasePopover]: true } }), `Corredor em ${runnerBasePopover}`)
+                          setRunnerBasePopover(null)
+                        }}>
+                        + Colocar corredor
+                      </button>
+                    ) : (
                       <>
-                        <button type="button" className="acoes-runner-btn" onClick={() => advanceRunner(base)}>Av</button>
-                        <button type="button" className="acoes-runner-btn" onClick={() => setPendingRemoveRunner(base)}>Out</button>
+                        <button type="button" className="runner-popover-btn runner-popover-btn--advance"
+                          onClick={() => { advanceRunner(runnerBasePopover); setRunnerBasePopover(null) }}>
+                          Avançar →
+                        </button>
+                        <button type="button" className="runner-popover-btn runner-popover-btn--out"
+                          onClick={() => { setPendingRemoveRunner(runnerBasePopover); setRunnerBasePopover(null) }}>
+                          Out ✕
+                        </button>
                       </>
                     )}
+                    <button type="button" className="runner-popover-btn runner-popover-btn--cancel"
+                      onClick={() => setRunnerBasePopover(null)}>
+                      Cancelar
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
 
             {invalidFeedback && <div className="drop-hint">{invalidFeedback}</div>}
 
             <div className="acoes-end-row">
-              <button type="button" className="acoes-undo-btn" onClick={() => handleUndo().catch(() => {})}>↩ Desfazer</button>
+              <button
+                type="button"
+                className={`acoes-undo-btn${undoStack.length === 0 ? ' acoes-undo-btn--empty' : ''}`}
+                disabled={undoStack.length === 0}
+                onClick={() => handleUndo().catch(() => {})}
+              >
+                ↩ {undoStack.length > 0 && (gameState.gameLog || []).length > 0
+                  ? `Desfazer: ${(gameState.gameLog || []).slice(-1)[0].description}`
+                  : 'Desfazer'}
+              </button>
               <button type="button" className="acoes-end-btn" onClick={() => setPendingEndGame(true)}>Encerrar jogo</button>
             </div>
           </div>
 
           <div className="acoes-right">
-            <div className="acoes-btns-grid">
+            {/* Persistent status bar */}
+            <div className="acoes-status-bar">
+              <span className={`acoes-status-mode ${gameState.isAttacking ? 'acoes-status-mode--atk' : 'acoes-status-mode--def'}`}>
+                {gameState.isAttacking ? 'ATACANDO' : 'DEFENDENDO'}
+              </span>
+              <span className="acoes-status-inning">
+                {gameState.inningHalf === 'top' ? '▲' : '▼'} {gameState.inning || 1}ª
+              </span>
+              <span className="acoes-status-count">
+                {gameState.balls||0}B · {gameState.strikes||0}S · {gameState.outs||0}O
+              </span>
+              {gameState.isAttacking && currentBatter && (
+                <span className="acoes-status-batter">{currentBatter.name} #{currentBatter.number}</span>
+              )}
+              {!gameState.isAttacking && gameState.currentPitcherId && playersById[gameState.currentPitcherId] && (
+                <span className="acoes-status-batter">{playersById[gameState.currentPitcherId].name} #{playersById[gameState.currentPitcherId].number}</span>
+              )}
+            </div>
+
+            {/* Pitch type selector (defense only) */}
+            {!gameState.isAttacking && (
+              <>
+                <div className="pitch-type-selector">
+                  {activePitchTypes.map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`pitch-type-btn${selectedPitchType === t ? ' active' : ''}`}
+                      onClick={() => setSelectedPitchType(t)}
+                    >
+                      <span className="pitch-type-btn-abbr">{t}</span>
+                      {selectedPitchType === t && <span className="pitch-type-btn-name">{PITCH_NAMES[t]}</span>}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Count section */}
+            <div className="acoes-section-label">Contagem</div>
+            <div className="acoes-count-btns">
               {gameState.isAttacking ? (
                 <>
                   <button type="button" className="acoes-btn acoes-strike" onClick={() => applyAttackCountAction('strike')}>STRIKE</button>
                   <button type="button" className="acoes-btn acoes-ball" onClick={() => applyAttackCountAction('ball')}>BALL</button>
                   <button type="button" className="acoes-btn acoes-foul" onClick={() => applyAttackCountAction('foul')}>FOUL</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="acoes-btn acoes-strike" onClick={() => handleDefensivePitch('strike')}>STRIKE</button>
+                  <button type="button" className="acoes-btn acoes-ball" onClick={() => handleDefensivePitch('ball')}>BALL</button>
+                  <button type="button" className="acoes-btn acoes-foul" onClick={() => handleDefensivePitch('foul')}>FOUL</button>
+                </>
+              )}
+            </div>
+
+            {/* Result section */}
+            <div className="acoes-section-label">Resultado</div>
+            <div className="acoes-btns-grid">
+              {gameState.isAttacking ? (
+                <>
                   <button type="button" className="acoes-btn acoes-out" onClick={() => applyPlateAppearance('out')}>OUT</button>
                   <button type="button" className="acoes-btn acoes-1b" onClick={() => applyPlateAppearance('single')}>SIMPLES</button>
                   <button type="button" className="acoes-btn acoes-2b" onClick={() => applyPlateAppearance('double')}>DUPLA</button>
                   <button type="button" className="acoes-btn acoes-3b" onClick={() => applyPlateAppearance('triple')}>TRIPLA</button>
                   <button type="button" className="acoes-btn acoes-hr" onClick={() => applyPlateAppearance('homerun')}>HOME RUN</button>
+                  <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
+                  <button type="button" className="acoes-btn acoes-erro" onClick={() => applyErrorEvent('')}>ERRO</button>
                   {(gameState.runners?.first || gameState.runners?.second || gameState.runners?.third) && gameState.outs < 2 && (
                     <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
                   )}
                   {gameState.runners?.third && gameState.outs < 2 && (
                     <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
                   )}
-                  <button type="button" className="acoes-btn acoes-erro" onClick={() => applyErrorEvent('')}>ERRO</button>
-                  <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
                 </>
               ) : (
                 <>
-                  <div className="pitch-type-selector">
-                    {activePitchTypes.map(t => (
-                      <button
-                        key={t}
-                        type="button"
-                        className={`pitch-type-btn${selectedPitchType === t ? ' active' : ''}`}
-                        onClick={() => setSelectedPitchType(t)}
-                      >{t}</button>
-                    ))}
-                  </div>
-                  <div className="pitch-type-selected-desc">{PITCH_NAMES[selectedPitchType]}</div>
-                  <button type="button" className="acoes-btn acoes-strike" onClick={() => handleDefensivePitch('strike')}>STRIKE</button>
-                  <button type="button" className="acoes-btn acoes-ball" onClick={() => handleDefensivePitch('ball')}>BALL</button>
-                  <button type="button" className="acoes-btn acoes-foul" onClick={() => handleDefensivePitch('foul')}>FOUL</button>
                   <button type="button" className="acoes-btn acoes-out" onClick={() => { setSelectedOutType(''); setSelectedOutFielderId(''); setPendingOutTypeSelect(true) }}>OUT</button>
                   <button type="button" className="acoes-btn acoes-1b" onClick={() => applyDefensiveHit('single')}>SINGLE</button>
                   <button type="button" className="acoes-btn acoes-2b" onClick={() => applyDefensiveHit('double')}>DOUBLE</button>
                   <button type="button" className="acoes-btn acoes-3b" onClick={() => applyDefensiveHit('triple')}>TRIPLE</button>
                   <button type="button" className="acoes-btn acoes-hr" onClick={() => applyDefensiveHit('homerun')}>HOME RUN</button>
+                  <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
+                  <button type="button" className="acoes-btn acoes-erro" onClick={() => { setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || ''); setPendingDefenseError(true) }}>ERRO</button>
                   {(gameState.runners?.first || gameState.runners?.second || gameState.runners?.third) && gameState.outs < 2 && (
                     <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
                   )}
                   {gameState.runners?.third && gameState.outs < 2 && (
                     <button type="button" className="acoes-btn acoes-sf" onClick={applySacFly}>SAC FLY</button>
                   )}
-                  <button type="button" className="acoes-btn acoes-erro" onClick={() => { setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || ''); setPendingDefenseError(true) }}>ERRO</button>
-                  <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
                 </>
               )}
             </div>
@@ -3066,6 +3151,20 @@ function FieldPage({
         </div>
       )}
 
+      {/* Always-visible score chip on campo view */}
+      {gameSubView === 'campo' && gameState.preGameConfigured && (
+        <button type="button" className="score-chip" onClick={() => setShowScoreboard(s => !s)}>
+          <span className={`score-chip-mode ${gameState.isAttacking ? 'score-chip-mode--atk' : 'score-chip-mode--def'}`}>
+            {gameState.isAttacking ? 'ATK' : 'DEF'}
+          </span>
+          <span className="score-chip-score">CAASO {gameState.homeScore||0} × {gameState.awayScore||0} {opponentName||'Adv'}</span>
+          <span className="score-chip-dot">·</span>
+          <span className="score-chip-inning">{gameState.inningHalf==='top'?'▲':'▼'} {gameState.inning||1}ª</span>
+          <span className="score-chip-dot">·</span>
+          <span className="score-chip-outs">{gameState.outs||0} out</span>
+        </button>
+      )}
+
       {/* Sub-view toggle */}
       <div className="game-subview-bar" role="tablist" aria-label="Visão do jogo">
         <button
@@ -3099,193 +3198,249 @@ function FieldPage({
 
     
 
-      {showPreGameSetup && (
-        <Modal
-          title="Configuracao Inicial"
-          onClose={gameState.currentGameId ? () => setShowPreGameSetup(false) : onCancelPreGame ?? undefined}
-          closeLabel="Cancelar"
-        >
-          <div className="pregame-grid">
-                <section className="player-stats-block pregame-info">
-                  <h4>0) Informações do jogo</h4>
-                  <label htmlFor="pregame-date" className="field-label">Data</label>
-                  <input
-                    id="pregame-date"
-                    type="date"
-                    value={pregameForm.date}
-                    onChange={(e) => setPregameForm((c) => ({ ...c, date: e.target.value }))}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <label htmlFor="pregame-opponent" className="field-label">Adversário</label>
-                  <input
-                    id="pregame-opponent"
-                    placeholder="Nome do adversario"
-                    value={pregameForm.opponentName}
-                    onChange={(e) => setPregameForm((c) => ({ ...c, opponentName: e.target.value }))}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <label htmlFor="pregame-competition" className="field-label">Competição</label>
-                  <input
-                    id="pregame-competition"
-                    placeholder="Competicao (treino/campeonato)"
-                    value={pregameForm.competition}
-                    onChange={(e) => setPregameForm((c) => ({ ...c, competition: e.target.value }))}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <label htmlFor="pregame-location" className="field-label">Local (opcional)</label>
-                  <input
-                    id="pregame-location"
-                    placeholder="Local (opcional)"
-                    value={pregameForm.location}
-                    onChange={(e) => setPregameForm((c) => ({ ...c, location: e.target.value }))}
-                  />
-                  <label htmlFor="pregame-innings" className="field-label" style={{ marginTop: 8, display: 'block' }}>Innings (0 = ilimitado)</label>
-                  <input
-                    id="pregame-innings"
-                    type="number"
-                    min="0"
-                    max="20"
-                    placeholder="9"
-                    value={pregameForm.maxInnings}
-                    onChange={(e) => setPregameForm((c) => ({ ...c, maxInnings: e.target.value }))}
-                  />
-                </section>
+      {showPreGameSetup && (() => {
+        const step0Valid = !gameState.currentGameId
+          ? (pregameForm.date && pregameForm.opponentName.trim() && pregameForm.competition.trim())
+          : true
+        const step1Valid = setupStarters.filter((item) => item.playerId).length === 9
+        const step2Valid = setupBattingOrder.length === 9
+        const allValid = step0Valid && step1Valid && step2Valid
+        const stepLabels = ['Jogo', 'Defesa', 'Ordem']
+        return (
+          <Modal
+            title="Configuração Inicial"
+            onClose={gameState.currentGameId ? () => setShowPreGameSetup(false) : onCancelPreGame ?? undefined}
+            closeLabel="Cancelar"
+          >
+            {/* Step indicator */}
+            <div className="pregame-steps">
+              {stepLabels.map((label, i) => {
+                const canJumpTo = i <= pregameStep
+                  || (i === 1 && step0Valid)
+                  || (i === 2 && step0Valid && step1Valid)
+                return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`pregame-step-btn${pregameStep === i ? ' active' : ''}${i < pregameStep ? ' done' : ''}${!canJumpTo ? ' disabled' : ''}`}
+                  onClick={() => canJumpTo && setPregameStep(i)}
+                  disabled={!canJumpTo}
+                >
+                  <span className="pregame-step-num">{i < pregameStep ? '✓' : i + 1}</span>
+                  <span className="pregame-step-label">{label}</span>
+                </button>
+              )
+              })}
+            </div>
 
-                <section className="player-stats-block">
-                  <h4>1) Inicio</h4>
-                  <div className="pregame-radio-row">
-                    <label>
-                      <input
-                        type="radio"
-                        name="setup-start"
-                        checked={setupAttacking}
-                        onChange={() => setSetupAttacking(true)}
-                      />
-                      Comecar atacando
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="setup-start"
-                        checked={!setupAttacking}
-                        onChange={() => setSetupAttacking(false)}
-                      />
-                      Comecar defendendo
-                    </label>
-                  </div>
-                </section>
+            {/* Step 0: Game info */}
+            {pregameStep === 0 && (
+              <div className="pregame-step-content">
+                <label htmlFor="pregame-date" className="field-label">Data</label>
+                <input
+                  id="pregame-date"
+                  type="date"
+                  value={pregameForm.date}
+                  onChange={(e) => setPregameForm((c) => ({ ...c, date: e.target.value }))}
+                  style={{ marginBottom: 12 }}
+                />
+                <label htmlFor="pregame-opponent" className="field-label">Adversário *</label>
+                <input
+                  id="pregame-opponent"
+                  placeholder="Nome do adversário"
+                  value={pregameForm.opponentName}
+                  onChange={(e) => setPregameForm((c) => ({ ...c, opponentName: e.target.value }))}
+                  style={{ marginBottom: 12 }}
+                />
+                <label htmlFor="pregame-competition" className="field-label">Competição *</label>
+                <input
+                  id="pregame-competition"
+                  placeholder="Ex: Treino, Campeonato..."
+                  value={pregameForm.competition}
+                  onChange={(e) => setPregameForm((c) => ({ ...c, competition: e.target.value }))}
+                  style={{ marginBottom: 12 }}
+                />
+                <label htmlFor="pregame-location" className="field-label">Local (opcional)</label>
+                <input
+                  id="pregame-location"
+                  placeholder="Local (opcional)"
+                  value={pregameForm.location}
+                  onChange={(e) => setPregameForm((c) => ({ ...c, location: e.target.value }))}
+                  style={{ marginBottom: 12 }}
+                />
+                <label htmlFor="pregame-innings" className="field-label">Innings (0 = ilimitado)</label>
+                <input
+                  id="pregame-innings"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="9"
+                  value={pregameForm.maxInnings}
+                  onChange={(e) => setPregameForm((c) => ({ ...c, maxInnings: e.target.value }))}
+                  style={{ marginBottom: 12 }}
+                />
+                <div className="pregame-radio-row">
+                  <label className={`pregame-radio-option${setupAttacking ? ' selected' : ''}`}>
+                    <input type="radio" name="setup-start" checked={setupAttacking} onChange={() => setSetupAttacking(true)} />
+                    Começar atacando
+                  </label>
+                  <label className={`pregame-radio-option${!setupAttacking ? ' selected' : ''}`}>
+                    <input type="radio" name="setup-start" checked={!setupAttacking} onChange={() => setSetupAttacking(false)} />
+                    Começar defendendo
+                  </label>
+                </div>
+              </div>
+            )}
 
-            <section className="player-stats-block">
-              <h4>2) Titulares e posicoes</h4>
-              <div className="pregame-lineup-grid">
-                {setupStarters.map((slot) => {
-                  const selectedIds = setupStarters
-                    .filter((item) => item.position !== slot.position)
-                    .map((item) => item.playerId)
-                    .filter(Boolean)
-                  const selectedPlayer = playersById[slot.playerId]
-
-                  return (
-                    <div key={`setup-${slot.position}`} className="pregame-slot">
-                      <strong>{slot.position}</strong>
-                      <select
-                        value={slot.playerId}
-                        onChange={(event) => assignStarter(slot.position, event.target.value)}
-                      >
-                        <option value="">Selecionar jogador</option>
-                        {selectedPlayer && (
-                          <option value={slot.playerId}>
-                            {selectedPlayer.name} #{selectedPlayer.number}
-                          </option>
-                        )}
-                        {(() => {
-                          const available = setupAvailablePlayers.filter(
-                            (player) => !selectedIds.includes(getPlayerId(player))
-                          )
-                          const preferred = available.filter((p) => playerPrefersPosition(getPlayerId(p), slot.position))
-                          const others = available.filter((p) => !playerPrefersPosition(getPlayerId(p), slot.position))
-                          const makeOption = (player, prefix = '') => {
-                            const id = getPlayerId(player)
-                            return (
-                              <option key={`setup-player-${slot.position}-${id}`} value={id}>
-                                {prefix}{player.name} #{player.number}
-                              </option>
+            {/* Step 1: Starters & positions */}
+            {pregameStep === 1 && (
+              <div className="pregame-step-content">
+                <p className="pregame-step-hint">Atribua um jogador a cada posição defensiva.</p>
+                <div className="pregame-lineup-grid">
+                  {setupStarters.map((slot) => {
+                    const selectedIds = setupStarters
+                      .filter((item) => item.position !== slot.position)
+                      .map((item) => item.playerId)
+                      .filter(Boolean)
+                    const selectedPlayer = playersById[slot.playerId]
+                    return (
+                      <div key={`setup-${slot.position}`} className="pregame-slot">
+                        <strong>{slot.position}</strong>
+                        <select
+                          value={slot.playerId}
+                          onChange={(event) => assignStarter(slot.position, event.target.value)}
+                        >
+                          <option value="">— Selecionar —</option>
+                          {selectedPlayer && (
+                            <option value={slot.playerId}>
+                              {selectedPlayer.name} #{selectedPlayer.number}
+                            </option>
+                          )}
+                          {(() => {
+                            const available = setupAvailablePlayers.filter(
+                              (player) => !selectedIds.includes(getPlayerId(player))
                             )
-                          }
-                          return (
-                            <>
-                              {preferred.length > 0 && (
-                                <optgroup label="Recomendados">
-                                  {preferred.map((p) => makeOption(p, '★ '))}
-                                </optgroup>
-                              )}
-                              {others.length > 0 && (
-                                <optgroup label="Outros">
-                                  {others.map((p) => makeOption(p))}
-                                </optgroup>
-                              )}
-                            </>
-                          )
-                        })()}
-                      </select>
-                    </div>
-                  )
-                })}
+                            const preferred = available.filter((p) => playerPrefersPosition(getPlayerId(p), slot.position))
+                            const others = available.filter((p) => !playerPrefersPosition(getPlayerId(p), slot.position))
+                            const makeOption = (player, prefix = '') => {
+                              const id = getPlayerId(player)
+                              return (
+                                <option key={`setup-player-${slot.position}-${id}`} value={id}>
+                                  {prefix}{player.name} #{player.number}
+                                </option>
+                              )
+                            }
+                            return (
+                              <>
+                                {preferred.length > 0 && (
+                                  <optgroup label="Recomendados">
+                                    {preferred.map((p) => makeOption(p, '★ '))}
+                                  </optgroup>
+                                )}
+                                {others.length > 0 && (
+                                  <optgroup label="Outros">
+                                    {others.map((p) => makeOption(p))}
+                                  </optgroup>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="pregame-step-count">
+                  {setupStarters.filter((item) => item.playerId).length}/9 posições preenchidas
+                </p>
               </div>
-            </section>
+            )}
 
-            <section className="player-stats-block">
-              <h4>3) Ordem de rebatida</h4>
-              <div
-                ref={orderListRef}
-                className="pregame-order-list"
-                onPointerMove={onOrderPointerMove}
-                onPointerUp={onOrderPointerUp}
-                onPointerCancel={onOrderPointerUp}
-              >
-                {setupBattingOrder.map((id, index) => {
-                  const player = playersById[id]
-                  if (!player) return null
-                  return (
-                    <div
-                      key={`order-${id}`}
-                      data-order-id={id}
-                      className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
-                      draggable
-                      onDragStart={() => onBattingDragStart(id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => onBattingDrop(id)}
-                    >
-                      <span>{index + 1}.</span>
-                      <strong>{player.name}</strong>
-                      <span>#{player.number}</span>
-                      <span
-                        className="pregame-order-handle"
-                        style={{ touchAction: 'none' }}
-                        onPointerDown={(ev) => onOrderPointerDown(id, ev)}
-                      >⠿</span>
-                    </div>
-                  )
-                })}
+            {/* Step 2: Batting order */}
+            {pregameStep === 2 && (
+              <div className="pregame-step-content">
+                <p className="pregame-step-hint">Arraste para reordenar a ordem de rebatida.</p>
+                <div
+                  ref={orderListRef}
+                  className="pregame-order-list"
+                  onPointerMove={onOrderPointerMove}
+                  onPointerUp={onOrderPointerUp}
+                  onPointerCancel={onOrderPointerUp}
+                >
+                  {setupBattingOrder.map((id, index) => {
+                    const player = playersById[id]
+                    if (!player) return null
+                    return (
+                      <div
+                        key={`order-${id}`}
+                        data-order-id={id}
+                        className={`pregame-order-item ${setupDraggingId === id ? 'dragging' : ''}`}
+                        draggable
+                        onDragStart={() => onBattingDragStart(id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => onBattingDrop(id)}
+                      >
+                        <span className="pregame-order-num">{index + 1}.</span>
+                        <strong>{player.name}</strong>
+                        <span>#{player.number}</span>
+                        <span
+                          className="pregame-order-handle"
+                          style={{ touchAction: 'none' }}
+                          onPointerDown={(ev) => onOrderPointerDown(id, ev)}
+                        >⠿</span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </section>
-          </div>
+            )}
 
-          <div className="detail-actions">
-            <Button
-              type="button"
-              variant="primary"
-              onClick={confirmPreGameSetup}
-              disabled={
-                setupBattingOrder.length !== 9
-                || setupStarters.filter((item) => item.playerId).length !== 9
-                || (!gameState.currentGameId && (!pregameForm.date || !pregameForm.opponentName.trim() || !pregameForm.competition.trim()))
-              }
-            >
-              Iniciar jogo
-            </Button>
-          </div>
-        </Modal>
+            {/* Navigation */}
+            <div className="pregame-nav">
+              {pregameStep > 0 && (
+                <Button type="button" variant="secondary" onClick={() => setPregameStep(s => s - 1)}>
+                  ← Anterior
+                </Button>
+              )}
+              {pregameStep < 2 && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => setPregameStep(s => s + 1)}
+                  disabled={(pregameStep === 0 && !step0Valid) || (pregameStep === 1 && !step1Valid)}
+                  style={{ marginLeft: 'auto' }}
+                >
+                  Próximo →
+                </Button>
+              )}
+              {pregameStep === 2 && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={confirmPreGameSetup}
+                  disabled={!allValid}
+                  style={{ marginLeft: 'auto' }}
+                >
+                  Iniciar jogo
+                </Button>
+              )}
+            </div>
+          </Modal>
+        )
+      })()}
+
+      {showModeConfirmModal && (
+        <ConfirmModal
+          message={`Trocar para ${gameState.isAttacking ? 'DEFENDENDO' : 'ATACANDO'}?`}
+          confirmLabel="Confirmar"
+          onConfirm={() => {
+            setShowModeConfirmModal(false)
+            onUpdateGameState((current) => ({
+              ...current, isAttacking: !current.isAttacking, balls: 0, strikes: 0,
+            }), 'Modo alternado manualmente')
+          }}
+          onCancel={() => setShowModeConfirmModal(false)}
+        />
       )}
 
       {pendingEndGame && (
