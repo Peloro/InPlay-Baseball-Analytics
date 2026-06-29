@@ -1882,6 +1882,7 @@ html, body {
 
 .stats-table {
   min-width: 820px;
+  width: max-content;
   border-collapse: collapse;
   table-layout: auto;
 }
@@ -1889,17 +1890,20 @@ html, body {
 .stats-table th,
 .stats-table td {
   border-bottom: 1px solid var(--line);
-  padding: 8px;
-  text-align: left;
+  padding: 8px 10px;
+  text-align: center;
   white-space: nowrap;
 }
 
 .stats-table th:first-child,
 .stats-table td:first-child {
+  text-align: left;
   position: sticky;
   left: 0;
   background: var(--panel);
   z-index: 2;
+  min-width: 90px;
+  padding-right: 14px;
 }
 
 .pitcher-stat-grid {
@@ -2806,6 +2810,7 @@ html, body {
 
   .stats-table {
     min-width: 600px;
+    width: max-content;
     font-size: 0.9rem;
     table-layout: auto;
   }
@@ -2840,6 +2845,12 @@ html, body {
     gap: 10px;
   }
 
+  .stats-empty {
+    color: #666;
+    text-align: center;
+    padding: 20px;
+  }
+
   .stat-card {
     border: 1px solid var(--line);
     border-radius: 10px;
@@ -2867,16 +2878,17 @@ html, body {
 
   .stat-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .stat-grid > div {
     background: #161616;
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 8px;
+    padding: 6px 4px;
     text-align: center;
+    font-size: 0.82rem;
   }
 }
 

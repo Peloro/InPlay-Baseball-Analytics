@@ -669,6 +669,11 @@ function StatsPage({
             </tbody>
           </table>
           <div className="stats-cards">
+            {!seasonLoading && !visibleSeasonRows.length && (
+              <p className="stats-empty">
+                {statsTab === 'pitchers' ? 'Nenhum pitcher cadastrado.' : 'Nenhum jogador cadastrado.'}
+              </p>
+            )}
             {visibleSeasonRows.map(({ player, entry }) => {
               const id = getPlayerId(player)
               return (
