@@ -1882,7 +1882,7 @@ html, body {
 
 .stats-table {
   min-width: 820px;
-  width: max-content;
+  width: 100%;
   border-collapse: collapse;
   table-layout: auto;
 }
@@ -2810,7 +2810,7 @@ html, body {
 
   .stats-table {
     min-width: 600px;
-    width: max-content;
+    width: 100%;
     font-size: 0.9rem;
     table-layout: auto;
   }
