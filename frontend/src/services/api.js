@@ -102,7 +102,13 @@ function getTokenExpiry(token) {
 
 export async function checkStatus() {
   if (!http) return
-  try { await http.get('/auth/ping') } catch { /* interceptor handles 401/403 */ }
+  try {
+    await http.get('/auth/ping')
+    // Ping succeeded → we're online. Flush any pending writes.
+    if (lfGet(LS.syncQueue).length > 0) {
+      syncWithServer().catch(() => {})
+    }
+  } catch { /* interceptor handles 401/403 */ }
 }
 
 export async function refreshTokenIfNeeded() {
@@ -338,7 +344,8 @@ export async function syncWithServer() {
 }
 
 if (typeof window !== 'undefined' && http) {
-  window.addEventListener('online', () => { syncWithServer().catch(() => {}) })
+  // Small delay lets the network route settle before attempting sync
+  window.addEventListener('online', () => { setTimeout(() => syncWithServer().catch(() => {}), 1500) })
   window.addEventListener('offline', () => { emitStatus('offline') })
 }
 
