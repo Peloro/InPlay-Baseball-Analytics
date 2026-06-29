@@ -19,6 +19,8 @@ dotenv.config()
 const app = express()
 const port = process.env.PORT || 4000
 
+app.set('trust proxy', 1)
+
 const allowedOrigins = process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL, 'https://localhost', 'capacitor://localhost', 'http://localhost']
   : true
