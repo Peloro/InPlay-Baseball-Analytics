@@ -401,8 +401,8 @@ function StatsPage({
     setShowGameDetail(false)
   }
 
-  const hitterColCount = 13   // Jogador, N, Pos, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
-  const pitcherColCount = 13  // Jogador, N, Pos, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
+  const hitterColCount = 11   // Jogador, AB, H, HR, R, RBI, BB, SO, OUT, AVG, OBP
+  const pitcherColCount = 11  // Jogador, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
 
   return (
     <section className="stats-page stats-page-full">
@@ -526,8 +526,6 @@ function StatsPage({
             <thead>
               <tr>
                 <th>Jogador</th>
-                <th>N</th>
-                <th>Posicao</th>
                 {statsTab === 'hitters' ? (
                   <>
                     {HITTER_COLS.map(({ label, sortKey }) => (
@@ -568,8 +566,6 @@ function StatsPage({
                         {player.name}
                       </Button>
                     </td>
-                    <td>{player.number}</td>
-                    <td>{getMainPosition(player)}</td>
                     {statsTab === 'hitters' ? (
                       <>
                         {HITTER_COLS.map(({ sortKey, get }) => (
