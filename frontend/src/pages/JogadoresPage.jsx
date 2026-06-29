@@ -3,6 +3,8 @@ import PlayerStatsModal from '../components/PlayerStatsModal'
 import Modal from '../components/ui/Modal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import { gameStatsApi, seasonStatsApi } from '../services/api'
 import { VALID_POSITIONS } from '../data/positions'
 import { getPlayerId, getMainPosition } from '../utils/player'
@@ -162,14 +164,14 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
           <h2>Adicionar jogador</h2>
           <form className="player-form" onSubmit={handleAddPlayer}>
             <label htmlFor="add-player-name" className="field-label">Nome</label>
-            <input
+            <Input
               id="add-player-name"
               placeholder="Nome"
               value={form.name}
               onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
             />
             <label htmlFor="add-player-number" className="field-label">Número</label>
-            <input
+            <Input
               id="add-player-number"
               placeholder="Numero"
               type="number"
@@ -177,7 +179,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
               onChange={(e) => setForm((c) => ({ ...c, number: e.target.value }))}
             />
             <label htmlFor="add-player-pitch-limit" className="field-label">Limite de pitches (deixe em branco = sem limite)</label>
-            <input
+            <Input
               id="add-player-pitch-limit"
               placeholder="Ex: 85"
               type="number"
@@ -210,7 +212,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
                 </label>
               ))}
             </div>
-            <select
+            <Select
               value={form.activePosition}
               onChange={(e) => setForm((c) => ({ ...c, activePosition: e.target.value }))}
             >
@@ -219,7 +221,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
                   Titular: {position}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button type="submit">Salvar jogador</Button>
           </form>
         </div>
@@ -295,21 +297,21 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
         <Modal title="Editar jogador" onClose={() => setEditingPlayerId(null)}>
           <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit() }}>
             <label htmlFor="edit-player-name" className="field-label">Nome</label>
-            <input
+            <Input
               id="edit-player-name"
               placeholder="Nome"
               value={editingForm.name}
               onChange={(e) => setEditingForm((c) => ({ ...c, name: e.target.value }))}
             />
             <label htmlFor="edit-player-number" className="field-label">Número</label>
-            <input
+            <Input
               id="edit-player-number"
               placeholder="Numero"
               value={editingForm.number}
               onChange={(e) => setEditingForm((c) => ({ ...c, number: e.target.value }))}
             />
             <label htmlFor="edit-player-pitch-limit" className="field-label">Limite de pitches (deixe em branco = sem limite)</label>
-            <input
+            <Input
               id="edit-player-pitch-limit"
               placeholder="Ex: 85"
               type="number"
@@ -342,7 +344,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
                 </label>
               ))}
             </div>
-            <select
+            <Select
               value={editingForm.activePosition}
               onChange={(e) => setEditingForm((c) => ({ ...c, activePosition: e.target.value }))}
             >
@@ -351,7 +353,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
                   Titular: {position}
                 </option>
               ))}
-            </select>
+            </Select>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <Button type="button" variant="primary" onClick={handleSaveEdit}>
                 Salvar

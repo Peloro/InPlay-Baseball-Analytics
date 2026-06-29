@@ -5,6 +5,7 @@ import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
 import ConfirmModal from '../components/ui/ConfirmModal'
+import Select from '../components/ui/Select'
 import { safeNumber } from '../utils/number'
 import { avgFromValues, eraFromEntry, formatIpFromOuts, whipFromPitching, k9FromPitching } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
@@ -467,7 +468,7 @@ function StatsPage({
         <div className="season-toolbar">
           <label>
             Filtro jogador
-            <select
+            <Select
               value={playerFilter}
               onChange={(event) => setPlayerFilter(event.target.value)}
             >
@@ -477,7 +478,7 @@ function StatsPage({
                   {player.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
         <div className="season-kpis">
@@ -743,10 +744,10 @@ function StatsPage({
         <div className="season-toolbar">
           <label>
             Ordenacao
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <Select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
               <option value="date">Por data</option>
               <option value="competition">Por competicao</option>
-            </select>
+            </Select>
           </label>
         </div>
 

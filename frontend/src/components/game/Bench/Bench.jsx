@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 
 // Memoized individual card — re-renders only when this specific player's data changes,
 // not when other cards are selected/deselected.
@@ -41,7 +42,7 @@ const BenchCard = React.memo(function BenchCard({
         Editar
       </Button>
       {(player.positions || []).length > 1 && (
-        <select
+        <Select
           value={getMainPosition(player)}
           onChange={(event) => {
             const nextPosition = event.target.value
@@ -81,7 +82,7 @@ const BenchCard = React.memo(function BenchCard({
               {position}
             </option>
           ))}
-        </select>
+        </Select>
       )}
     </div>
   )

@@ -109,20 +109,42 @@ input[type="radio"]:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Select (custom arrow) ────────────────────────────────────── */
+/* ── Select ───────────────────────────────────────────────────── */
 select {
   appearance: none;
   -webkit-appearance: none;
+  font: inherit;
+  border: 1px solid var(--ctrl-border);
+  border-radius: 8px;
+  padding: 8px 28px 8px 10px;
+  background-color: var(--ctrl-bg);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23bc9900' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  padding-right: 28px;
+  color: var(--ink);
   cursor: pointer;
 }
 select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 0;
   border-color: var(--accent-dark);
+}
+
+/* ── Textarea ─────────────────────────────────────────────────── */
+textarea {
+  display: block;
+  width: 100%;
+  font: inherit;
+  border: 1px solid var(--ctrl-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--ctrl-bg);
+  color: var(--ink);
+  resize: vertical;
+  min-height: 80px;
+}
+textarea::placeholder {
+  color: var(--muted);
 }
 
 /* ── text-input (Input UI component) ────────────────────────── */
@@ -138,6 +160,16 @@ select:focus-visible {
 }
 .text-input::placeholder {
   color: var(--muted);
+}
+
+/* ── select-input / textarea-input (Select + Textarea UI components) */
+.select-input {
+  display: block;
+  width: 100%;
+}
+.textarea-input {
+  display: block;
+  width: 100%;
 }
 
 /* ── Placeholder color for all app inputs ───────────────────── */
@@ -861,12 +893,7 @@ textarea:focus-visible {
 
 .bench-info-btn,
 .bench-card select {
-  font: inherit;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px;
-  background: #242424;
-  color: var(--ink);
+  padding: 6px 28px 6px 8px;
 }
 
 .bench-info-btn {
@@ -1298,12 +1325,7 @@ textarea:focus-visible {
 }
 
 .pregame-slot select {
-  font: inherit;
-  border: 1px solid var(--ctrl-border);
-  border-radius: 8px;
-  padding: 6px;
-  background: #161616;
-  color: var(--ink);
+  padding: 6px 28px 6px 8px;
 }
 
 .field-label {
@@ -3268,11 +3290,6 @@ html {
 
 .acoes-pitcher-select {
   font-size: 0.85rem;
-  background: #1a1a1a;
-  color: #f5f5f5;
-  border: 1px solid #333;
-  border-radius: 4px;
-  padding: 8px 6px;
   width: 100%;
   min-height: 40px;
 }
@@ -4160,11 +4177,6 @@ html {
 }
 
 .game-summary-wlsv-row select {
-  background: var(--input-bg, #222);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: #fff;
-  padding: 6px 8px;
   font-size: 0.85rem;
   width: 100%;
 }

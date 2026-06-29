@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../services/api'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
+import Textarea from '../components/ui/Textarea'
 
 const BILLING_LABELS = { trial: 'Trial', paid: 'Pago', unpaid: 'Inadimplente' }
 const BILLING_COLORS = { trial: '#f59e0b', paid: '#22c55e', unpaid: '#ef4444' }
@@ -262,21 +265,19 @@ export default function AdminPage() {
           <div style={modalStyle}>
             <h3 style={{ fontWeight: 600, marginBottom: '1rem' }}>Cobrança — {billingTeam.name}</h3>
             <label style={labelStyle}>Status de cobrança</label>
-            <select
+            <Select
               value={billingForm.billingStatus}
               onChange={e => setBillingForm(f => ({ ...f, billingStatus: e.target.value }))}
-              style={{ ...inputStyle, width: '100%' }}
             >
               <option value="trial">Trial</option>
               <option value="paid">Pago</option>
               <option value="unpaid">Inadimplente</option>
-            </select>
+            </Select>
             <label style={{ ...labelStyle, marginTop: '0.75rem' }}>Notas</label>
-            <textarea
+            <Textarea
               value={billingForm.billingNotes}
               onChange={e => setBillingForm(f => ({ ...f, billingNotes: e.target.value }))}
               rows={3}
-              style={{ ...inputStyle, width: '100%', resize: 'vertical' }}
               placeholder="ex: pago via PIX em 2026-07-01"
             />
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
@@ -297,11 +298,10 @@ export default function AdminPage() {
               Esta ação é irreversível. Todos os jogadores, jogos e estatísticas serão deletados.
               {' '}Digite <strong style={{ color: '#e5e7eb' }}>{deleteTeam.name}</strong> para confirmar.
             </p>
-            <input
+            <Input
               value={deleteConfirm}
               onChange={e => setDeleteConfirm(e.target.value)}
               placeholder={deleteTeam.name}
-              style={{ ...inputStyle, width: '100%' }}
             />
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
               <button onClick={() => setDeleteTeam(null)} style={btnStyle('#374151')}>Cancelar</button>

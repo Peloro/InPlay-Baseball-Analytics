@@ -3,6 +3,8 @@ import useFieldZoom from '../hooks/useFieldZoom'
 import useDragPosition from '../hooks/useDragPosition'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import CountDots from '../components/CountDots'
@@ -2665,7 +2667,7 @@ function FieldPage({
             {!gameState.isAttacking && (
               <div className="acoes-pitcher-row">
                 <span className="acoes-label">Pitcher</span>
-                <select
+                <Select
                   className="acoes-pitcher-select"
                   value={gameState.currentPitcherId || ''}
                   onChange={(event) => handlePitcherSelect(event.target.value || null)}
@@ -2681,7 +2683,7 @@ function FieldPage({
                       {player.name} #{player.number} (banco)
                     </option>
                   ))}
-                </select>
+                </Select>
                 <span className="acoes-pitcher-pc">
                   PC: {gameState.currentPitcherId && gameState.pitchCounts && Number.isFinite(gameState.pitchCounts[gameState.currentPitcherId])
                     ? gameState.pitchCounts[gameState.currentPitcherId]
@@ -2707,7 +2709,7 @@ function FieldPage({
                     <span className="acoes-opp-lineup-slot">{slotLabel}</span>
                   </div>
                   <div className="acoes-opp-batter-row">
-                    <input
+                    <Input
                       type="text"
                       className={`acoes-opp-batter-num${knownCount === 9 ? ' acoes-input-prefilled' : ''}`}
                       placeholder="#"
@@ -2718,7 +2720,7 @@ function FieldPage({
                         onUpdateGameState((curr) => ({ ...curr, currentOpponentBatter: { ...curr.currentOpponentBatter, number: v } }))
                       }}
                     />
-                    <input
+                    <Input
                       type="text"
                       className={`acoes-opp-batter-name${knownCount === 9 ? ' acoes-input-prefilled' : ''}`}
                       placeholder="Nome (opcional)"
@@ -2746,7 +2748,7 @@ function FieldPage({
               <div className="acoes-opp-pitcher-section">
                 <span className="acoes-label">Pitcher Adv.</span>
                 <div className="acoes-opp-batter-row">
-                  <input
+                  <Input
                     type="text"
                     className="acoes-opp-batter-num"
                     placeholder="#"
@@ -2757,7 +2759,7 @@ function FieldPage({
                       onUpdateGameState((curr) => ({ ...curr, opposingPitcher: { ...curr.opposingPitcher, number: v } }))
                     }}
                   />
-                  <input
+                  <Input
                     type="text"
                     className="acoes-opp-batter-name"
                     placeholder="Nome (opcional)"
@@ -3237,7 +3239,7 @@ function FieldPage({
             {pregameStep === 0 && (
               <div className="pregame-step-content">
                 <label htmlFor="pregame-date" className="field-label">Data</label>
-                <input
+                <Input
                   id="pregame-date"
                   type="date"
                   value={pregameForm.date}
@@ -3245,7 +3247,7 @@ function FieldPage({
                   style={{ marginBottom: 12 }}
                 />
                 <label htmlFor="pregame-opponent" className="field-label">Adversário *</label>
-                <input
+                <Input
                   id="pregame-opponent"
                   placeholder="Nome do adversário"
                   value={pregameForm.opponentName}
@@ -3253,7 +3255,7 @@ function FieldPage({
                   style={{ marginBottom: 12 }}
                 />
                 <label htmlFor="pregame-competition" className="field-label">Competição *</label>
-                <input
+                <Input
                   id="pregame-competition"
                   placeholder="Ex: Treino, Campeonato..."
                   value={pregameForm.competition}
@@ -3261,7 +3263,7 @@ function FieldPage({
                   style={{ marginBottom: 12 }}
                 />
                 <label htmlFor="pregame-location" className="field-label">Local (opcional)</label>
-                <input
+                <Input
                   id="pregame-location"
                   placeholder="Local (opcional)"
                   value={pregameForm.location}
@@ -3269,7 +3271,7 @@ function FieldPage({
                   style={{ marginBottom: 12 }}
                 />
                 <label htmlFor="pregame-innings" className="field-label">Innings (0 = ilimitado)</label>
-                <input
+                <Input
                   id="pregame-innings"
                   type="number"
                   min="0"
@@ -3306,7 +3308,7 @@ function FieldPage({
                     return (
                       <div key={`setup-${slot.position}`} className="pregame-slot">
                         <strong>{slot.position}</strong>
-                        <select
+                        <Select
                           value={slot.playerId}
                           onChange={(event) => assignStarter(slot.position, event.target.value)}
                         >
@@ -3345,7 +3347,7 @@ function FieldPage({
                               </>
                             )
                           })()}
-                        </select>
+                        </Select>
                       </div>
                     )
                   })}
@@ -3543,24 +3545,24 @@ function FieldPage({
                   <div className="game-summary-wlsv-row">
                     <label>
                       W
-                      <select value={summaryWP} onChange={e => setSummaryWP(e.target.value)}>
+                      <Select value={summaryWP} onChange={e => setSummaryWP(e.target.value)}>
                         <option value="">—</option>
                         {pitchers.map(p => <option key={getPlayerId(p)} value={getPlayerId(p)}>{p.name}</option>)}
-                      </select>
+                      </Select>
                     </label>
                     <label>
                       L
-                      <select value={summaryLP} onChange={e => setSummaryLP(e.target.value)}>
+                      <Select value={summaryLP} onChange={e => setSummaryLP(e.target.value)}>
                         <option value="">—</option>
                         {pitchers.map(p => <option key={getPlayerId(p)} value={getPlayerId(p)}>{p.name}</option>)}
-                      </select>
+                      </Select>
                     </label>
                     <label>
                       SV
-                      <select value={summarySV} onChange={e => setSummarySV(e.target.value)}>
+                      <Select value={summarySV} onChange={e => setSummarySV(e.target.value)}>
                         <option value="">—</option>
                         {pitchers.map(p => <option key={getPlayerId(p)} value={getPlayerId(p)}>{p.name}</option>)}
-                      </select>
+                      </Select>
                     </label>
                   </div>
                 </div>
@@ -3593,10 +3595,9 @@ function FieldPage({
       {pendingDoublePlaySelect && (
         <Modal title="Double Play: corredor eliminado" onClose={() => setPendingDoublePlaySelect(false)}>
           <div className="player-stats-block">
-            <select
+            <Select
               value={selectedDoublePlayRunnerBase}
               onChange={(event) => setSelectedDoublePlayRunnerBase(event.target.value)}
-              style={{ width: '100%' }}
             >
               <option value="">Selecionar base</option>
               {doublePlayRunnerOptions.map((base) => (
@@ -3604,7 +3605,7 @@ function FieldPage({
                   {base.toUpperCase()}
                 </option>
               ))}
-            </select>
+            </Select>
 
             {!gameState.isAttacking && (
               <div style={{ marginTop: '10px' }}>
@@ -3698,16 +3699,15 @@ function FieldPage({
             {selectedOutType && selectedOutType !== 'strikeout' && (
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', marginBottom: '4px' }}>Fielder (opcional)</label>
-                <select
+                <Select
                   value={selectedOutFielderId}
                   onChange={(ev) => setSelectedOutFielderId(ev.target.value)}
-                  style={{ width: '100%' }}
                 >
                   <option value="">-- nenhum --</option>
                   {errorDefenderOptions.map((opt) => (
                     <option key={`out-fielder-${opt.id}`} value={opt.id}>{opt.label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 
@@ -3734,10 +3734,9 @@ function FieldPage({
       {pendingDefenseError && (
         <Modal title="Selecionar defensor com erro" onClose={() => setPendingDefenseError(false)}>
           <div className="player-stats-block">
-            <select
+            <Select
               value={selectedErrorDefenderId}
               onChange={(event) => setSelectedErrorDefenderId(event.target.value)}
-              style={{ width: '100%' }}
             >
               <option value="">Selecionar jogador</option>
               {errorDefenderOptions.map((option) => (
@@ -3745,7 +3744,7 @@ function FieldPage({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className="detail-actions" style={{ marginTop: '10px' }}>
               <Button type="button" variant="secondary" onClick={() => setPendingDefenseError(false)}>
                 Cancelar
@@ -3795,12 +3794,12 @@ function FieldPage({
       {editingPlayerId && (
         <Modal title="Editar jogador" onClose={() => setEditingPlayerId(null)}>
           <form className="player-form" onSubmit={(event) => { event.preventDefault(); saveEditedPlayer() }}>
-            <input
+            <Input
               placeholder="Nome"
               value={editForm.name}
               onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
             />
-            <input
+            <Input
               placeholder="Numero"
               type="number"
               value={editForm.number}
@@ -3820,7 +3819,7 @@ function FieldPage({
               ))}
             </div>
 
-            <select
+            <Select
               value={editForm.activePosition}
               onChange={(event) => setEditForm((current) => ({ ...current, activePosition: event.target.value }))}
             >
@@ -3829,7 +3828,7 @@ function FieldPage({
                   Titular: {position}
                 </option>
               ))}
-            </select>
+            </Select>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <Button type="button" variant="primary" onClick={saveEditedPlayer}>
