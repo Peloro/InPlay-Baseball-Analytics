@@ -73,11 +73,14 @@ if (http) {
     return cfg
   })
 
-  // 2.3 — on 401 clear auth and signal the app to show login screen
+  // 2.3 — on 401 or team-blocked 403, clear auth and signal the app to show login screen
   http.interceptors.response.use(
     res => res,
     err => {
-      if (err?.response?.status === 401) {
+      const status = err?.response?.status
+      const msg = err?.response?.data?.message || ''
+      const blocked = status === 403 && msg.includes('bloqueada')
+      if (status === 401 || blocked) {
         localStorage.removeItem(AUTH_KEY)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('baseball:logout'))
