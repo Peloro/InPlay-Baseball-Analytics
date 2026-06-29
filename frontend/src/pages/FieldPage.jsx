@@ -126,14 +126,14 @@ function applyRunnerAdvance(runners, basesToAdvance) {
     if (targetIndex >= order.length) {
       runs += 1
     } else {
-      nextRunners[order[targetIndex]] = true
+      nextRunners[order[targetIndex]] = runners[base]  // preserve player ID
     }
   }
 
   return { nextRunners, runs }
 }
 
-function applyHitToBases(runners, hitType) {
+function applyHitToBases(runners, hitType, batterId = null) {
   if (hitType === 'homerun') {
     let runs = 1
     if (runners?.first) runs += 1
@@ -149,9 +149,10 @@ function applyHitToBases(runners, hitType) {
   const bases = hitType === 'triple' ? 3 : hitType === 'double' ? 2 : 1
   const advanced = applyRunnerAdvance(runners, bases)
   const nextRunners = { ...advanced.nextRunners }
-  if (bases === 1) nextRunners.first = true
-  if (bases === 2) nextRunners.second = true
-  if (bases === 3) nextRunners.third = true
+  const marker = batterId || true
+  if (bases === 1) nextRunners.first = marker
+  if (bases === 2) nextRunners.second = marker
+  if (bases === 3) nextRunners.third = marker
 
   return {
     nextRunners,
@@ -160,12 +161,13 @@ function applyHitToBases(runners, hitType) {
   }
 }
 
-function forceAdvanceToFirst(runners) {
+function forceAdvanceToFirst(runners, batterId = null) {
   const next = { ...(runners || { first: false, second: false, third: false }) }
   let runs = 0
+  const marker = batterId || true
 
   if (!next.first) {
-    next.first = true
+    next.first = marker
     return { nextRunners: next, runs }
   }
 
@@ -173,9 +175,9 @@ function forceAdvanceToFirst(runners) {
     runs += 1
   }
 
-  next.third = next.second ? true : next.third
-  next.second = true
-  next.first = true
+  next.third = next.second ? next.second : next.third  // preserve runner ID
+  next.second = next.first                              // preserve runner ID
+  next.first = marker
 
   return { nextRunners: next, runs }
 }
@@ -778,6 +780,9 @@ function FieldPage({
     isProcessingRef.current = true
     window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
+    // Capture runner ID before state update so we can credit SB
+    const runnerId = typeof gameState.runners?.[base] === 'string' ? gameState.runners[base] : null
+
     onUpdateGameState((current) => {
       if (!current.runners?.[base]) return current
 
@@ -786,7 +791,7 @@ function FieldPage({
       const runs = nextBase ? 0 : 1
 
       if (nextBase) {
-        nextRunners[nextBase] = true
+        nextRunners[nextBase] = current.runners[base]  // preserve player ID
       }
 
       const ourR = current.isAttacking ? runs : 0
@@ -800,10 +805,22 @@ function FieldPage({
       }
     }, `Corredor avancou de ${base}`)
 
+    // Credit stolen base when attacking and runner ID is known
+    if (gameState.isAttacking && runnerId && gameState.currentGameId) {
+      const found = gameStatsApi.listByGame(gameState.currentGameId, runnerId)
+      const cur = found.data?.[0]
+      if (cur) {
+        gameStatsApi.upsert(gameState.currentGameId, runnerId, {
+          ...cur,
+          hitting: { ...(cur.hitting || {}), stolenBases: safeNumber(cur.hitting?.stolenBases) + 1 },
+        })
+      }
+    }
+
     if (!gameState.isAttacking && base === 'third' && gameState.runners?.third) {
       onDefensiveEarnedRun?.(1)
     }
-  }, [gameState.isAttacking, gameState.runners, onDefensiveEarnedRun, onUpdateGameState])
+  }, [gameState.isAttacking, gameState.runners, gameState.currentGameId, onDefensiveEarnedRun, onUpdateGameState])
 
   const removeRunner = useCallback((base) => {
     if (isProcessingRef.current) return
@@ -1208,7 +1225,7 @@ function FieldPage({
       let runs = 0
 
       if (isHit) {
-        const hitResult = applyHitToBases(nextRunners, kind)
+        const hitResult = applyHitToBases(nextRunners, kind, localOrder[currentIndex])
         nextRunners = hitResult.nextRunners
         runs = hitResult.runs
       }
@@ -1413,7 +1430,8 @@ function FieldPage({
       }
 
       if (cDidWalk) {
-        const forced = forceAdvanceToFirst(nextRunners)
+        const walkBatterId = order[Math.min(current.currentBatterIndex || 0, order.length - 1)]
+        const forced = forceAdvanceToFirst(nextRunners, walkBatterId)
         nextRunners = forced.nextRunners
         scoredRuns = forced.runs
       }
@@ -1712,13 +1730,14 @@ function FieldPage({
     await captureUndoSnapshot()
 
     onUpdateGameState((current) => {
-      const forced = forceAdvanceToFirst(current.runners || { first: false, second: false, third: false })
+      const hbpOrder = current.battingOrder || []
+      const hbpIdx = Math.min(current.currentBatterIndex || 0, Math.max(0, hbpOrder.length - 1))
+      const hbpBatterId = hbpOrder[hbpIdx]
+      const forced = forceAdvanceToFirst(current.runners || { first: false, second: false, third: false }, current.isAttacking ? hbpBatterId : null)
 
       const ourR = current.isAttacking ? forced.runs : 0
       const theirR = current.isAttacking ? 0 : forced.runs
 
-      const hbpOrder = current.battingOrder || []
-      const hbpIdx = Math.min(current.currentBatterIndex || 0, Math.max(0, hbpOrder.length - 1))
       const hbpWho = current.isAttacking
         ? (playersById[hbpOrder[hbpIdx]]?.name || '?')
         : oppBatterLabel(current)

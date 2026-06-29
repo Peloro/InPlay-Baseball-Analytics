@@ -23,6 +23,11 @@ const GLOSSARY = {
   CH:    { name: 'Changeup',           desc: 'Arremesso lento com garra de fastball para enganar o timing do rebatedor.' },
   SI:    { name: 'Sinker',             desc: 'Fastball com movimento descendente que induz bola rasteira.' },
   CT:    { name: 'Cutter',             desc: 'Fastball com desvio lateral próximo ao home plate.' },
+  SLG:   { name: 'Slugging Percentage', desc: 'Média de bases por at-bat: (H + 2B + 2×3B + 3×HR) / AB.' },
+  OPS:   { name: 'On-base Plus Slugging', desc: 'OBP + SLG. Mede a capacidade ofensiva geral do rebatedor.' },
+  'FLD%':{ name: 'Fielding Percentage', desc: 'Porcentagem de chances defensivas concluídas sem erro: (TC − E) / TC.' },
+  TC:    { name: 'Total Chances',       desc: 'Total de jogadas defensivas: FO + GO + LO + E.' },
+  SB:    { name: 'Stolen Bases',        desc: 'Bases roubadas: quando o corredor avança para a próxima base sem rebatida.' },
 }
 
 export default function StatLabel({ abbr }) {

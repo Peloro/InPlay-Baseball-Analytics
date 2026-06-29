@@ -181,9 +181,9 @@ function StatsPage({
   )
 
   const visibleSeasonRows = useMemo(() => {
-    // Hitters tab: all players. Pitchers tab: pitchers only.
+    // Hitters tab: all players. Pitchers tab: pitchers only. Defense tab: all players.
     const rows = seasonRows.filter(({ player }) =>
-      statsTab === 'hitters' ? true : detectPlayerType(player) === 'pitcher'
+      statsTab === 'pitchers' ? detectPlayerType(player) === 'pitcher' : true
     )
 
     if (!colSort.col) return rows
@@ -216,7 +216,20 @@ function StatsPage({
       balls:          (e) => safeNumber(e.pitching?.balls),
     }
 
-    const metrics = statsTab === 'hitters' ? hitterMetrics : pitcherMetrics
+    const defenseMetrics = {
+      errors:      (e) => safeNumber(e.defense?.errors),
+      doublePlays: (e) => safeNumber(e.defense?.doublePlays),
+      flyOuts:     (e) => safeNumber(e.defense?.flyOuts),
+      groundOuts:  (e) => safeNumber(e.defense?.groundOuts),
+      lineOuts:    (e) => safeNumber(e.defense?.lineOuts),
+      totalChances:(e) => safeNumber(e.defense?.flyOuts) + safeNumber(e.defense?.groundOuts) + safeNumber(e.defense?.lineOuts) + safeNumber(e.defense?.errors),
+      fieldingPct: (e) => {
+        const tc = safeNumber(e.defense?.flyOuts) + safeNumber(e.defense?.groundOuts) + safeNumber(e.defense?.lineOuts) + safeNumber(e.defense?.errors)
+        return tc ? (tc - safeNumber(e.defense?.errors)) / tc : 1
+      },
+    }
+
+    const metrics = statsTab === 'hitters' ? hitterMetrics : statsTab === 'defense' ? defenseMetrics : pitcherMetrics
     const metricFn = metrics[colSort.col]
     if (!metricFn) return rows
 
@@ -278,12 +291,18 @@ function StatsPage({
       wins: acc.wins + safeNumber(item.entry.pitching?.wins),
       losses: acc.losses + safeNumber(item.entry.pitching?.losses),
       saves: acc.saves + safeNumber(item.entry.pitching?.saves),
+      defErrors:      acc.defErrors      + safeNumber(item.entry.defense?.errors),
+      defDoublePlays: acc.defDoublePlays + safeNumber(item.entry.defense?.doublePlays),
+      defFlyOuts:     acc.defFlyOuts     + safeNumber(item.entry.defense?.flyOuts),
+      defGroundOuts:  acc.defGroundOuts  + safeNumber(item.entry.defense?.groundOuts),
+      defLineOuts:    acc.defLineOuts    + safeNumber(item.entry.defense?.lineOuts),
     }), {
       atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0,
       runs: 0, rbi: 0, hittingStrikeouts: 0, walks: 0, stolenBases: 0,
       outsPitched: 0, earnedRuns: 0, hitsAllowed: 0,
       pitchingStrikeouts: 0, pitchingWalks: 0,
       wins: 0, losses: 0, saves: 0,
+      defErrors: 0, defDoublePlays: 0, defFlyOuts: 0, defGroundOuts: 0, defLineOuts: 0,
     })
   }, [visibleSeasonRows])
 
@@ -405,6 +424,7 @@ function StatsPage({
 
   const hitterColCount = 16   // Jogador, AB, H, 2B, 3B, HR, R, RBI, BB, SO, SB, OUT, AVG, OBP, SLG, OPS
   const pitcherColCount = 14  // Jogador, W, L, SV, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
+  const defenseColCount = 8   // Jogador, E, DP, FO, GO, LO, TC, FLD%
 
   return (
     <section className="stats-page stats-page-full">
@@ -435,6 +455,13 @@ function StatsPage({
             onClick={() => setStatsTab('pitchers')}
           >
             Pitchers
+          </button>
+          <button
+            type="button"
+            className={statsTab === 'defense' ? 'active' : ''}
+            onClick={() => setStatsTab('defense')}
+          >
+            Defesa
           </button>
         </div>
         <div className="season-toolbar">
@@ -489,7 +516,7 @@ function StatsPage({
                 <span>{seasonTotals.hittingStrikeouts}</span>
               </div>
             </>
-          ) : (
+          ) : statsTab === 'pitchers' ? (
             <>
               <div className="kpi">
                 <strong>W-L</strong>
@@ -524,7 +551,25 @@ function StatsPage({
                 <span>{seasonTotals.pitchingWalks}</span>
               </div>
             </>
-          )}
+          ) : statsTab === 'defense' ? (
+            <>
+              {(() => {
+                const tc = seasonTotals.defFlyOuts + seasonTotals.defGroundOuts + seasonTotals.defLineOuts + seasonTotals.defErrors
+                const fldPct = tc ? ((tc - seasonTotals.defErrors) / tc).toFixed(3) : '1.000'
+                return (
+                  <>
+                    <div className="kpi"><strong><StatLabel abbr="FLD%" /></strong><span>{fldPct}</span></div>
+                    <div className="kpi"><strong>E</strong><span>{seasonTotals.defErrors}</span></div>
+                    <div className="kpi"><strong>DP</strong><span>{seasonTotals.defDoublePlays}</span></div>
+                    <div className="kpi"><strong>TC</strong><span>{tc}</span></div>
+                    <div className="kpi"><strong>FO</strong><span>{seasonTotals.defFlyOuts}</span></div>
+                    <div className="kpi"><strong>GO</strong><span>{seasonTotals.defGroundOuts}</span></div>
+                    <div className="kpi"><strong>LO</strong><span>{seasonTotals.defLineOuts}</span></div>
+                  </>
+                )
+              })()}
+            </>
+          ) : null}
         </div>
         <div className="stats-table-wrap">
           {seasonLoading && <div className="stats-loading">Carregando estatísticas...</div>}
@@ -540,9 +585,17 @@ function StatsPage({
                       </th>
                     ))}
                   </>
-                ) : (
+                ) : statsTab === 'pitchers' ? (
                   <>
                     {[['wins','W'],['losses','L'],['saves','SV'],['inningsPitched','IP'],['era','ERA'],['whip','WHIP'],['k9','K/9'],['strikeouts_p','SO'],['walks_p','BB'],['hitsAllowed','H'],['pitchCount','PC'],['strikes','STR'],['balls','BAL']].map(([col, label]) => (
+                      <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
+                        {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
+                      </th>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {[['errors','E'],['doublePlays','DP'],['flyOuts','FO'],['groundOuts','GO'],['lineOuts','LO'],['totalChances','TC'],['fieldingPct','FLD%']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
                         {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
@@ -554,8 +607,8 @@ function StatsPage({
             <tbody>
               {!seasonLoading && !visibleSeasonRows.length && (
                 <tr>
-                  <td colSpan={statsTab === 'hitters' ? hitterColCount : pitcherColCount} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                    {statsTab === 'hitters' ? 'Nenhum jogador cadastrado.' : 'Nenhum pitcher cadastrado.'}
+                  <td colSpan={statsTab === 'hitters' ? hitterColCount : statsTab === 'pitchers' ? pitcherColCount : defenseColCount} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                    {statsTab === 'pitchers' ? 'Nenhum pitcher cadastrado.' : 'Nenhum jogador cadastrado.'}
                   </td>
                 </tr>
               )}
@@ -578,7 +631,7 @@ function StatsPage({
                           <td key={sortKey}>{get(entry)}</td>
                         ))}
                       </>
-                    ) : (
+                    ) : statsTab === 'pitchers' ? (
                       <>
                         <td>{safeNumber(entry.pitching?.wins)}</td>
                         <td>{safeNumber(entry.pitching?.losses)}</td>
@@ -594,7 +647,21 @@ function StatsPage({
                         <td>{safeNumber(entry.pitching?.strikes)}</td>
                         <td>{safeNumber(entry.pitching?.balls)}</td>
                       </>
-                    )}
+                    ) : (() => {
+                      const tc = safeNumber(entry.defense?.flyOuts) + safeNumber(entry.defense?.groundOuts) + safeNumber(entry.defense?.lineOuts) + safeNumber(entry.defense?.errors)
+                      const fldPct = tc ? ((tc - safeNumber(entry.defense?.errors)) / tc).toFixed(3) : '1.000'
+                      return (
+                        <>
+                          <td>{safeNumber(entry.defense?.errors)}</td>
+                          <td>{safeNumber(entry.defense?.doublePlays)}</td>
+                          <td>{safeNumber(entry.defense?.flyOuts)}</td>
+                          <td>{safeNumber(entry.defense?.groundOuts)}</td>
+                          <td>{safeNumber(entry.defense?.lineOuts)}</td>
+                          <td>{tc}</td>
+                          <td>{fldPct}</td>
+                        </>
+                      )
+                    })()}
                   </tr>
                 )
               })}
@@ -623,7 +690,7 @@ function StatsPage({
                           </div>
                         ))}
                       </div>
-                    ) : (
+                    ) : statsTab === 'pitchers' ? (
                       <div className="stat-grid">
                         <div><strong>W</strong><div>{safeNumber(entry.pitching?.wins)}</div></div>
                         <div><strong>L</strong><div>{safeNumber(entry.pitching?.losses)}</div></div>
@@ -639,7 +706,21 @@ function StatsPage({
                         <div><strong><StatLabel abbr="STR" /></strong><div>{safeNumber(entry.pitching?.strikes)}</div></div>
                         <div><strong><StatLabel abbr="BAL" /></strong><div>{safeNumber(entry.pitching?.balls)}</div></div>
                       </div>
-                    )}
+                    ) : (() => {
+                      const tc = safeNumber(entry.defense?.flyOuts) + safeNumber(entry.defense?.groundOuts) + safeNumber(entry.defense?.lineOuts) + safeNumber(entry.defense?.errors)
+                      const fldPct = tc ? ((tc - safeNumber(entry.defense?.errors)) / tc).toFixed(3) : '1.000'
+                      return (
+                        <div className="stat-grid">
+                          <div><strong>E</strong><div>{safeNumber(entry.defense?.errors)}</div></div>
+                          <div><strong>DP</strong><div>{safeNumber(entry.defense?.doublePlays)}</div></div>
+                          <div><strong>FO</strong><div>{safeNumber(entry.defense?.flyOuts)}</div></div>
+                          <div><strong>GO</strong><div>{safeNumber(entry.defense?.groundOuts)}</div></div>
+                          <div><strong>LO</strong><div>{safeNumber(entry.defense?.lineOuts)}</div></div>
+                          <div><strong>TC</strong><div>{tc}</div></div>
+                          <div><strong><StatLabel abbr="FLD%" /></strong><div>{fldPct}</div></div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </article>
               )
