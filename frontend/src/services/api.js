@@ -348,6 +348,7 @@ export const playersApi = {
 
   async remove(id) {
     lfSet(LS.players, lfGet(LS.players).filter(p => p._id !== id && p.id !== id))
+    lfSet(LS.gameStats, lfGet(LS.gameStats).filter(s => String(s.playerId?._id || s.playerId) !== id))
 
     const synced = await netWrite('delete', `/players/${id}`)
     if (!synced) queueSync('delete', `/players/${id}`, null, id)
@@ -422,7 +423,10 @@ export const gamesApi = {
   clearSeason() {
     lfSet(LS.games, [])
     lfSet(LS.gameStats, [])
-    lfSet(LS.syncQueue, [])
+    const q = lfGet(LS.syncQueue).filter(
+      item => !item.url.startsWith('/games') && !item.url.startsWith('/game-stats')
+    )
+    lfSet(LS.syncQueue, q)
     return { data: [] }
   },
 }

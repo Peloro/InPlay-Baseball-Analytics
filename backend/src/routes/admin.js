@@ -1,4 +1,5 @@
 const express = require('express')
+const mongoose = require('mongoose')
 const Team = require('../models/Team')
 const User = require('../models/User')
 const Player = require('../models/Player')
@@ -7,9 +8,17 @@ const GameStat = require('../models/GameStat')
 
 const router = express.Router()
 
+function validId(id, res) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    res.status(400).json({ message: 'id invalido.' })
+    return false
+  }
+  return true
+}
+
 router.get('/pending', async (req, res) => {
   try {
-    const pending = await User.find({ status: 'pending' }).sort({ createdAt: -1 }).lean()
+    const pending = await User.find({ status: 'pending', role: 'coach' }).sort({ createdAt: -1 }).lean()
     const teamIds = pending.map(u => u.teamId)
     const teams = await Team.find({ _id: { $in: teamIds } }).select('name').lean()
     const teamMap = {}
@@ -28,6 +37,7 @@ router.get('/pending', async (req, res) => {
 })
 
 router.patch('/users/:id/approve', async (req, res) => {
+  if (!validId(req.params.id, res)) return
   try {
     const user = await User.findByIdAndUpdate(
       req.params.id,
@@ -42,6 +52,7 @@ router.patch('/users/:id/approve', async (req, res) => {
 })
 
 router.delete('/users/:id', async (req, res) => {
+  if (!validId(req.params.id, res)) return
   try {
     const user = await User.findByIdAndDelete(req.params.id)
     if (!user) return res.status(404).json({ message: 'Usuário não encontrado.' })
@@ -79,6 +90,7 @@ router.get('/teams', async (req, res) => {
 })
 
 router.patch('/teams/:id/status', async (req, res) => {
+  if (!validId(req.params.id, res)) return
   try {
     const { status } = req.body
     if (!['active', 'blocked'].includes(status)) {
@@ -93,6 +105,7 @@ router.patch('/teams/:id/status', async (req, res) => {
 })
 
 router.patch('/teams/:id/billing', async (req, res) => {
+  if (!validId(req.params.id, res)) return
   try {
     const update = {}
     if (req.body.billingStatus !== undefined) {
@@ -114,6 +127,7 @@ router.patch('/teams/:id/billing', async (req, res) => {
 })
 
 router.delete('/teams/:id', async (req, res) => {
+  if (!validId(req.params.id, res)) return
   try {
     const { id } = req.params
     const team = await Team.findByIdAndDelete(id)

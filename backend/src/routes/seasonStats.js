@@ -61,6 +61,13 @@ router.get('/', async (req, res) => {
               },
             ],
           },
+          // inningsPitched computed from outsPitched — avoids decimal-sum bug (2.1+1.2=3.3 vs correct 4.0)
+          inningsPitchedCalc: {
+            $add: [
+              { $floor: { $divide: ['$pitchingOutsPitched', 3] } },
+              { $divide: [{ $mod: ['$pitchingOutsPitched', 3] }, 10] },
+            ],
+          },
         },
       },
       {
@@ -77,7 +84,7 @@ router.get('/', async (req, res) => {
             homeRuns:   '$hittingHomeRuns',
           },
           pitching: {
-            inningsPitched: '$pitchingInningsPitched',
+            inningsPitched: '$inningsPitchedCalc',
             outsPitched:    '$pitchingOutsPitched',
             earnedRuns:     '$pitchingEarnedRuns',
             strikeouts:     '$pitchingStrikeouts',
