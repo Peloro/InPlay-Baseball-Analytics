@@ -20,7 +20,7 @@
 
 ## About
 
-CAASO Baseball Tracker is a mobile-first app for live game tracking and statistics management. The app runs fully offline — all data is stored locally in `localStorage` and synced with the backend in the background whenever a connection is available.
+InPlay Baseball Analytics is a mobile-first app for live game tracking and statistics management. The app runs fully offline — all data is stored locally in `localStorage` and synced with the backend in the background whenever a connection is available.
 
 It is distributed as an **Android APK** via Capacitor and can also be used directly in the browser.
 
