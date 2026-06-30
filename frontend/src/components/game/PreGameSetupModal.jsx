@@ -26,6 +26,7 @@ export default function PreGameSetupModal({
   const [setupStarters, setSetupStarters] = useState(INITIAL_STARTERS)
   const [setupBattingOrder, setSetupBattingOrder] = useState([])
   const [setupDraggingId, setSetupDraggingId] = useState(null)
+  const [setupDhId, setSetupDhId] = useState('')
 
   const orderTouchRef = useRef({ dragging: null })
   const orderListRef = useRef(null)
@@ -33,16 +34,30 @@ export default function PreGameSetupModal({
   const assignStarter = (position, playerId) => {
     setSetupStarters((current) => {
       const next = current.map((item) => (item.position === position ? { ...item, playerId } : item))
-      const ids = next.map((item) => item.playerId).filter(Boolean)
+      const defIds = next.map((item) => item.playerId).filter(Boolean)
       setSetupBattingOrder((order) => {
-        const filtered = order.filter((id) => ids.includes(id))
-        for (const id of ids) {
+        const allIds = setupDhId ? [...defIds, setupDhId] : defIds
+        const filtered = order.filter((id) => allIds.includes(id))
+        for (const id of allIds) {
           if (!filtered.includes(id)) filtered.push(id)
         }
-        return filtered.slice(0, 9)
+        return filtered
       })
       return next
     })
+  }
+
+  const assignDh = (playerId) => {
+    setSetupBattingOrder((order) => {
+      const defIds = setupStarters.map(item => item.playerId).filter(Boolean)
+      const allIds = playerId ? [...defIds, playerId] : defIds
+      const filtered = order.filter(id => allIds.includes(id))
+      for (const id of allIds) {
+        if (!filtered.includes(id)) filtered.push(id)
+      }
+      return filtered
+    })
+    setSetupDhId(playerId)
   }
 
   const onBattingDragStart = (id) => setSetupDraggingId(id)
@@ -87,12 +102,14 @@ export default function PreGameSetupModal({
     setSetupDraggingId(null)
   }
 
-  const starters = setupStarters.filter((item) => item.playerId)
+  const defStarters = setupStarters.filter((item) => item.playerId)
+  const starters = [...defStarters, ...(setupDhId ? [{ position: 'DH', playerId: setupDhId }] : [])]
   const step0Valid = !gameState.currentGameId
     ? Boolean(pregameForm.date && pregameForm.opponentName.trim() && pregameForm.competition.trim())
     : true
-  const step1Valid = starters.length === 9
-  const step2Valid = setupBattingOrder.length === 9
+  const step1Valid = defStarters.length === 9
+  const expectedBatters = setupDhId ? 10 : 9
+  const step2Valid = setupBattingOrder.length === expectedBatters
   const allValid = step0Valid && step1Valid && step2Valid
 
   const stepLabels = ['Jogo', 'Defesa', 'Ordem']
@@ -209,7 +226,7 @@ export default function PreGameSetupModal({
                     )}
                     {(() => {
                       const available = setupAvailablePlayers.filter(
-                        (player) => !selectedIds.includes(getPlayerId(player))
+                        (player) => !selectedIds.includes(getPlayerId(player)) && getPlayerId(player) !== setupDhId
                       )
                       const preferred = available.filter((p) => playerPrefersPosition(getPlayerId(p), slot.position))
                       const others = available.filter((p) => !playerPrefersPosition(getPlayerId(p), slot.position))
@@ -242,8 +259,32 @@ export default function PreGameSetupModal({
             })}
           </div>
           <p className="pregame-step-count">
-            {starters.length}/9 posições preenchidas
+            {defStarters.length}/9 posições preenchidas
           </p>
+
+          <div className="pregame-dh-section">
+            <label className="pregame-dh-label">DH — Designated Hitter (opcional)</label>
+            <Select
+              value={setupDhId}
+              onChange={(e) => assignDh(e.target.value)}
+            >
+              <option value="">— Sem DH —</option>
+              {setupAvailablePlayers
+                .filter((p) => !defStarters.some((s) => s.playerId === getPlayerId(p)))
+                .map((p) => {
+                  const id = getPlayerId(p)
+                  return (
+                    <option key={`dh-${id}`} value={id}>
+                      {p.name} #{p.number}
+                    </option>
+                  )
+                })
+              }
+            </Select>
+            {setupDhId && (
+              <p className="pregame-dh-hint">O DH rebate na ordem mas não joga defesa.</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -274,6 +315,7 @@ export default function PreGameSetupModal({
                   <span className="pregame-order-num">{index + 1}.</span>
                   <strong>{player.name}</strong>
                   <span>#{player.number}</span>
+                  {id === setupDhId && <span className="pregame-dh-tag">DH</span>}
                   <span
                     className="pregame-order-handle"
                     style={{ touchAction: 'none' }}

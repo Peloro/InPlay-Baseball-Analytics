@@ -598,7 +598,7 @@ function StatsPage({
                   <>
                     {[['errors','E'],['doublePlays','DP'],['flyOuts','FO'],['groundOuts','GO'],['lineOuts','LO'],['totalChances','TC'],['fieldingPct','FLD%']].map(([col, label]) => (
                       <th key={col} className={`sortable-th${colSort.col === col ? ' sort-active' : ''}`} onClick={() => handleColSort(col)}>
-                        <StatLabel abbr={label} />{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
+                        {label}{colSort.col === col ? (colSort.dir === 'desc' ? ' ▼' : ' ▲') : ''}
                       </th>
                     ))}
                   </>

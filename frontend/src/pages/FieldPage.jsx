@@ -1208,8 +1208,13 @@ function FieldPage({
   const opponentMarkers = useMemo(() => opponentDefense, [opponentDefense])
   const defensivePlayers = useMemo(() => {
     if (gameState.isAttacking) return []
-    return fieldPlayers
-  }, [fieldPlayers, gameState.isAttacking])
+    const dhIds = new Set(
+      (gameState.lineup || [])
+        .filter(item => item.position === 'DH')
+        .map(item => item.playerId)
+    )
+    return fieldPlayers.filter(p => !dhIds.has(getPlayerId(p)))
+  }, [fieldPlayers, gameState.isAttacking, gameState.lineup, getPlayerId])
   const visibleFieldMarkers = useMemo(() => {
     if (!gameState.preGameConfigured) return []
     return gameState.isAttacking ? opponentMarkers : defensivePlayers
@@ -1759,7 +1764,7 @@ function FieldPage({
                   <button type="button" className="acoes-btn acoes-3b" onClick={() => applyPlateAppearance('triple')}>TRIPLA</button>
                   <button type="button" className="acoes-btn acoes-hr" onClick={() => applyPlateAppearance('homerun')}>HOME RUN</button>
                   <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
-                  <button type="button" className="acoes-btn acoes-erro" onClick={() => applyErrorEvent('')}>ERRO</button>
+                  <button type="button" className="acoes-btn acoes-erro" onClick={() => _applyErrorEvent('')}>ERRO</button>
                   {(gameState.runners?.first || gameState.runners?.second || gameState.runners?.third) && gameState.outs < 2 && (
                     <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
                   )}
