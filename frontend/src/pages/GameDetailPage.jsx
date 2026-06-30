@@ -6,83 +6,6 @@ import { avgFromValues, formatEraFromOuts, formatIpFromOuts } from '../utils/sta
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 import { EMPTY_HITTING, EMPTY_PITCHING, EMPTY_DEFENSE } from '../constants/stats'
 
-
-
-function Stepper({ label, value, onMinus, onPlus }) {
-  return (
-    <div className="stat-stepper stat-box">
-      <span><StatLabel abbr={label} /></span>
-      <button type="button" onClick={onMinus}>-</button>
-      <strong>{safeNumber(value)}</strong>
-      <button type="button" onClick={onPlus}>+</button>
-    </div>
-  )
-}
-
-function PitchingBlock({ row, onQuickEvent }) {
-  return (
-    <div className="pitching">
-      <Stepper label="Outs" value={row.pitching.outsPitched}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'outsPitched', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'outsPitched', 1)} />
-      <div className="pitcher-metric stat-box">IP: {formatIpFromOuts(row.pitching.outsPitched)}</div>
-      <Stepper label="ER" value={row.pitching.earnedRuns}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'earnedRuns', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'earnedRuns', 1)} />
-      <div className="pitcher-metric stat-box">ERA: {formatEraFromOuts(row.pitching.outsPitched, row.pitching.earnedRuns)}</div>
-      <Stepper label="H" value={row.pitching.hitsAllowed}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'hitsAllowed', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'hitsAllowed', 1)} />
-      <Stepper label="SO" value={row.pitching.strikeouts}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'strikeouts', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'strikeouts', 1)} />
-      <Stepper label="BB" value={row.pitching.walks}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'walks', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'walks', 1)} />
-      <Stepper label="PC" value={row.pitching.pitchCount}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'pitchCount', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'pitchCount', 1)} />
-      <Stepper label="STR" value={row.pitching.strikes}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'strikes', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'strikes', 1)} />
-      <Stepper label="BAL" value={row.pitching.balls}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'balls', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'balls', 1)} />
-      <Stepper label="W" value={row.pitching.wins || 0}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'wins', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'wins', 1)} />
-      <Stepper label="L" value={row.pitching.losses || 0}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'losses', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'losses', 1)} />
-      <Stepper label="SV" value={row.pitching.saves || 0}
-        onMinus={() => onQuickEvent(row.playerId, 'pitching', 'saves', -1)}
-        onPlus={() => onQuickEvent(row.playerId, 'pitching', 'saves', 1)} />
-    </div>
-  )
-}
-
-function DefenseRow({ playerId, defense, onQuickEvent }) {
-  return (
-    <div className="defense">
-      <Stepper label="E" value={defense.errors}
-        onMinus={() => onQuickEvent(playerId, 'defense', 'errors', -1)}
-        onPlus={() => onQuickEvent(playerId, 'defense', 'errors', 1)} />
-      <Stepper label="DP" value={defense.doublePlays}
-        onMinus={() => onQuickEvent(playerId, 'defense', 'doublePlays', -1)}
-        onPlus={() => onQuickEvent(playerId, 'defense', 'doublePlays', 1)} />
-      <Stepper label="FO" value={defense.flyOuts}
-        onMinus={() => onQuickEvent(playerId, 'defense', 'flyOuts', -1)}
-        onPlus={() => onQuickEvent(playerId, 'defense', 'flyOuts', 1)} />
-      <Stepper label="GO" value={defense.groundOuts}
-        onMinus={() => onQuickEvent(playerId, 'defense', 'groundOuts', -1)}
-        onPlus={() => onQuickEvent(playerId, 'defense', 'groundOuts', 1)} />
-      <Stepper label="LO" value={defense.lineOuts}
-        onMinus={() => onQuickEvent(playerId, 'defense', 'lineOuts', -1)}
-        onPlus={() => onQuickEvent(playerId, 'defense', 'lineOuts', 1)} />
-    </div>
-  )
-}
-
 // ── Report generation ─────────────────────────────────────────────
 
 function pad(str, len, right = false) {
@@ -107,7 +30,6 @@ function generateTextReport(game, rows) {
     `Placar final: ${homeScore} x ${awayScore}`,
   ]
 
-  // Inning-by-inning line score
   const maxInning = Math.max(inningScores.home.length, inningScores.away.length)
   if (maxInning > 0) {
     const innings = Array.from({ length: maxInning }, (_, i) => i + 1)
@@ -118,7 +40,6 @@ function generateTextReport(game, rows) {
     lines.push(`${'Deles'.padEnd(8)} ${innings.map((_, i) => pad(inningScores.away[i] ?? 0, 3)).join('')}  | ${awayScore}`)
   }
 
-  // Batting
   lines.push('')
   lines.push('BATTING')
   lines.push(sep)
@@ -137,7 +58,6 @@ function generateTextReport(game, rows) {
     )
   }
 
-  // Pitching — pitchers only
   const pitchers = rows.filter((r) => r.type === 'pitcher')
   if (pitchers.length > 0) {
     lines.push('')
@@ -158,7 +78,6 @@ function generateTextReport(game, rows) {
     }
   }
 
-  // Substitutions
   const subs = gs.substitutions || []
   if (subs.length > 0) {
     lines.push('')
@@ -173,7 +92,6 @@ function generateTextReport(game, rows) {
     }
   }
 
-  // Play-by-play
   const log = gs.gameLog || []
   if (log.length > 0) {
     lines.push('')
@@ -308,7 +226,6 @@ function ExportModal({ text, onClose }) {
         if (err.name === 'AbortError') return
       }
     }
-    // Fallback: copy to clipboard
     handleCopy()
   }
 
@@ -350,9 +267,131 @@ function ExportModal({ text, onClose }) {
   )
 }
 
+// ── Stat cell ─────────────────────────────────────────────────────
+
+function StatCell({ label, value, onMinus, onPlus }) {
+  return (
+    <div className="gd-stat-cell">
+      <div className="gd-stat-label"><StatLabel abbr={label} /></div>
+      <div className="gd-stat-controls">
+        <button type="button" className="gd-stat-btn" onClick={onMinus}>−</button>
+        <span className="gd-stat-value">{safeNumber(value)}</span>
+        <button type="button" className="gd-stat-btn" onClick={onPlus}>+</button>
+      </div>
+    </div>
+  )
+}
+
+function ComputedCell({ label, value }) {
+  return (
+    <div className="gd-stat-cell gd-stat-cell--computed">
+      <div className="gd-stat-label"><StatLabel abbr={label} /></div>
+      <div className="gd-stat-computed">{value}</div>
+    </div>
+  )
+}
+
+// ── Stat sections ─────────────────────────────────────────────────
+
+function HittingSection({ row, onQuickEvent }) {
+  const h = row.hitting
+  const avg = avgFromValues(h.atBats, h.hits)
+  const q = (field, delta) => onQuickEvent(row.playerId, 'hitting', field, delta)
+  return (
+    <div className="gd-stats-grid">
+      <StatCell label="AB"  value={h.atBats}          onMinus={() => q('atBats', -1)}       onPlus={() => q('atBats', 1)} />
+      <StatCell label="H"   value={h.hits}             onMinus={() => q('hits', -1)}          onPlus={() => q('hits', 1)} />
+      <ComputedCell label="AVG" value={avg} />
+      <StatCell label="2B"  value={h.doubles || 0}     onMinus={() => q('doubles', -1)}       onPlus={() => q('doubles', 1)} />
+      <StatCell label="3B"  value={h.triples || 0}     onMinus={() => q('triples', -1)}       onPlus={() => q('triples', 1)} />
+      <StatCell label="HR"  value={h.homeRuns || 0}    onMinus={() => q('homeRuns', -1)}      onPlus={() => q('homeRuns', 1)} />
+      <StatCell label="R"   value={h.runs || 0}        onMinus={() => q('runs', -1)}           onPlus={() => q('runs', 1)} />
+      <StatCell label="RBI" value={h.rbi || 0}         onMinus={() => q('rbi', -1)}            onPlus={() => q('rbi', 1)} />
+      <StatCell label="BB"  value={h.walks || 0}       onMinus={() => q('walks', -1)}          onPlus={() => q('walks', 1)} />
+      <StatCell label="SO"  value={h.strikeouts}       onMinus={() => q('strikeouts', -1)}     onPlus={() => q('strikeouts', 1)} />
+      <StatCell label="SB"  value={h.stolenBases || 0} onMinus={() => q('stolenBases', -1)}   onPlus={() => q('stolenBases', 1)} />
+      <StatCell label="OUT" value={h.outs}             onMinus={() => q('outs', -1)}           onPlus={() => q('outs', 1)} />
+    </div>
+  )
+}
+
+function PitchingSection({ row, onQuickEvent }) {
+  const p = row.pitching
+  const ip  = formatIpFromOuts(p.outsPitched)
+  const era = formatEraFromOuts(p.outsPitched, p.earnedRuns)
+  const q = (field, delta) => onQuickEvent(row.playerId, 'pitching', field, delta)
+  return (
+    <div className="gd-stats-grid">
+      <StatCell label="Outs" value={p.outsPitched}      onMinus={() => q('outsPitched', -1)}  onPlus={() => q('outsPitched', 1)} />
+      <ComputedCell label="IP"  value={ip} />
+      <StatCell label="ER"   value={p.earnedRuns}       onMinus={() => q('earnedRuns', -1)}   onPlus={() => q('earnedRuns', 1)} />
+      <ComputedCell label="ERA" value={era} />
+      <StatCell label="H"    value={p.hitsAllowed}      onMinus={() => q('hitsAllowed', -1)}  onPlus={() => q('hitsAllowed', 1)} />
+      <StatCell label="SO"   value={p.strikeouts}       onMinus={() => q('strikeouts', -1)}   onPlus={() => q('strikeouts', 1)} />
+      <StatCell label="BB"   value={p.walks}            onMinus={() => q('walks', -1)}         onPlus={() => q('walks', 1)} />
+      <StatCell label="PC"   value={p.pitchCount}       onMinus={() => q('pitchCount', -1)}   onPlus={() => q('pitchCount', 1)} />
+      <StatCell label="STR"  value={p.strikes}          onMinus={() => q('strikes', -1)}       onPlus={() => q('strikes', 1)} />
+      <StatCell label="BAL"  value={p.balls}            onMinus={() => q('balls', -1)}         onPlus={() => q('balls', 1)} />
+      <StatCell label="W"    value={p.wins || 0}        onMinus={() => q('wins', -1)}          onPlus={() => q('wins', 1)} />
+      <StatCell label="L"    value={p.losses || 0}      onMinus={() => q('losses', -1)}        onPlus={() => q('losses', 1)} />
+      <StatCell label="SV"   value={p.saves || 0}       onMinus={() => q('saves', -1)}         onPlus={() => q('saves', 1)} />
+    </div>
+  )
+}
+
+function DefenseSection({ row, onQuickEvent }) {
+  const d = row.defense
+  const q = (field, delta) => onQuickEvent(row.playerId, 'defense', field, delta)
+  return (
+    <div className="gd-stats-grid">
+      <StatCell label="E"  value={d.errors}       onMinus={() => q('errors', -1)}       onPlus={() => q('errors', 1)} />
+      <StatCell label="DP" value={d.doublePlays}  onMinus={() => q('doublePlays', -1)}  onPlus={() => q('doublePlays', 1)} />
+      <StatCell label="FO" value={d.flyOuts}      onMinus={() => q('flyOuts', -1)}      onPlus={() => q('flyOuts', 1)} />
+      <StatCell label="GO" value={d.groundOuts}   onMinus={() => q('groundOuts', -1)}   onPlus={() => q('groundOuts', 1)} />
+      <StatCell label="LO" value={d.lineOuts}     onMinus={() => q('lineOuts', -1)}     onPlus={() => q('lineOuts', 1)} />
+    </div>
+  )
+}
+
+// ── Player card ────────────────────────────────────────────────────
+
+function PlayerDetailCard({ row, onQuickEvent, onOpenPlayer }) {
+  const isPitcher = row.type === 'pitcher'
+  const tabs = ['Batting', ...(isPitcher ? ['Pitching'] : []), 'Defesa']
+  const [activeTab, setActiveTab] = useState('Batting')
+
+  return (
+    <article className="gd-player-card">
+      <header className="gd-player-header">
+        <div>
+          <button type="button" className="gd-player-name" onClick={() => onOpenPlayer?.(row.playerId)}>
+            {row.player.name}
+          </button>
+          <div className="gd-player-meta">
+            #{row.player.number} · {getMainPosition(row.player)}
+            {isPitcher && <span className="gd-pitcher-badge">P</span>}
+          </div>
+        </div>
+      </header>
+
+      <div className="gd-tabs">
+        {tabs.map((tab) => (
+          <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'Batting'  && <HittingSection  row={row} onQuickEvent={onQuickEvent} />}
+      {activeTab === 'Pitching' && <PitchingSection row={row} onQuickEvent={onQuickEvent} />}
+      {activeTab === 'Defesa'   && <DefenseSection  row={row} onQuickEvent={onQuickEvent} />}
+    </article>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────
 
-function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpenPlayer, onPrint }) {
+function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpenPlayer }) {
   const [showExport, setShowExport] = useState(false)
 
   const rows = useMemo(() => {
@@ -360,11 +399,9 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
     for (const stat of gameStats) {
       byPlayer[String(stat.playerId?._id || stat.playerId)] = stat
     }
-
     return players.map((player) => {
       const playerId = getPlayerId(player)
       const stat = byPlayer[playerId] || {}
-
       return {
         player,
         playerId,
@@ -376,8 +413,31 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
     })
   }, [gameStats, players])
 
-  const handlePrintReport = () => {
+  const handlePrintReport = async () => {
     const html = generateHtmlReport(game, rows)
+    const isNative = Boolean(window.Capacitor?.isNativePlatform?.() || window.Capacitor?.isNative)
+
+    if (isNative) {
+      // Android WebView does not support window.print(); share the HTML file instead.
+      try {
+        const blob = new Blob([html], { type: 'text/html' })
+        const file = new File([blob], 'relatorio-jogo.html', { type: 'text/html' })
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ title: 'Relatório de Jogo', files: [file] })
+          return
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+      }
+      // Fallback: share as plain text
+      const text = generateTextReport(game, rows)
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Relatório de Jogo', text }) } catch {}
+      }
+      return
+    }
+
+    // Desktop/browser: use hidden iframe + window.print()
     const iframe = document.createElement('iframe')
     iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none'
     document.body.appendChild(iframe)
@@ -391,94 +451,58 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
   }
 
   const exportText = useMemo(() => generateTextReport(game, rows), [game, rows])
+  const gs = game.gameState || {}
+  const homeScore = safeNumber(gs.homeScore)
+  const awayScore = safeNumber(gs.awayScore)
+  const hasScore = gs.homeScore != null || gs.awayScore != null
+  const isNative = Boolean(window.Capacitor?.isNativePlatform?.() || window.Capacitor?.isNative)
 
   return (
     <div className="game-detail card">
-      <div className="game-detail-head">
-        <h3>Detalhe do jogo</h3>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      {/* ── Header ── */}
+      <div className="gd-header">
+        <div className="gd-header-info">
+          <h3 className="gd-title">vs {game.opponentName || game.opponent}</h3>
+          <p className="gd-meta">
+            {new Date(game.date).toLocaleDateString('pt-BR')}
+            {game.competition ? ` · ${game.competition}` : ''}
+          </p>
+          {hasScore && (
+            <div className="gd-score">
+              <span className="gd-score-team">Nós</span>
+              <strong className="gd-score-num">{homeScore}</strong>
+              <span className="gd-score-sep">×</span>
+              <strong className="gd-score-num">{awayScore}</strong>
+              <span className="gd-score-team">Adversário</span>
+            </div>
+          )}
+        </div>
+        <div className="gd-head-actions">
           <Button type="button" variant="primary" onClick={() => setShowExport(true)}>
-            Gerar Resumo
+            Resumo
           </Button>
           <Button type="button" variant="secondary" onClick={handlePrintReport}>
-            Imprimir / PDF
+            {isNative ? 'Compartilhar' : 'PDF'}
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>Fechar</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            ✕
+          </Button>
         </div>
       </div>
-      <p>
-        {new Date(game.date).toLocaleDateString('pt-BR')} - {game.opponent} ({game.competition})
-      </p>
 
-      <h4>Planilha do jogo</h4>
-      <div className="stats-container">
-        <div className="player-row player-row-head">
-          <strong>Jogador</strong>
-          <strong>N</strong>
-          <strong>Posicao</strong>
-          <strong>Hitting</strong>
-          <strong>Pitching</strong>
-          <strong>Defesa</strong>
-        </div>
-
+      {/* ── Player cards ── */}
+      <div className="gd-players">
         {rows.map((row) => (
-          <div key={`h-${row.playerId}`} className="player-row">
-            <div>
-              <Button type="button" variant="link" onClick={() => onOpenPlayer?.(row.playerId)}>
-                {row.player.name}
-              </Button>
-            </div>
-            <div>{row.player.number}</div>
-            <div>{getMainPosition(row.player)}</div>
-            <div className="hitting">
-              <Stepper label="AB" value={row.hitting.atBats}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'atBats', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'atBats', 1)} />
-              <Stepper label="H" value={row.hitting.hits}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'hits', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'hits', 1)} />
-              <Stepper label="2B" value={row.hitting.doubles || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'doubles', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'doubles', 1)} />
-              <Stepper label="3B" value={row.hitting.triples || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'triples', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'triples', 1)} />
-              <Stepper label="HR" value={row.hitting.homeRuns || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'homeRuns', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'homeRuns', 1)} />
-              <Stepper label="R" value={row.hitting.runs || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'runs', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'runs', 1)} />
-              <Stepper label="RBI" value={row.hitting.rbi || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'rbi', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'rbi', 1)} />
-              <Stepper label="BB" value={row.hitting.walks || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'walks', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'walks', 1)} />
-              <Stepper label="SO" value={row.hitting.strikeouts}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'strikeouts', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'strikeouts', 1)} />
-              <Stepper label="SB" value={row.hitting.stolenBases || 0}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'stolenBases', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'stolenBases', 1)} />
-              <Stepper label="OUT" value={row.hitting.outs}
-                onMinus={() => onQuickEvent(row.playerId, 'hitting', 'outs', -1)}
-                onPlus={() => onQuickEvent(row.playerId, 'hitting', 'outs', 1)} />
-              <div className="pitcher-metric stat-box">AVG: {avgFromValues(row.hitting.atBats, row.hitting.hits)}</div>
-            </div>
-            <div>
-              {row.type === 'pitcher' ? <PitchingBlock row={row} onQuickEvent={onQuickEvent} /> : <span>-</span>}
-            </div>
-            <div>
-              <DefenseRow playerId={row.playerId} defense={row.defense} onQuickEvent={onQuickEvent} />
-            </div>
-          </div>
+          <PlayerDetailCard
+            key={row.playerId}
+            row={row}
+            onQuickEvent={onQuickEvent}
+            onOpenPlayer={onOpenPlayer}
+          />
         ))}
       </div>
 
-      {showExport && (
-        <ExportModal text={exportText} onClose={() => setShowExport(false)} />
-      )}
+      {showExport && <ExportModal text={exportText} onClose={() => setShowExport(false)} />}
     </div>
   )
 }

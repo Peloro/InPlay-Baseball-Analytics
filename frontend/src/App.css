@@ -4673,3 +4673,295 @@ html {
   color: #888;
   min-width: 20px;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   GAME DETAIL PAGE — redesigned card layout
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Header */
+.gd-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.gd-header-info {
+  display: grid;
+  gap: 4px;
+}
+
+.gd-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.gd-meta {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.gd-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.gd-score-team {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gd-score-num {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.gd-score-sep {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.gd-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+/* Player grid */
+.gd-players {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .gd-players {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .gd-players {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Player card */
+.gd-player-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #181828;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  transition: border-color 120ms ease;
+}
+
+.gd-player-card:hover {
+  border-color: #383860;
+}
+
+.gd-player-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gd-player-name {
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-size: 0.97rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  line-height: 1.2;
+  transition: color 120ms;
+}
+
+.gd-player-name:hover {
+  color: var(--accent);
+}
+
+.gd-player-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gd-pitcher-badge {
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Section tabs inside player card */
+.gd-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.gd-tabs button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #202030;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 5px 12px;
+  min-height: 32px;
+  transition: background 120ms, color 120ms, border-color 120ms;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gd-tabs button.active {
+  background: var(--accent);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+
+.gd-tabs button:not(.active):hover {
+  border-color: #484878;
+  color: var(--ink);
+}
+
+/* Stats grid inside player card */
+.gd-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* Individual stat cell */
+.gd-stat-cell {
+  background: #1e1e2c;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.gd-stat-cell--computed {
+  background: rgba(99, 102, 241, 0.07);
+  border-color: rgba(99, 102, 241, 0.28);
+}
+
+.gd-stat-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.gd-stat-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.gd-stat-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink);
+  min-width: 22px;
+  text-align: center;
+  line-height: 1;
+}
+
+.gd-stat-computed {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  padding: 4px 0;
+}
+
+.gd-stat-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #252538;
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 100ms, border-color 100ms;
+  line-height: 1;
+  padding: 0;
+}
+
+.gd-stat-btn:hover {
+  background: #363658;
+  border-color: #484878;
+}
+
+.gd-stat-btn:active {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+}
+
+/* Mobile: bump touch targets */
+@media (max-width: 767px) {
+  .gd-stat-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .gd-stat-value {
+    font-size: 1rem;
+    min-width: 26px;
+  }
+
+  .gd-stats-grid {
+    gap: 5px;
+  }
+
+  .gd-head-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .gd-score-num {
+    font-size: 1.4rem;
+  }
+}

@@ -42,7 +42,12 @@ export default function usePlayers({ players, setPlayers, gameState }) {
       })
   }, [players, onFieldIds, benchSearch, getPlayerId, getMainPosition])
 
-  const setupAvailablePlayers = useMemo(() => players, [players])
+  const setupAvailablePlayers = useMemo(() => {
+    const participantIds = gameState.participantPlayerIds
+    if (!participantIds || !participantIds.length) return players
+    const idSet = new Set(participantIds)
+    return players.filter((p) => idSet.has(getPlayerId(p)))
+  }, [players, gameState.participantPlayerIds, getPlayerId])
 
   // All players can play any position; returns true always so existing callers still compile.
   const playerCanPlayPosition = useCallback((_playerId, _position) => true, [])
