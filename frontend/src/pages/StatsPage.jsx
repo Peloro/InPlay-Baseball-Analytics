@@ -101,15 +101,23 @@ function StatsPage({
 
   // Bootstrap: load games and season stats on mount
   useEffect(() => {
-    const bootstrap = async () => {
-      try {
-        await loadGames()
-        await loadSeasonStats()
-      } catch {
-        // Mantem pagina funcional mesmo sem backend.
-      }
+    loadGames().catch(() => {})
+    loadSeasonStats().catch(() => {})
+  }, [loadGames, loadSeasonStats])
+
+  // Refresh when the app comes back to foreground (Capacitor resume + browser visibility)
+  useEffect(() => {
+    const refresh = () => {
+      loadGames().catch(() => {})
+      loadSeasonStats().catch(() => {})
     }
-    bootstrap()
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisibility)
+    document.addEventListener('resume', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('resume', refresh)
+    }
   }, [loadGames, loadSeasonStats])
 
   // Reload season stats when playerFilter changes

@@ -145,6 +145,7 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
   const toggleParticipant = (playerId) => {
     const current = participantIds.length ? participantIds : players.map((p) => getPlayerId(p))
     const has = current.includes(playerId)
+    if (has && current.length <= 9) return
     const next = has ? current.filter((id) => id !== playerId) : [...current, playerId]
     onUpdateGameState?.((state) => {
       const currentOrder = state.battingOrder || []
@@ -228,14 +229,34 @@ function JogadoresPage({ players, onAddPlayer, onDeletePlayer, onUpdatePlayer, g
 
         <div className="card">
           <h2>Lineup da ficha</h2>
-          <p className="jogadores-hint">Selecione quem participa do jogo atual.</p>
+          {(() => {
+            const count = participantIds.length ? participantIds.length : players.length
+            const atMin = count <= 9
+            return (
+              <>
+                <p className="jogadores-hint">
+                  Selecione quem participa do jogo atual.{' '}
+                  <strong style={{ color: atMin ? '#ef4444' : undefined }}>{count} selecionado{count !== 1 ? 's' : ''}</strong>
+                  {atMin && count < 9 && <span style={{ color: '#ef4444' }}> — mínimo 9 jogadores</span>}
+                  {atMin && count === 9 && <span style={{ color: '#6b7280' }}> (mínimo atingido)</span>}
+                </p>
+              </>
+            )
+          })()}
           <div className="lineup-picker">
             {players.map((player) => {
               const id = getPlayerId(player)
               const selected = participantIds.length ? participantIds.includes(id) : true
+              const currentCount = participantIds.length ? participantIds.length : players.length
+              const blocked = selected && currentCount <= 9
               return (
-                <label key={`lineup-${id}`}>
-                  <input type="checkbox" checked={selected} onChange={() => toggleParticipant(id)} />
+                <label key={`lineup-${id}`} style={blocked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => toggleParticipant(id)}
+                    disabled={blocked}
+                  />
                   {player.name} #{player.number} ({getMainPosition(player)})
                 </label>
               )

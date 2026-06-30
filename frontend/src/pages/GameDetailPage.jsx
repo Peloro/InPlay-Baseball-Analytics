@@ -378,11 +378,16 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
 
   const handlePrintReport = () => {
     const html = generateHtmlReport(game, rows)
-    const blob = new Blob([html], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const win = window.open(url, '_blank')
-    if (win) win.addEventListener('load', () => URL.revokeObjectURL(url))
-    else URL.revokeObjectURL(url)
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentDocument || iframe.contentWindow.document
+    doc.open()
+    doc.write(html)
+    doc.close()
+    iframe.contentWindow.focus()
+    iframe.contentWindow.print()
+    setTimeout(() => document.body.removeChild(iframe), 2000)
   }
 
   const exportText = useMemo(() => generateTextReport(game, rows), [game, rows])
