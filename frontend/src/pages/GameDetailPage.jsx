@@ -34,14 +34,17 @@ function generateTextReport(game, rows) {
   ]
 
   const maxInning = Math.max(inningScores.home.length, inningScores.away.length)
+  const teamW = Math.max(myTeam.length, opponent.length, 8)
+  lines.push('')
+  lines.push('BOX SCORE')
   if (maxInning > 0) {
     const innings = Array.from({ length: maxInning }, (_, i) => i + 1)
-    const teamW = Math.max(myTeam.length, opponent.length, 8)
-    lines.push('')
-    lines.push('BOX SCORE')
     lines.push(`${pad('', teamW, true)} ${innings.map((n) => pad(n, 3)).join('')}  | Tot`)
     lines.push(`${pad(myTeam, teamW, true)} ${innings.map((_, i) => pad(inningScores.home[i] ?? 0, 3)).join('')}  | ${homeScore}`)
     lines.push(`${pad(opponent, teamW, true)} ${innings.map((_, i) => pad(inningScores.away[i] ?? 0, 3)).join('')}  | ${awayScore}`)
+  } else {
+    lines.push(`${pad(myTeam, teamW, true)}  R: ${homeScore}`)
+    lines.push(`${pad(opponent, teamW, true)}  R: ${awayScore}`)
   }
 
   lines.push('')
@@ -158,20 +161,17 @@ function generateHtmlReport(game, rows) {
     return `<tr><td>${row.player.name}</td><td>#${row.player.number}</td><td>${getMainPosition(row.player)}</td><td>${safeNumber(d.errors)}</td><td>${safeNumber(d.doublePlays)}</td><td>${safeNumber(d.flyOuts)}</td><td>${safeNumber(d.groundOuts)}</td><td>${safeNumber(d.lineOuts)}</td></tr>`
   }).join('')
 
-  let linescoreHtml = ''
-  if (maxInning > 0) {
-    const innings = Array.from({ length: maxInning }, (_, i) => i + 1)
-    const thCells = innings.map((n) => `<th>${n}</th>`).join('')
-    const homeCells = innings.map((_, i) => `<td>${inningScores.home[i] ?? 0}</td>`).join('')
-    const awayCells = innings.map((_, i) => `<td>${inningScores.away[i] ?? 0}</td>`).join('')
-    linescoreHtml = `
-      <h2>Box Score</h2>
-      <table><thead><tr><th>Time</th>${thCells}<th>R</th></tr></thead>
-      <tbody>
-        <tr><td><strong>${myTeam}</strong></td>${homeCells}<td><strong>${homeScore}</strong></td></tr>
-        <tr><td><strong>${opponent}</strong></td>${awayCells}<td><strong>${awayScore}</strong></td></tr>
-      </tbody></table>`
-  }
+  const innings = maxInning > 0 ? Array.from({ length: maxInning }, (_, i) => i + 1) : []
+  const inningHeaders = innings.map((n) => `<th>${n}</th>`).join('')
+  const homeCells = innings.map((_, i) => `<td>${inningScores.home[i] ?? 0}</td>`).join('')
+  const awayCells = innings.map((_, i) => `<td>${inningScores.away[i] ?? 0}</td>`).join('')
+  const linescoreHtml = `
+    <h2>Box Score</h2>
+    <table><thead><tr><th>Time</th>${inningHeaders}<th>R</th></tr></thead>
+    <tbody>
+      <tr><td><strong>${myTeam}</strong></td>${homeCells}<td><strong>${homeScore}</strong></td></tr>
+      <tr><td><strong>${opponent}</strong></td>${awayCells}<td><strong>${awayScore}</strong></td></tr>
+    </tbody></table>`
 
   const subs = gs.substitutions || []
   const subsHtml = subs.length > 0 ? `
@@ -525,7 +525,7 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
       </div>
 
       {/* ── Box score (linescore) ── */}
-      {maxInning > 0 && (
+      {hasScore && (
         <div className="gd-boxscore-wrap">
           <div className="gd-boxscore-scroll">
             <table className="gd-boxscore">
