@@ -701,7 +701,7 @@ export default function useGameActions({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentPitcherId, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertPlayerStat, showInvalidAction])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentPitcherId, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertGameStat, showInvalidAction])
 
   const applyDoublePlayWithRunner = useCallback(async (runnerBase, defenderIds = []) => {
     if (!runnerBase) return
@@ -765,7 +765,7 @@ export default function useGameActions({
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertPlayerStat, playersById])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertGameStat, playersById])
 
   const applySacFly = useCallback(async () => {
     if (!gameState.runners?.third) {

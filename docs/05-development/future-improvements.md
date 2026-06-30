@@ -4,80 +4,6 @@ Oportunidades de melhoria identificadas a partir do código e das limitações c
 
 ---
 
-## Alta Prioridade
-
-### 1. Adicionar Campos de Stats ao Schema do Backend
-
-Sincronizar os campos que existem apenas no frontend:
-
-```js
-// backend/src/models/GameStat.js — adicionar:
-hitting: {
-  // campos existentes...
-  doubles: { type: Number, default: 0 },
-  triples: { type: Number, default: 0 },
-  stolenBases: { type: Number, default: 0 },
-  hitByPitch: { type: Number, default: 0 },
-  sacrificeFlies: { type: Number, default: 0 },
-  caughtStealing: { type: Number, default: 0 },
-},
-pitching: {
-  // campos existentes...
-  wildPitches: { type: Number, default: 0 },
-  wins: { type: Number, default: 0 },
-  losses: { type: Number, default: 0 },
-  saves: { type: Number, default: 0 },
-}
-```
-
-```js
-// backend/src/models/Player.js — adicionar:
-pitchCountLimit: { type: Number, default: null },
-pitchRepertoire: { type: [String], default: [] },
-```
-
-**Impacto**: Preservação completa de dados após reinstalação do app.
-
----
-
-### 2. Testes Automatizados
-
-Adicionar Vitest para funções puras:
-- `utils/stats.js` (cálculos estatísticos)
-- `utils/gameState.js` (computeInningTransition)
-- `utils/fieldGame.js` (applyHitToBases, advanceOnWalk)
-- `services/api.js` (gameStatsApi.upsert)
-
-Ver [testing.md](testing.md) para setup detalhado.
-
----
-
-### 3. Aviso de Quota Excedida no localStorage
-
-```js
-// Melhorar o catch de QuotaExceededError:
-try {
-  localStorage.setItem(key, JSON.stringify(data))
-} catch (e) {
-  if (e.name === 'QuotaExceededError') {
-    // Exibir toast: "Armazenamento local cheio — dados não salvos"
-    showToast('Armazenamento cheio. Considere exportar e limpar jogos antigos.')
-  }
-}
-```
-
----
-
-### 4. Detecção Automática de W/L/S
-
-Ao encerrar o jogo, detectar automaticamente qual pitcher ganhou/perdeu baseado nas regras oficiais do beisebol:
-
-- **Win**: Pitcher que estava arremessando quando o time passou a liderar (e manteve).
-- **Loss**: Pitcher que cedeu a vantagem decisiva.
-- **Save**: Pitcher que entrou em vantagem e terminou o jogo em certas condições.
-
----
-
 ## Média Prioridade
 
 ### 5. Múltiplos Usuários por Time
@@ -188,7 +114,3 @@ Capacitor suporta iOS, mas o projeto só tem `@capacitor/android`. Adicionar sup
 Interface para editar manualmente o placar de innings anteriores, útil quando há erro de registro durante o jogo.
 
 ---
-
-### 17. Relatórios PDF
-
-Gerar PDF de relatório do jogo para impressão ou compartilhamento, usando bibliotecas como `jspdf` ou `html2canvas`.
