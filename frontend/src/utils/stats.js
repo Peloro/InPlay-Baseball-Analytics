@@ -85,12 +85,14 @@ export function addInningRuns(inningScores, inning, ourRuns, theirRuns) {
 }
 
 export function obpFromHitting(hitting) {
-  const h = toNum(hitting?.hits)
-  const bb = toNum(hitting?.walks)
-  const ab = toNum(hitting?.atBats)
-  const denom = ab + bb
+  const h   = toNum(hitting?.hits)
+  const bb  = toNum(hitting?.walks)
+  const hbp = toNum(hitting?.hitByPitch)
+  const ab  = toNum(hitting?.atBats)
+  const sf  = toNum(hitting?.sacrificeFlies)
+  const denom = ab + bb + hbp + sf
   if (!denom) return '---'
-  return ((h + bb) / denom).toFixed(3)
+  return ((h + bb + hbp) / denom).toFixed(3)
 }
 
 export function slgFromHitting(hitting) {
@@ -105,16 +107,39 @@ export function slgFromHitting(hitting) {
 }
 
 export function opsFromHitting(hitting) {
-  const ab = toNum(hitting?.atBats)
-  const bb = toNum(hitting?.walks)
-  if (!(ab + bb)) return '---'
+  const ab  = toNum(hitting?.atBats)
+  const bb  = toNum(hitting?.walks)
+  const hbp = toNum(hitting?.hitByPitch)
+  const sf  = toNum(hitting?.sacrificeFlies)
+  const denom = ab + bb + hbp + sf
+  if (!denom) return '---'
   const h  = toNum(hitting?.hits)
   const d  = toNum(hitting?.doubles)
   const t  = toNum(hitting?.triples)
   const hr = toNum(hitting?.homeRuns)
-  const obp = (h + bb) / (ab + bb)
+  const obp = (h + bb + hbp) / denom
   const slg = ab ? (h + d + t * 2 + hr * 3) / ab : 0
   return (obp + slg).toFixed(3)
+}
+
+export function kPctFromHitting(hitting) {
+  const ab  = toNum(hitting?.atBats)
+  const bb  = toNum(hitting?.walks)
+  const hbp = toNum(hitting?.hitByPitch)
+  const sf  = toNum(hitting?.sacrificeFlies)
+  const pa  = ab + bb + hbp + sf
+  if (!pa) return '---'
+  return ((toNum(hitting?.strikeouts) / pa) * 100).toFixed(1) + '%'
+}
+
+export function bbPctFromHitting(hitting) {
+  const ab  = toNum(hitting?.atBats)
+  const bb  = toNum(hitting?.walks)
+  const hbp = toNum(hitting?.hitByPitch)
+  const sf  = toNum(hitting?.sacrificeFlies)
+  const pa  = ab + bb + hbp + sf
+  if (!pa) return '---'
+  return ((bb / pa) * 100).toFixed(1) + '%'
 }
 
 export function whipFromPitching(pitching) {

@@ -445,15 +445,17 @@ textarea:focus-visible {
 
 .field-layout,
 .training-layout {
-  position: relative;
-  width: 100%;
-  height: calc(100vh - var(--top-nav-height));
+  position: fixed;
+  top: var(--top-nav-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
 }
 
 .nav-collapsed .field-layout,
 .nav-collapsed .training-layout {
-  height: 100vh;
+  top: env(safe-area-inset-top, 0px);
 }
 
 .game-scoreboard {
@@ -1593,9 +1595,9 @@ html, body {
 @media (max-width: 767px) {
   .field-layout,
   .training-layout {
-    position: relative;
-    height: auto;
-    min-height: calc(100vh - var(--top-nav-height));
+    /* Keep position: fixed from base rule — scroll inside the container, not the page */
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1614,6 +1616,7 @@ html, body {
   .field-stage {
     position: relative;
     inset: auto;
+    flex-shrink: 0;
     height: 56vh;
     min-height: 320px;
     max-height: 68vh;
@@ -1641,6 +1644,7 @@ html, body {
     padding: 10px;
     overflow: auto;
     z-index: 1;
+    flex-shrink: 0;
   }
 
   .field-hud {
@@ -1653,6 +1657,7 @@ html, body {
     max-height: none;
     overflow: visible;
     z-index: 1;
+    flex-shrink: 0;
   }
 
   /* Make sure markers remain within the field and not cause horizontal scroll */
@@ -3485,6 +3490,35 @@ html {
   to   { opacity: 0; }
 }
 
+/* ── Storage quota warning banner ── */
+.storage-full-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  background: #7c2d12;
+  border-bottom: 2px solid #dc2626;
+  color: #fef2f2;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 12px;
+}
+.storage-full-banner button {
+  background: none;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
 /* ── Opponent batter pre-filled from lineup ── */
 .acoes-input-prefilled {
   border-color: #2f6040 !important;
@@ -3559,6 +3593,8 @@ html {
 .acoes-sf     { background: #2e2e2e; color: #ccc; }
 .acoes-erro   { background: #7a2020; color: #fbb; }
 .acoes-hbp    { background: #2a2a2a; color: #bbb; border: 1px solid #444; }
+.acoes-bb     { background: #1a5c3a; color: #7de4a0; }
+.acoes-wp     { background: #2a3c5a; color: #8ab4d4; }
 
 .acoes-pitcher-stats {
   background: rgba(255,255,255,0.03);
@@ -3818,15 +3854,19 @@ html {
 /* ── Jogadores page ─────────────────────────────────────────────── */
 
 .jogadores-page {
-  min-height: calc(100vh - var(--top-nav-height));
+  height: calc(100vh - var(--top-nav-height));
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
   padding: 16px;
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
   box-sizing: border-box;
+}
+
+.nav-collapsed .jogadores-page {
+  height: 100vh;
 }
 
 .jogadores-col {
@@ -3835,6 +3875,8 @@ html {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  overflow-y: auto;
+  padding-bottom: 16px;
 }
 
 .jogadores-hint {
@@ -4175,6 +4217,13 @@ html {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+.wls-auto-label {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--accent, #6366f1);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .game-summary-wlsv-row {
@@ -4737,22 +4786,28 @@ html {
 
 .gd-head-actions {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  flex-shrink: 0;
-  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
   width: 100%;
 }
 
 .gd-head-actions-right {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* Reset .game-list button cascade for game-detail action buttons */
+.gd-head-actions button {
+  width: auto;
+  display: inline-flex;
+  text-align: center;
 }
 
 .gd-delete-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
@@ -4764,6 +4819,7 @@ html {
   font-weight: 700;
   cursor: pointer;
   min-height: 34px;
+  width: auto;
   transition: background 120ms, color 120ms;
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
@@ -4804,6 +4860,8 @@ html {
   padding: 12px;
   display: grid;
   gap: 10px;
+  min-width: 0;
+  overflow: hidden;
   transition: border-color 120ms ease;
 }
 

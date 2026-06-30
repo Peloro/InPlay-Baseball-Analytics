@@ -33,6 +33,7 @@ export const INITIAL_GAME_STATE = {
   opponentLineupIndex: 0,
   opposingPitcher: { number: '', name: '' },
   maxInnings: 0,
+  pitcherStints: [],
 }
 
 export function getSavedGameState() {
@@ -88,6 +89,7 @@ export function getSavedGameState() {
       opponentLineupIndex: typeof parsed?.opponentLineupIndex === 'number' ? parsed.opponentLineupIndex : 0,
       opposingPitcher: parsed?.opposingPitcher || { number: '', name: '' },
       maxInnings: typeof parsed?.maxInnings === 'number' ? parsed.maxInnings : 0,
+      pitcherStints: Array.isArray(parsed?.pitcherStints) ? parsed.pitcherStints : [],
     }
   } catch {
     return INITIAL_GAME_STATE

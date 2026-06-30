@@ -23,6 +23,8 @@ const playerSchema = new mongoose.Schema(
     },
     x: { type: Number, default: 50 },
     y: { type: Number, default: 50 },
+    pitchCountLimit: { type: Number, default: null },
+    pitchRepertoire: { type: [String], default: [] },
   },
   { timestamps: true },
 )

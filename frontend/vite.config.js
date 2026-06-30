@@ -10,4 +10,8 @@ export default defineConfig({
     // Capacitor WebView needs assets addressable from root
     assetsDir: 'assets',
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+  },
 })

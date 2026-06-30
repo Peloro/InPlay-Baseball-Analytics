@@ -288,7 +288,10 @@ function StatsPage({
       rbi: acc.rbi + safeNumber(item.entry.hitting?.rbi),
       hittingStrikeouts: acc.hittingStrikeouts + safeNumber(item.entry.hitting?.strikeouts),
       walks: acc.walks + safeNumber(item.entry.hitting?.walks),
-      stolenBases: acc.stolenBases + safeNumber(item.entry.hitting?.stolenBases),
+      stolenBases:    acc.stolenBases    + safeNumber(item.entry.hitting?.stolenBases),
+      hitByPitch:     acc.hitByPitch     + safeNumber(item.entry.hitting?.hitByPitch),
+      sacrificeFlies: acc.sacrificeFlies + safeNumber(item.entry.hitting?.sacrificeFlies),
+      caughtStealing: acc.caughtStealing + safeNumber(item.entry.hitting?.caughtStealing),
       // Sum raw outs so IP is computed correctly (decimal IP values can't be added directly)
       outsPitched: acc.outsPitched + safeNumber(item.entry.pitching?.outsPitched),
       earnedRuns: acc.earnedRuns + safeNumber(item.entry.pitching?.earnedRuns),
@@ -306,6 +309,7 @@ function StatsPage({
     }), {
       atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0,
       runs: 0, rbi: 0, hittingStrikeouts: 0, walks: 0, stolenBases: 0,
+      hitByPitch: 0, sacrificeFlies: 0, caughtStealing: 0,
       outsPitched: 0, earnedRuns: 0, hitsAllowed: 0,
       pitchingStrikeouts: 0, pitchingWalks: 0,
       wins: 0, losses: 0, saves: 0,
@@ -421,7 +425,7 @@ function StatsPage({
     setShowGameDetail(false)
   }
 
-  const hitterColCount = 16   // Jogador, AB, H, 2B, 3B, HR, R, RBI, BB, SO, SB, OUT, AVG, OBP, SLG, OPS
+  const hitterColCount = 21   // Jogador, AB, H, 2B, 3B, HR, R, RBI, BB, SO, SB, CS, HBP, SF, OUT, AVG, OBP, SLG, OPS, K%, BB%
   const pitcherColCount = 14  // Jogador, W, L, SV, IP, ERA, WHIP, K/9, SO, BB, H, PC, STR, BAL
   const defenseColCount = 8   // Jogador, E, DP, FO, GO, LO, TC, FLD%
 
@@ -488,7 +492,7 @@ function StatsPage({
               </div>
               <div className="kpi">
                 <strong><StatLabel abbr="OBP" /></strong>
-                <span>{(seasonTotals.atBats + seasonTotals.walks) ? (((seasonTotals.hits + seasonTotals.walks) / (seasonTotals.atBats + seasonTotals.walks)).toFixed(3)) : '---'}</span>
+                <span>{(() => { const den = seasonTotals.atBats + seasonTotals.walks + seasonTotals.hitByPitch + seasonTotals.sacrificeFlies; return den ? (((seasonTotals.hits + seasonTotals.walks + seasonTotals.hitByPitch) / den).toFixed(3)) : '---' })()}</span>
               </div>
               <div className="kpi">
                 <strong>H</strong>

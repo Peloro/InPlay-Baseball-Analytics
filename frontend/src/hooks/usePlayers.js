@@ -23,10 +23,23 @@ export default function usePlayers({ players, setPlayers, gameState }) {
 
   const getMainPosition = useCallback((player) => getMainPositionUtil(player), [])
 
+  // Split into two memos: participant/field filter (expensive) and search filter (cheap).
+  // This way a search term change doesn't re-run the participant filter, and vice-versa.
+  const benchBase = useMemo(() => {
+    const participantSet = gameState.participantPlayerIds?.length
+      ? new Set(gameState.participantPlayerIds)
+      : null
+    return players.filter((player) => {
+      const id = getPlayerId(player)
+      if (onFieldIds.has(id)) return false
+      if (participantSet && !participantSet.has(id)) return false
+      return true
+    })
+  }, [players, onFieldIds, gameState.participantPlayerIds, getPlayerId])
+
   const benchPlayers = useMemo(() => {
     const term = benchSearch.trim().toLowerCase()
-    return players
-      .filter((player) => !onFieldIds.has(getPlayerId(player)))
+    return benchBase
       .filter((player) => {
         if (!term) return true
         return (
@@ -40,7 +53,7 @@ export default function usePlayers({ players, setPlayers, gameState }) {
         if (byPos !== 0) return byPos
         return a.number - b.number
       })
-  }, [players, onFieldIds, benchSearch, getPlayerId, getMainPosition])
+  }, [benchBase, benchSearch, getMainPosition])
 
   const setupAvailablePlayers = useMemo(() => {
     const participantIds = gameState.participantPlayerIds

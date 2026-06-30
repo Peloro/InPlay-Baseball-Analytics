@@ -114,6 +114,7 @@ function FieldPage({
   const [sideSwitchBanner, setSideSwitchBanner] = useState(null)
   const sideSwitchTimerRef = useRef(null)
   const prevIsAttackingRef = useRef(null)
+  const [storageFullWarning, setStorageFullWarning] = useState(false)
 
   const { zoom, offsetX, offsetY, handleTouchStartMobile, handleTouchMoveMobile, handleTouchEndMobile } =
     useFieldZoom({ fieldRect, fieldStageRef, activeTool })
@@ -234,6 +235,12 @@ function FieldPage({
   }, [gameState.currentGameId])
 
   useEffect(() => {
+    const handler = () => setStorageFullWarning(true)
+    window.addEventListener('baseball:storage-full', handler)
+    return () => window.removeEventListener('baseball:storage-full', handler)
+  }, [])
+
+  useEffect(() => {
     const maxInn = Number(gameState.maxInnings) || 0
     if (!maxInn || !gameState.currentGameId || !gameState.preGameConfigured) return
 
@@ -317,7 +324,14 @@ function FieldPage({
     const starterIds = starters.map((item) => item.playerId)
     const lineupById = {}
     for (const item of starters) lineupById[item.playerId] = item.position
-    const bench = players.map((player) => getPlayerId(player)).filter((id) => !starterIds.includes(id))
+    const fichaIds = new Set(
+      gameState.participantPlayerIds?.length
+        ? gameState.participantPlayerIds
+        : players.map((player) => getPlayerId(player))
+    )
+    const bench = players
+      .map((player) => getPlayerId(player))
+      .filter((id) => !starterIds.includes(id) && fichaIds.has(id))
 
     setPlayers((current) =>
       current.map((player) => {
@@ -329,6 +343,7 @@ function FieldPage({
       }),
     )
 
+    const gameStartDesc = `Jogo iniciado: ${teamName} vs ${pregameForm.opponentName.trim() || 'Adversário'}`
     onUpdateGameState((current) => ({
       ...current,
       isAttacking,
@@ -346,6 +361,7 @@ function FieldPage({
       inning: current.inning || 1,
       inningHalf: current.inningHalf || 'top',
       maxInnings: Number(pregameForm.maxInnings) || 0,
+      gameLog: [makeLogEntry({ inning: current.inning || 1, inningHalf: current.inningHalf || 'top' }, 'game-start', gameStartDesc)],
     }), 'Configuracao inicial confirmada')
 
     // Ensure a game exists: create if missing, then persist setup to backend
@@ -517,7 +533,7 @@ function FieldPage({
   }, [gameState.onFieldPlayerIds, gameState.lineup, onUpdateGameState, players, playersById, getPlayerId])
   
 
-  const advanceRunner = useCallback((base) => {
+  const advanceRunner = useCallback(async (base) => {
     const order = ['first', 'second', 'third']
     const index = order.indexOf(base)
     if (index === -1) return
@@ -525,8 +541,10 @@ function FieldPage({
     isProcessingRef.current = true
     window.setTimeout(() => { isProcessingRef.current = false }, 700)
 
-    // Capture runner ID before state update so we can credit SB
     const runnerId = typeof gameState.runners?.[base] === 'string' ? gameState.runners[base] : null
+    const runnerName = runnerId ? (playersById[runnerId]?.name || null) : null
+    const baseLabels = { first: '1ª', second: '2ª', third: '3ª' }
+    const nextLabels = { first: '2ª', second: '3ª', third: 'home' }
 
     onUpdateGameState((current) => {
       if (!current.runners?.[base]) return current
@@ -536,36 +554,47 @@ function FieldPage({
       const runs = nextBase ? 0 : 1
 
       if (nextBase) {
-        nextRunners[nextBase] = current.runners[base]  // preserve player ID
+        nextRunners[nextBase] = current.runners[base]
       }
 
       const ourR = current.isAttacking ? runs : 0
       const theirR = current.isAttacking ? 0 : runs
+
+      const scored = !nextBase
+      const logType = current.isAttacking ? 'stolen-base' : 'runner-advance'
+      const logDesc = current.isAttacking
+        ? `${runnerName || 'Corredor'}: SB (${baseLabels[base]}→${nextLabels[base]})${scored ? ' ✓ ponto' : ''}`
+        : `ADV: avanço ${baseLabels[base]}→${nextLabels[base]}${scored ? ' ✓ ponto' : ''}`
+
       return {
         ...current,
         runners: nextRunners,
         homeScore: (current.homeScore || 0) + ourR,
         awayScore: (current.awayScore || 0) + theirR,
         inningScores: runs > 0 ? addInningRuns(current.inningScores, current.inning, ourR, theirR) : (current.inningScores || { home: [], away: [] }),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, logType, logDesc)],
       }
     }, `Corredor avancou de ${base}`)
 
-    // Credit stolen base when attacking and runner ID is known
     if (gameState.isAttacking && runnerId && gameState.currentGameId) {
-      const found = gameStatsApi.listByGame(gameState.currentGameId, runnerId)
-      const cur = found.data?.[0]
-      if (cur) {
-        gameStatsApi.upsert(gameState.currentGameId, runnerId, {
-          ...cur,
-          hitting: { ...(cur.hitting || {}), stolenBases: safeNumber(cur.hitting?.stolenBases) + 1 },
-        })
+      try {
+        const found = await gameStatsApi.listByGame(gameState.currentGameId, runnerId)
+        const cur = found.data?.[0]
+        if (cur) {
+          gameStatsApi.upsert(gameState.currentGameId, runnerId, {
+            ...cur,
+            hitting: { ...(cur.hitting || {}), stolenBases: safeNumber(cur.hitting?.stolenBases) + 1 },
+          })
+        }
+      } catch {
+        // Mantem fluxo local mesmo sem backend.
       }
     }
 
     if (!gameState.isAttacking && base === 'third' && gameState.runners?.third) {
       onDefensiveEarnedRun?.(1)
     }
-  }, [gameState.isAttacking, gameState.runners, gameState.currentGameId, onDefensiveEarnedRun, onUpdateGameState])
+  }, [gameState.isAttacking, gameState.runners, gameState.currentGameId, onDefensiveEarnedRun, onUpdateGameState, playersById])
 
   const removeRunner = useCallback((base) => {
     if (isProcessingRef.current) return
@@ -576,6 +605,15 @@ function FieldPage({
       if (!current.runners?.[base]) return current
 
       const { nextOuts, sideSwitch, nextHalf, nextInning } = computeInningTransition(current)
+
+      const baseLabels = { first: '1ª', second: '2ª', third: '3ª' }
+      const outDesc = current.isAttacking
+        ? `Out: corredor eliminado em ${baseLabels[base]}`
+        : `Out: corredor ADV eliminado em ${baseLabels[base]}`
+      const logEntries = [makeLogEntry(current, 'out', outDesc)]
+      if (sideSwitch) {
+        logEntries.push(makeLogEntry(current, 'inning-end', `Fim do ${current.inning}º ${current.inningHalf === 'top' ? '▲' : '▼'}`))
+      }
 
       return {
         ...current,
@@ -588,6 +626,7 @@ function FieldPage({
         isAttacking: sideSwitch ? !current.isAttacking : current.isAttacking,
         inningHalf: nextHalf,
         inning: nextInning,
+        gameLog: [...(current.gameLog || []), ...logEntries],
       }
     }, `Corredor removido em ${base}`)
     if (!gameState.isAttacking && gameState.runners?.[base]) {
@@ -612,6 +651,8 @@ function FieldPage({
     applySacFly,
     applyHBP,
     applyErrorEvent: _applyErrorEvent,
+    applyWildPitch,
+    applyDefensiveWalk,
   } = useGameActions({
     gameState,
     onUpdateGameState,
@@ -1278,6 +1319,12 @@ function FieldPage({
           {`Inning ${gameState.inning || 1} ${gameState.inningHalf === 'top' ? 'topo' : 'parte baixa'}, ${gameState.outs || 0} out${(gameState.outs || 0) !== 1 ? 's' : ''}, ${teamName} ${gameState.homeScore || 0} x ${gameState.awayScore || 0} ${opponentName || 'Adversário'}`}
         </div>
         <Scoreboard gameState={gameState} opponentName={opponentName} visible={gameSubView === 'campo' && showScoreboard} />
+        {storageFullWarning && (
+          <div className="storage-full-banner" role="alert">
+            <span>Armazenamento cheio — dados não salvos. Considere exportar e limpar jogos antigos.</span>
+            <button type="button" onClick={() => setStorageFullWarning(false)} aria-label="Fechar aviso">✕</button>
+          </div>
+        )}
         {sideSwitchBanner && (
           <div className={`side-switch-banner side-switch-banner--${gameState.isAttacking ? 'attack' : 'defense'}`}>
             TROCA DE LADO — {sideSwitchBanner}
@@ -1782,6 +1829,8 @@ function FieldPage({
                   <button type="button" className="acoes-btn acoes-hr" onClick={() => applyDefensiveHit('homerun')}>HOME RUN</button>
                   <button type="button" className="acoes-btn acoes-hbp" onClick={applyHBP}>HBP</button>
                   <button type="button" className="acoes-btn acoes-erro" onClick={() => { setSelectedErrorDefenderId((current) => current || errorDefenderOptions[0]?.id || ''); setPendingDefenseError(true) }}>ERRO</button>
+                  <button type="button" className="acoes-btn acoes-bb" onClick={applyDefensiveWalk}>BB</button>
+                  <button type="button" className="acoes-btn acoes-wp" onClick={applyWildPitch}>WP</button>
                   {(gameState.runners?.first || gameState.runners?.second || gameState.runners?.third) && gameState.outs < 2 && (
                     <button type="button" className="acoes-btn acoes-dp" onClick={handleDoublePlayAction}>D. PLAY</button>
                   )}
@@ -2019,6 +2068,10 @@ function FieldPage({
           danger
           onConfirm={() => {
             setPendingEndGame(false)
+            onUpdateGameState((current) => ({
+              ...current,
+              gameLog: [...(current.gameLog || []), makeLogEntry(current, 'game-end', `Jogo encerrado — ${teamName} ${current.homeScore || 0} × ${current.awayScore || 0} ${opponentName || 'Adversário'}`)],
+            }), 'Jogo encerrado')
             setGameSummarySnapshot({ homeScore: gameState.homeScore, awayScore: gameState.awayScore, inning: gameState.inning, opponentName: opponentName || 'Adversário', inningScores: gameState.inningScores || { home: [], away: [] } })
             setShowGameSummary(true)
           }}
@@ -2052,6 +2105,10 @@ function FieldPage({
           danger
           onConfirm={() => {
             setPendingAutoEnd(null)
+            onUpdateGameState((current) => ({
+              ...current,
+              gameLog: [...(current.gameLog || []), makeLogEntry(current, 'game-end', `Jogo encerrado — ${teamName} ${current.homeScore || 0} × ${current.awayScore || 0} ${opponentName || 'Adversário'}`)],
+            }), 'Jogo encerrado')
             setGameSummarySnapshot({ homeScore: gameState.homeScore, awayScore: gameState.awayScore, inning: gameState.inning, opponentName: opponentName || 'Adversário' })
             setShowGameSummary(true)
           }}

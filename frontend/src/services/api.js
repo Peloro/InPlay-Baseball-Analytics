@@ -29,7 +29,15 @@ function lfGet(key) {
 }
 
 function lfSet(key, data) {
-  try { localStorage.setItem(lsKey(key), JSON.stringify(data)) } catch {}
+  try {
+    localStorage.setItem(lsKey(key), JSON.stringify(data))
+  } catch (e) {
+    if (e?.name === 'QuotaExceededError' || e?.code === 22) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('baseball:storage-full'))
+      }
+    }
+  }
 }
 
 function uid() {
@@ -549,7 +557,10 @@ export const seasonStatsApi = {
       agg.hitting.walks       += safeN(h.walks)
       agg.hitting.runs        += safeN(h.runs)
       agg.hitting.rbi         += safeN(h.rbi)
-      agg.hitting.stolenBases += safeN(h.stolenBases)
+      agg.hitting.stolenBases    += safeN(h.stolenBases)
+      agg.hitting.hitByPitch     += safeN(h.hitByPitch)
+      agg.hitting.sacrificeFlies += safeN(h.sacrificeFlies)
+      agg.hitting.caughtStealing += safeN(h.caughtStealing)
       const p = stat.pitching || {}
       agg.pitching.outsPitched  += safeN(p.outsPitched)
       agg.pitching.earnedRuns   += safeN(p.earnedRuns)

@@ -44,29 +44,37 @@ export default function useGameActions({
   }, [undoStack.length, showInvalidAction])
 
   // ── Stat write helpers ──────────────────────────────────────────
+  //
+  // Single function replaces the former upsertCurrentBatterStats / upsertPlayerStat pair.
+  // preservePitching=true → pitching columns come from current record only (batter updates).
+  // knownCurrent         → pass already-fetched record to skip the localStorage re-read.
 
-  const upsertCurrentBatterStats = useCallback(async (playerId, patch = {}) => {
+  const upsertGameStat = useCallback(async (playerId, patch = {}, { preservePitching = false, knownCurrent = undefined } = {}) => {
     if (!gameState.currentGameId || !playerId) return
 
-    const found = await gameStatsApi.listByGame(gameState.currentGameId, playerId)
-    const current = found.data?.[0]
+    const current = knownCurrent !== undefined
+      ? knownCurrent
+      : gameStatsApi.listByGame(gameState.currentGameId, playerId).data?.[0]
 
     const payload = {
       type: detectPlayerType(playersById[playerId]),
       hitting: {
-        atBats:      safeNumber(patch.hitting?.atBats      ?? current?.hitting?.atBats),
-        hits:        safeNumber(patch.hitting?.hits        ?? current?.hitting?.hits),
-        doubles:     safeNumber(patch.hitting?.doubles     ?? current?.hitting?.doubles),
-        triples:     safeNumber(patch.hitting?.triples     ?? current?.hitting?.triples),
-        homeRuns:    safeNumber(patch.hitting?.homeRuns    ?? current?.hitting?.homeRuns),
-        strikeouts:  safeNumber(patch.hitting?.strikeouts  ?? current?.hitting?.strikeouts),
-        outs:        safeNumber(patch.hitting?.outs        ?? current?.hitting?.outs),
-        walks:       safeNumber(patch.hitting?.walks       ?? current?.hitting?.walks),
-        runs:        safeNumber(patch.hitting?.runs        ?? current?.hitting?.runs),
-        rbi:         safeNumber(patch.hitting?.rbi         ?? current?.hitting?.rbi),
-        stolenBases: safeNumber(patch.hitting?.stolenBases ?? current?.hitting?.stolenBases),
+        atBats:         safeNumber(patch.hitting?.atBats         ?? current?.hitting?.atBats),
+        hits:           safeNumber(patch.hitting?.hits           ?? current?.hitting?.hits),
+        doubles:        safeNumber(patch.hitting?.doubles        ?? current?.hitting?.doubles),
+        triples:        safeNumber(patch.hitting?.triples        ?? current?.hitting?.triples),
+        homeRuns:       safeNumber(patch.hitting?.homeRuns       ?? current?.hitting?.homeRuns),
+        strikeouts:     safeNumber(patch.hitting?.strikeouts     ?? current?.hitting?.strikeouts),
+        outs:           safeNumber(patch.hitting?.outs           ?? current?.hitting?.outs),
+        walks:          safeNumber(patch.hitting?.walks          ?? current?.hitting?.walks),
+        runs:           safeNumber(patch.hitting?.runs           ?? current?.hitting?.runs),
+        rbi:            safeNumber(patch.hitting?.rbi            ?? current?.hitting?.rbi),
+        stolenBases:    safeNumber(patch.hitting?.stolenBases    ?? current?.hitting?.stolenBases),
+        hitByPitch:     safeNumber(patch.hitting?.hitByPitch     ?? current?.hitting?.hitByPitch),
+        sacrificeFlies: safeNumber(patch.hitting?.sacrificeFlies ?? current?.hitting?.sacrificeFlies),
+        caughtStealing: safeNumber(patch.hitting?.caughtStealing ?? current?.hitting?.caughtStealing),
       },
-      pitching: {
+      pitching: preservePitching ? {
         inningsPitched: safeNumber(current?.pitching?.inningsPitched),
         outsPitched:    safeNumber(current?.pitching?.outsPitched),
         earnedRuns:     safeNumber(current?.pitching?.earnedRuns),
@@ -79,41 +87,9 @@ export default function useGameActions({
         wins:           safeNumber(current?.pitching?.wins),
         losses:         safeNumber(current?.pitching?.losses),
         saves:          safeNumber(current?.pitching?.saves),
-      },
-      defense: {
-        errors:      safeNumber(current?.defense?.errors),
-        doublePlays: safeNumber(current?.defense?.doublePlays),
-        flyOuts:     safeNumber(current?.defense?.flyOuts),
-        groundOuts:  safeNumber(current?.defense?.groundOuts),
-        lineOuts:    safeNumber(current?.defense?.lineOuts),
-      },
-    }
-
-    gameStatsApi.upsert(gameState.currentGameId, playerId, payload)
-  }, [gameState.currentGameId, playersById])
-
-  const upsertPlayerStat = useCallback(async (playerId, patch = {}) => {
-    if (!gameState.currentGameId || !playerId) return
-
-    const found = await gameStatsApi.listByGame(gameState.currentGameId, playerId)
-    const current = found.data?.[0]
-
-    const payload = {
-      type: detectPlayerType(playersById[playerId]),
-      hitting: {
-        atBats:      safeNumber(patch.hitting?.atBats      ?? current?.hitting?.atBats),
-        hits:        safeNumber(patch.hitting?.hits        ?? current?.hitting?.hits),
-        doubles:     safeNumber(patch.hitting?.doubles     ?? current?.hitting?.doubles),
-        triples:     safeNumber(patch.hitting?.triples     ?? current?.hitting?.triples),
-        homeRuns:    safeNumber(patch.hitting?.homeRuns    ?? current?.hitting?.homeRuns),
-        strikeouts:  safeNumber(patch.hitting?.strikeouts  ?? current?.hitting?.strikeouts),
-        outs:        safeNumber(patch.hitting?.outs        ?? current?.hitting?.outs),
-        walks:       safeNumber(patch.hitting?.walks       ?? current?.hitting?.walks),
-        runs:        safeNumber(patch.hitting?.runs        ?? current?.hitting?.runs),
-        rbi:         safeNumber(patch.hitting?.rbi         ?? current?.hitting?.rbi),
-        stolenBases: safeNumber(patch.hitting?.stolenBases ?? current?.hitting?.stolenBases),
-      },
-      pitching: {
+        wildPitches:    safeNumber(current?.pitching?.wildPitches),
+        pitchTypes:     current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
+      } : {
         inningsPitched: safeNumber(patch.pitching?.inningsPitched ?? current?.pitching?.inningsPitched),
         outsPitched:    safeNumber(patch.pitching?.outsPitched    ?? current?.pitching?.outsPitched),
         earnedRuns:     safeNumber(patch.pitching?.earnedRuns     ?? current?.pitching?.earnedRuns),
@@ -126,6 +102,7 @@ export default function useGameActions({
         wins:           safeNumber(patch.pitching?.wins           ?? current?.pitching?.wins),
         losses:         safeNumber(patch.pitching?.losses         ?? current?.pitching?.losses),
         saves:          safeNumber(patch.pitching?.saves          ?? current?.pitching?.saves),
+        wildPitches:    safeNumber(patch.pitching?.wildPitches    ?? current?.pitching?.wildPitches),
         pitchTypes:     patch.pitching?.pitchTypes ?? current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
       },
       defense: {
@@ -140,13 +117,12 @@ export default function useGameActions({
     gameStatsApi.upsert(gameState.currentGameId, playerId, payload)
   }, [gameState.currentGameId, playersById])
 
-  const syncDefensivePitcherEvent = useCallback(async ({ outsDelta = 0, earnedRunsDelta = 0, pitchCountDelta = 0, walksDelta = 0, strikeoutsDelta = 0, hitsAllowedDelta = 0 } = {}) => {
+  const syncDefensivePitcherEvent = useCallback(async ({ outsDelta = 0, earnedRunsDelta = 0, pitchCountDelta = 0, walksDelta = 0, strikeoutsDelta = 0, hitsAllowedDelta = 0, wildPitchesDelta = 0 } = {}) => {
     if (gameState.isAttacking) return
     if (!gameState.currentGameId || !gameState.currentPitcherId) return
 
     const pitcherId = gameState.currentPitcherId
-    const found = await gameStatsApi.listByGame(gameState.currentGameId, pitcherId)
-    const current = found.data?.[0]
+    const current = gameStatsApi.listByGame(gameState.currentGameId, pitcherId).data?.[0]
 
     const nextOutsPitched = safeNumber(current?.pitching?.outsPitched) + safeNumber(outsDelta)
     const patch = {
@@ -160,13 +136,14 @@ export default function useGameActions({
         balls: safeNumber(current?.pitching?.balls),
         pitchCount: safeNumber(current?.pitching?.pitchCount) + safeNumber(pitchCountDelta),
         hitsAllowed: safeNumber(current?.pitching?.hitsAllowed) + safeNumber(hitsAllowedDelta),
+        wildPitches: safeNumber(current?.pitching?.wildPitches) + safeNumber(wildPitchesDelta),
         pitchTypes: current?.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
       },
     }
 
-    await upsertPlayerStat(pitcherId, patch)
+    await upsertGameStat(pitcherId, patch, { knownCurrent: current })
     onStatsUpdated?.()
-  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, upsertPlayerStat, onStatsUpdated])
+  }, [gameState.currentGameId, gameState.currentPitcherId, gameState.isAttacking, upsertGameStat, onStatsUpdated])
 
   // ── Undo ───────────────────────────────────────────────────────
 
@@ -175,38 +152,48 @@ export default function useGameActions({
 
     let statsSnapshot = []
     try {
-      const response = await gameStatsApi.listByGame(gameState.currentGameId)
+      const response = gameStatsApi.listByGame(gameState.currentGameId)
       statsSnapshot = (response.data || []).map((entry) => ({
         playerId: entry.playerId?._id || entry.playerId,
         type: entry.type,
         hitting: {
-          atBats: safeNumber(entry.hitting?.atBats),
-          hits: safeNumber(entry.hitting?.hits),
-          strikeouts: safeNumber(entry.hitting?.strikeouts),
-          outs: safeNumber(entry.hitting?.outs),
-          walks: safeNumber(entry.hitting?.walks),
-          runs: safeNumber(entry.hitting?.runs),
-          rbi: safeNumber(entry.hitting?.rbi),
-          homeRuns: safeNumber(entry.hitting?.homeRuns),
+          atBats:         safeNumber(entry.hitting?.atBats),
+          hits:           safeNumber(entry.hitting?.hits),
+          doubles:        safeNumber(entry.hitting?.doubles),
+          triples:        safeNumber(entry.hitting?.triples),
+          homeRuns:       safeNumber(entry.hitting?.homeRuns),
+          strikeouts:     safeNumber(entry.hitting?.strikeouts),
+          outs:           safeNumber(entry.hitting?.outs),
+          walks:          safeNumber(entry.hitting?.walks),
+          runs:           safeNumber(entry.hitting?.runs),
+          rbi:            safeNumber(entry.hitting?.rbi),
+          stolenBases:    safeNumber(entry.hitting?.stolenBases),
+          hitByPitch:     safeNumber(entry.hitting?.hitByPitch),
+          sacrificeFlies: safeNumber(entry.hitting?.sacrificeFlies),
+          caughtStealing: safeNumber(entry.hitting?.caughtStealing),
         },
         pitching: {
           inningsPitched: safeNumber(entry.pitching?.inningsPitched),
-          outsPitched: safeNumber(entry.pitching?.outsPitched),
-          earnedRuns: safeNumber(entry.pitching?.earnedRuns),
-          strikeouts: safeNumber(entry.pitching?.strikeouts),
-          walks: safeNumber(entry.pitching?.walks),
-          strikes: safeNumber(entry.pitching?.strikes),
-          balls: safeNumber(entry.pitching?.balls),
-          pitchCount: safeNumber(entry.pitching?.pitchCount),
-          hitsAllowed: safeNumber(entry.pitching?.hitsAllowed),
-          pitchTypes: entry.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
+          outsPitched:    safeNumber(entry.pitching?.outsPitched),
+          earnedRuns:     safeNumber(entry.pitching?.earnedRuns),
+          strikeouts:     safeNumber(entry.pitching?.strikeouts),
+          walks:          safeNumber(entry.pitching?.walks),
+          strikes:        safeNumber(entry.pitching?.strikes),
+          balls:          safeNumber(entry.pitching?.balls),
+          pitchCount:     safeNumber(entry.pitching?.pitchCount),
+          hitsAllowed:    safeNumber(entry.pitching?.hitsAllowed),
+          wildPitches:    safeNumber(entry.pitching?.wildPitches),
+          wins:           safeNumber(entry.pitching?.wins),
+          losses:         safeNumber(entry.pitching?.losses),
+          saves:          safeNumber(entry.pitching?.saves),
+          pitchTypes:     entry.pitching?.pitchTypes ?? EMPTY_PITCHING.pitchTypes,
         },
         defense: {
-          errors: safeNumber(entry.defense?.errors),
+          errors:      safeNumber(entry.defense?.errors),
           doublePlays: safeNumber(entry.defense?.doublePlays),
-          flyOuts: safeNumber(entry.defense?.flyOuts),
-          groundOuts: safeNumber(entry.defense?.groundOuts),
-          lineOuts: safeNumber(entry.defense?.lineOuts),
+          flyOuts:     safeNumber(entry.defense?.flyOuts),
+          groundOuts:  safeNumber(entry.defense?.groundOuts),
+          lineOuts:    safeNumber(entry.defense?.lineOuts),
         },
       }))
     } catch {
@@ -230,41 +217,28 @@ export default function useGameActions({
     if (!gameState.currentGameId) return
 
     try {
-      const currentStatsResponse = await gameStatsApi.listByGame(gameState.currentGameId)
-      const currentStats = currentStatsResponse.data || []
+      // Snapshot is now complete — write directly without re-reading each player.
       const snapshotMap = {}
-      for (const item of latest.statsSnapshot || []) {
-        snapshotMap[item.playerId] = item
+      for (const saved of latest.statsSnapshot || []) {
+        snapshotMap[saved.playerId] = true
+        gameStatsApi.upsert(gameState.currentGameId, saved.playerId, saved)
       }
 
+      // Zero out any entry that was created after the snapshot was taken.
+      const currentStats = gameStatsApi.listByGame(gameState.currentGameId).data || []
       for (const currentEntry of currentStats) {
         const pid = currentEntry.playerId?._id || currentEntry.playerId
-        const saved = snapshotMap[pid]
-
-        if (saved) {
-          await upsertPlayerStat(pid, saved)
-          continue
-        }
-
-        await upsertPlayerStat(pid, {
-          type: currentEntry.type,
-          ...EMPTY_GAME_STAT,
-        })
-      }
-
-      for (const saved of latest.statsSnapshot || []) {
-        const alreadyExists = currentStats.some((item) => {
-          const pid = item.playerId?._id || item.playerId
-          return pid === saved.playerId
-        })
-        if (!alreadyExists) {
-          await upsertPlayerStat(saved.playerId, saved)
+        if (!snapshotMap[pid]) {
+          gameStatsApi.upsert(gameState.currentGameId, pid, {
+            type: currentEntry.type,
+            ...EMPTY_GAME_STAT,
+          })
         }
       }
     } catch {
       showInvalidAction('Falha ao restaurar stats')
     }
-  }, [gameState.currentGameId, onUpdateGameState, showInvalidAction, undoStack, upsertPlayerStat])
+  }, [gameState.currentGameId, onUpdateGameState, showInvalidAction, undoStack])
 
   // ── Pitch / defensive-mode actions ────────────────────────────
 
@@ -305,7 +279,8 @@ export default function useGameActions({
         const nextLineup = (current.lineup || []).map(l =>
           l.playerId === nextId ? { ...l, position: 'P' } : l
         )
-        return { ...current, currentPitcherId: nextId, pitchCounts: nextPitchCounts, lineup: nextLineup }
+        const stint = { pitcherId: nextId, inning: current.inning || 1, inningHalf: current.inningHalf || 'top' }
+        return { ...current, currentPitcherId: nextId, pitchCounts: nextPitchCounts, lineup: nextLineup, pitcherStints: [...(current.pitcherStints || []), stint] }
       }, 'Arremessador alterado')
     } else {
       const oldPitcherId = gameState.currentPitcherId
@@ -339,6 +314,7 @@ export default function useGameActions({
           playerOutId: oldPitcherId || null,
           playerOutName: oldPitcherName || '',
         }
+        const stint = { pitcherId: nextId, inning: current.inning || 1, inningHalf: current.inningHalf || 'top' }
         return {
           ...current,
           onFieldPlayerIds: Array.from(new Set(nextOnField)),
@@ -349,6 +325,7 @@ export default function useGameActions({
           currentPitcherId: nextId,
           pitchCounts: nextPitchCounts,
           substitutions: [...(current.substitutions || []), subRecord],
+          pitcherStints: [...(current.pitcherStints || []), stint],
           gameLog: [
             ...(current.gameLog || []),
             makeLogEntry(current, 'sub', `Sub pitcher: ${nextPitcher?.name || '?'}${oldPitcherName ? ` → ${oldPitcherName}` : ''}`),
@@ -413,6 +390,12 @@ export default function useGameActions({
             ? `${batterName}: K`
             : `${batterName}: Out`
 
+      const playLog = makeLogEntry(current, isHit ? `hit-${kind}` : 'out', logDesc)
+      const newGameLog = [...(current.gameLog || []), playLog]
+      if (sideSwitch) {
+        newGameLog.push(makeLogEntry(current, 'inning-end', `Fim do ${current.inning}º ${current.inningHalf === 'top' ? '▲' : '▼'}`))
+      }
+
       return {
         ...current,
         opponentPitchCount: Number(current.opponentPitchCount || 0) + 1,
@@ -427,7 +410,7 @@ export default function useGameActions({
         homeScore: (current.homeScore || 0) + (current.isAttacking ? runs : 0),
         awayScore: (current.awayScore || 0) + (!current.isAttacking ? runs : 0),
         inningScores: runs > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? runs : 0, current.isAttacking ? 0 : runs) : (current.inningScores || { home: [], away: [] }),
-        gameLog: [...(current.gameLog || []), makeLogEntry(current, isHit ? `hit-${kind}` : 'out', logDesc)],
+        gameLog: newGameLog,
       }
     }, `Acao de bastao: ${kind}`)
     haptic(isHit ? ImpactStyle.Light : ImpactStyle.Medium)
@@ -446,26 +429,25 @@ export default function useGameActions({
       const rbiCredit = runsOnHit
       const batterRuns = isHomeRun ? 1 : 0
 
-      const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
-      const current = found.data?.[0]
+      const current = gameStatsApi.listByGame(gameState.currentGameId, batterId).data?.[0]
       const patch = {
         hitting: {
-          atBats:    safeNumber(current?.hitting?.atBats)    + 1,
-          hits:      safeNumber(current?.hitting?.hits)      + (isHitKind ? 1 : 0),
-          doubles:   safeNumber(current?.hitting?.doubles)   + (kind === 'double'  ? 1 : 0),
-          triples:   safeNumber(current?.hitting?.triples)   + (kind === 'triple'  ? 1 : 0),
-          homeRuns:  safeNumber(current?.hitting?.homeRuns)  + (isHomeRun ? 1 : 0),
-          strikeouts:safeNumber(current?.hitting?.strikeouts)+ (kind === 'strikeout' ? 1 : 0),
-          outs:      safeNumber(current?.hitting?.outs)      + (endedAsOut ? 1 : 0),
-          rbi:       safeNumber(current?.hitting?.rbi)       + rbiCredit,
-          runs:      safeNumber(current?.hitting?.runs)      + batterRuns,
+          atBats:     safeNumber(current?.hitting?.atBats)     + 1,
+          hits:       safeNumber(current?.hitting?.hits)       + (isHitKind ? 1 : 0),
+          doubles:    safeNumber(current?.hitting?.doubles)    + (kind === 'double'  ? 1 : 0),
+          triples:    safeNumber(current?.hitting?.triples)    + (kind === 'triple'  ? 1 : 0),
+          homeRuns:   safeNumber(current?.hitting?.homeRuns)   + (isHomeRun ? 1 : 0),
+          strikeouts: safeNumber(current?.hitting?.strikeouts) + (kind === 'strikeout' ? 1 : 0),
+          outs:       safeNumber(current?.hitting?.outs)       + (endedAsOut ? 1 : 0),
+          rbi:        safeNumber(current?.hitting?.rbi)        + rbiCredit,
+          runs:       safeNumber(current?.hitting?.runs)       + batterRuns,
         },
       }
-      await upsertCurrentBatterStats(batterId, patch)
+      await upsertGameStat(batterId, patch, { preservePitching: true, knownCurrent: current })
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertCurrentBatterStats, setAnimatedBall, gameState.runners, playersById])
+  }, [captureUndoSnapshot, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.isAttacking, onUpdateGameState, upsertGameStat, setAnimatedBall, gameState.runners, playersById])
 
   const applyDefensiveHit = useCallback(async (kind) => {
     if (gameState.isAttacking) return
@@ -614,6 +596,9 @@ export default function useGameActions({
         const batterName = playersById[order[batterIdx]]?.name || '?'
         const logDesc = cDidStrikeout ? `${batterName}: K` : `${batterName}: BB (base por bolas)`
         newLog = [...logEntries, makeLogEntry(current, cDidStrikeout ? 'out' : 'walk', logDesc)]
+        if (cDidStrikeout && (Number(current.outs || 0) + 1) >= 3) {
+          newLog.push(makeLogEntry(current, 'inning-end', `Fim do ${current.inning}º ${current.inningHalf === 'top' ? '▲' : '▼'}`))
+        }
       }
 
       return {
@@ -637,23 +622,21 @@ export default function useGameActions({
 
     if ((didStrikeout || didWalk) && batterId && gameState.currentGameId) {
       try {
-        const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
-        const cur = found.data?.[0]
-        await upsertCurrentBatterStats(batterId, {
+        const cur = gameStatsApi.listByGame(gameState.currentGameId, batterId).data?.[0]
+        await upsertGameStat(batterId, {
           hitting: {
-            atBats: safeNumber(cur?.hitting?.atBats) + (didStrikeout ? 1 : 0),
-            hits: safeNumber(cur?.hitting?.hits),
+            atBats:     safeNumber(cur?.hitting?.atBats)     + (didStrikeout ? 1 : 0),
             strikeouts: safeNumber(cur?.hitting?.strikeouts) + (didStrikeout ? 1 : 0),
-            outs: safeNumber(cur?.hitting?.outs) + (didStrikeout ? 1 : 0),
-            walks: safeNumber(cur?.hitting?.walks) + (didWalk ? 1 : 0),
-            rbi: safeNumber(cur?.hitting?.rbi) + (didWalk ? preScoredRuns : 0),
+            outs:       safeNumber(cur?.hitting?.outs)       + (didStrikeout ? 1 : 0),
+            walks:      safeNumber(cur?.hitting?.walks)      + (didWalk ? 1 : 0),
+            rbi:        safeNumber(cur?.hitting?.rbi)        + (didWalk ? preScoredRuns : 0),
           },
-        })
+        }, { preservePitching: true, knownCurrent: cur })
       } catch {
         // Mantem fluxo local mesmo sem backend.
       }
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.strikes, gameState.balls, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.runners, onUpdateGameState, upsertCurrentBatterStats, playersById])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.strikes, gameState.balls, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, gameState.runners, onUpdateGameState, upsertGameStat, playersById])
 
   const applyDefensiveOutEvent = useCallback(async (outType = 'out', fielderId = '') => {
     if (gameState.isAttacking) return
@@ -675,6 +658,11 @@ export default function useGameActions({
       const outLabel = outType === 'strikeout' ? 'K' : outType === 'flyout' ? 'FO' : outType === 'groundout' ? 'GO' : outType === 'lineout' ? 'LO' : 'Out'
       const logDesc = `${oppBatterLabel(current)}: ${outLabel}`
 
+      const defOutLog = [...(current.gameLog || []), makeLogEntry(current, 'def-out', logDesc)]
+      if (sideSwitch) {
+        defOutLog.push(makeLogEntry(current, 'inning-end', `Fim do ${current.inning}º ${current.inningHalf === 'top' ? '▲' : '▼'}`))
+      }
+
       return {
         ...current,
         outs: sideSwitch ? 0 : nextOutsRaw,
@@ -688,7 +676,7 @@ export default function useGameActions({
         runners: sideSwitch ? { first: false, second: false, third: false } : current.runners,
         ...updateOppBatter(current, outType === 'strikeout' ? 'strikeout' : 'out'),
         ...advanceOpponentLineup(current),
-        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'def-out', logDesc)],
+        gameLog: defOutLog,
       }
     }, `Out defensivo: ${outType}`)
     haptic(ImpactStyle.Medium)
@@ -701,17 +689,14 @@ export default function useGameActions({
       })
 
       if (fielderId && outType !== 'strikeout') {
-        const found = await gameStatsApi.listByGame(gameState.currentGameId, fielderId)
-        const cur = found.data?.[0]
-        await upsertPlayerStat(fielderId, {
+        const cur = gameStatsApi.listByGame(gameState.currentGameId, fielderId).data?.[0]
+        await upsertGameStat(fielderId, {
           defense: {
-            errors: safeNumber(cur?.defense?.errors),
-            doublePlays: safeNumber(cur?.defense?.doublePlays),
-            flyOuts: safeNumber(cur?.defense?.flyOuts) + (outType === 'flyout' ? 1 : 0),
+            flyOuts:    safeNumber(cur?.defense?.flyOuts)    + (outType === 'flyout'    ? 1 : 0),
             groundOuts: safeNumber(cur?.defense?.groundOuts) + (outType === 'groundout' ? 1 : 0),
-            lineOuts: safeNumber(cur?.defense?.lineOuts) + (outType === 'lineout' ? 1 : 0),
+            lineOuts:   safeNumber(cur?.defense?.lineOuts)   + (outType === 'lineout'   ? 1 : 0),
           },
-        })
+        }, { knownCurrent: cur })
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
@@ -742,6 +727,11 @@ export default function useGameActions({
       const dpSide = current.isAttacking ? 'Nós' : oppBatterLabel(current)
       const logDesc = `${dpSide}: Double Play em ${runnerBase}${defenderText ? ` (${defenderText})` : ''}`
 
+      const dpLog = [...(current.gameLog || []), makeLogEntry(current, 'double-play', logDesc)]
+      if (sideSwitch) {
+        dpLog.push(makeLogEntry(current, 'inning-end', `Fim do ${current.inning}º ${current.inningHalf === 'top' ? '▲' : '▼'}`))
+      }
+
       return {
         ...current,
         ...(current.isAttacking
@@ -756,7 +746,7 @@ export default function useGameActions({
         inning: nextInning,
         runners: sideSwitch ? { first: false, second: false, third: false } : nextRunners,
         ...(!current.isAttacking ? advanceOpponentLineup(current) : {}),
-        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'double-play', logDesc)],
+        gameLog: dpLog,
       }
     }, `Double play em ${runnerBase}${defenderText}`)
     haptic(ImpactStyle.Medium)
@@ -766,17 +756,10 @@ export default function useGameActions({
         await syncDefensivePitcherEvent({ outsDelta: 2, pitchCountDelta: 1 })
 
         for (const defenderId of defenderIds) {
-          const found = await gameStatsApi.listByGame(gameState.currentGameId, defenderId)
-          const current = found.data?.[0]
-          await upsertPlayerStat(defenderId, {
-            defense: {
-              errors: safeNumber(current?.defense?.errors),
-              doublePlays: safeNumber(current?.defense?.doublePlays) + 1,
-              flyOuts: safeNumber(current?.defense?.flyOuts),
-              groundOuts: safeNumber(current?.defense?.groundOuts),
-              lineOuts: safeNumber(current?.defense?.lineOuts),
-            },
-          })
+          const current = gameStatsApi.listByGame(gameState.currentGameId, defenderId).data?.[0]
+          await upsertGameStat(defenderId, {
+            defense: { doublePlays: safeNumber(current?.defense?.doublePlays) + 1 },
+          }, { knownCurrent: current })
         }
       }
     } catch {
@@ -812,6 +795,11 @@ export default function useGameActions({
         : oppBatterLabel(current)
       const sfLogDesc = `${sfWho}: Sac Fly${runScored > 0 ? ' (+1)' : ''}`
 
+      const sfLog = [...(current.gameLog || []), makeLogEntry(current, 'sac-fly', sfLogDesc)]
+      if (sideSwitch) {
+        sfLog.push(makeLogEntry(current, 'inning-end', `Fim do ${current.inning}º ${current.inningHalf === 'top' ? '▲' : '▼'}`))
+      }
+
       return {
         ...current,
         ...(current.isAttacking
@@ -830,7 +818,7 @@ export default function useGameActions({
         inningScores: runScored > 0 ? addInningRuns(current.inningScores, current.inning, current.isAttacking ? runScored : 0, current.isAttacking ? 0 : runScored) : (current.inningScores || { home: [], away: [] }),
         ...(!current.isAttacking ? updateOppBatter(current, 'sacfly') : {}),
         ...(!current.isAttacking ? advanceOpponentLineup(current) : {}),
-        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'sac-fly', sfLogDesc)],
+        gameLog: sfLog,
       }
     }, 'Sac fly')
     haptic(ImpactStyle.Medium)
@@ -843,26 +831,19 @@ export default function useGameActions({
         const batterIndex = Math.min(gameState.currentBatterIndex || 0, order.length - 1)
         const batterId = order[batterIndex]
         if (batterId && gameState.currentGameId) {
-          const found = await gameStatsApi.listByGame(gameState.currentGameId, batterId)
-          const cur = found.data?.[0]
-          await upsertCurrentBatterStats(batterId, {
+          const cur = gameStatsApi.listByGame(gameState.currentGameId, batterId).data?.[0]
+          await upsertGameStat(batterId, {
             hitting: {
-              atBats:    safeNumber(cur?.hitting?.atBats),
-              hits:      safeNumber(cur?.hitting?.hits),
-              strikeouts:safeNumber(cur?.hitting?.strikeouts),
-              outs:      safeNumber(cur?.hitting?.outs),
-              walks:     safeNumber(cur?.hitting?.walks),
-              runs:      safeNumber(cur?.hitting?.runs),
-              rbi:       safeNumber(cur?.hitting?.rbi) + preRunScored,
-              homeRuns:  safeNumber(cur?.hitting?.homeRuns),
+              rbi:            safeNumber(cur?.hitting?.rbi)            + preRunScored,
+              sacrificeFlies: safeNumber(cur?.hitting?.sacrificeFlies) + 1,
             },
-          })
+          }, { preservePitching: true, knownCurrent: cur })
         }
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.runners, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertCurrentBatterStats, showInvalidAction, playersById])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.runners, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertGameStat, showInvalidAction, playersById])
 
   const applyHBP = useCallback(async () => {
     await captureUndoSnapshot()
@@ -915,11 +896,21 @@ export default function useGameActions({
     try {
       if (!gameState.isAttacking) {
         await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
+      } else {
+        const order = gameState.battingOrder || []
+        const hbpIdx = Math.min(gameState.currentBatterIndex || 0, Math.max(0, order.length - 1))
+        const hbpBatterId = order[hbpIdx]
+        if (hbpBatterId && gameState.currentGameId) {
+          const cur = gameStatsApi.listByGame(gameState.currentGameId, hbpBatterId).data?.[0]
+          await upsertGameStat(hbpBatterId, {
+            hitting: { hitByPitch: safeNumber(cur?.hitting?.hitByPitch) + 1 },
+          }, { preservePitching: true, knownCurrent: cur })
+        }
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, onUpdateGameState, syncDefensivePitcherEvent, playersById])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertGameStat, playersById])
 
   const applyErrorEvent = useCallback(async (defenderId = '') => {
     const errPreOrder = gameState.battingOrder || []
@@ -976,39 +967,110 @@ export default function useGameActions({
     try {
       if (!gameState.isAttacking) {
         if (defenderId) {
-          const found = await gameStatsApi.listByGame(gameState.currentGameId, defenderId)
-          const current = found.data?.[0]
-          await upsertPlayerStat(defenderId, {
-            defense: {
-              errors: safeNumber(current?.defense?.errors) + 1,
-              doublePlays: safeNumber(current?.defense?.doublePlays),
-              flyOuts: safeNumber(current?.defense?.flyOuts),
-              groundOuts: safeNumber(current?.defense?.groundOuts),
-              lineOuts: safeNumber(current?.defense?.lineOuts),
-            },
-          })
+          const current = gameStatsApi.listByGame(gameState.currentGameId, defenderId).data?.[0]
+          await upsertGameStat(defenderId, {
+            defense: { errors: safeNumber(current?.defense?.errors) + 1 },
+          }, { knownCurrent: current })
         }
 
         // Runs on errors are unearned — do NOT pass earnedRunsDelta
         await syncDefensivePitcherEvent({ pitchCountDelta: 1 })
       } else if (errBatterId && gameState.currentGameId) {
-        const found = await gameStatsApi.listByGame(gameState.currentGameId, errBatterId)
-        const cur = found.data?.[0]
-        await upsertCurrentBatterStats(errBatterId, {
-          hitting: {
-            atBats: safeNumber(cur?.hitting?.atBats) + 1,
-            hits: safeNumber(cur?.hitting?.hits),
-            strikeouts: safeNumber(cur?.hitting?.strikeouts),
-            outs: safeNumber(cur?.hitting?.outs),
-            walks: safeNumber(cur?.hitting?.walks),
-            rbi: safeNumber(cur?.hitting?.rbi),
-          },
-        })
+        const cur = gameStatsApi.listByGame(gameState.currentGameId, errBatterId).data?.[0]
+        await upsertGameStat(errBatterId, {
+          hitting: { atBats: safeNumber(cur?.hitting?.atBats) + 1 },
+        }, { preservePitching: true, knownCurrent: cur })
       }
     } catch {
       // Mantem fluxo local mesmo sem backend.
     }
-  }, [captureUndoSnapshot, gameState.isAttacking, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertPlayerStat, upsertCurrentBatterStats, playersById])
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.battingOrder, gameState.currentBatterIndex, gameState.currentGameId, onUpdateGameState, syncDefensivePitcherEvent, upsertGameStat, playersById])
+
+  const applyWildPitch = useCallback(async () => {
+    if (gameState.isAttacking) return
+    if (!gameState.currentPitcherId) {
+      showInvalidAction('Selecione o arremessador antes de registrar o evento')
+      return
+    }
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
+
+    await captureUndoSnapshot()
+
+    let preRunsScored = 0
+    const preRunners = { ...(gameState.runners || { first: false, second: false, third: false }) }
+    preRunsScored = applyRunnerAdvance(preRunners, 1).runs
+
+    onUpdateGameState((current) => {
+      if (current.isAttacking) return current
+
+      const advanced = applyRunnerAdvance(current.runners || { first: false, second: false, third: false }, 1)
+      const theirR = advanced.runs
+      const wpLogDesc = `WP (wild pitch)${theirR > 0 ? ` — ADV marcou ${theirR}` : ''}`
+
+      return {
+        ...current,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: incrementPitcherCount(current),
+        runners: advanced.nextRunners,
+        awayScore: (current.awayScore || 0) + theirR,
+        inningScores: theirR > 0 ? addInningRuns(current.inningScores, current.inning, 0, theirR) : (current.inningScores || { home: [], away: [] }),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'wild-pitch', wpLogDesc)],
+      }
+    }, 'Wild Pitch')
+
+    try {
+      await syncDefensivePitcherEvent({ pitchCountDelta: 1, earnedRunsDelta: preRunsScored, wildPitchesDelta: 1 })
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentPitcherId, gameState.runners, onUpdateGameState, syncDefensivePitcherEvent, showInvalidAction])
+
+  const applyDefensiveWalk = useCallback(async () => {
+    if (gameState.isAttacking) return
+    if (!gameState.currentPitcherId) {
+      showInvalidAction('Selecione o arremessador antes de registrar o evento')
+      return
+    }
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
+    window.setTimeout(() => { isProcessingRef.current = false }, 700)
+
+    await captureUndoSnapshot()
+
+    let preRunsScored = 0
+    const preRunners = { ...(gameState.runners || { first: false, second: false, third: false }) }
+    preRunsScored = forceAdvanceToFirst(preRunners).runs
+
+    onUpdateGameState((current) => {
+      if (current.isAttacking) return current
+
+      const forced = forceAdvanceToFirst(current.runners || { first: false, second: false, third: false })
+      const theirR = forced.runs
+      const bbLogDesc = `${oppBatterLabel(current)}: BB${theirR > 0 ? ` (+${theirR})` : ''}`
+
+      return {
+        ...current,
+        ourPitchCount: Number(current.ourPitchCount || 0) + 1,
+        pitchCounts: incrementPitcherCount(current),
+        balls: 0,
+        strikes: 0,
+        runners: forced.nextRunners,
+        awayScore: (current.awayScore || 0) + theirR,
+        inningScores: theirR > 0 ? addInningRuns(current.inningScores, current.inning, 0, theirR) : (current.inningScores || { home: [], away: [] }),
+        ...updateOppBatter(current, 'walk'),
+        ...advanceOpponentLineup(current),
+        gameLog: [...(current.gameLog || []), makeLogEntry(current, 'def-walk', bbLogDesc)],
+      }
+    }, 'BB adversário')
+
+    try {
+      await syncDefensivePitcherEvent({ pitchCountDelta: 1, walksDelta: 1, earnedRunsDelta: preRunsScored })
+    } catch {
+      // Mantem fluxo local mesmo sem backend.
+    }
+  }, [captureUndoSnapshot, gameState.isAttacking, gameState.currentPitcherId, gameState.runners, onUpdateGameState, syncDefensivePitcherEvent, showInvalidAction])
 
   return {
     // state
@@ -1017,7 +1079,7 @@ export default function useGameActions({
     // helpers
     showInvalidAction,
     captureUndoSnapshot,
-    upsertPlayerStat,
+    upsertPlayerStat: upsertGameStat,
     // actions
     handleUndo,
     handleDefensivePitch,
@@ -1030,5 +1092,7 @@ export default function useGameActions({
     applySacFly,
     applyHBP,
     applyErrorEvent,
+    applyWildPitch,
+    applyDefensiveWalk,
   }
 }

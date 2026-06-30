@@ -5,12 +5,14 @@ import Select from '../ui/Select'
 import { gameStatsApi, getAuth } from '../../services/api'
 import { safeNumber } from '../../utils/number'
 import { detectPlayerType, getPlayerId } from '../../utils/player'
+import { detectWLS } from '../../utils/wls'
 
 export default function GameSummaryModal({ snapshot, gameState, players, upsertPlayerStat, onClose }) {
   const teamName = getAuth()?.teamName || 'Nós'
-  const [summaryWP, setSummaryWP] = useState('')
-  const [summaryLP, setSummaryLP] = useState('')
-  const [summarySV, setSummarySV] = useState('')
+  const detected = detectWLS(gameState)
+  const [summaryWP, setSummaryWP] = useState(detected.winId)
+  const [summaryLP, setSummaryLP] = useState(detected.lossId)
+  const [summarySV, setSummarySV] = useState(detected.saveId)
 
   const numInnings = Math.max(
     snapshot.inning,
@@ -80,7 +82,7 @@ export default function GameSummaryModal({ snapshot, gameState, players, upsertP
 
         {pitchers.length > 0 && (
           <div className="game-summary-wlsv">
-            <h4>Decisão (opcional)</h4>
+            <h4>Decisão (opcional){(detected.winId || detected.lossId || detected.saveId) && <span className="wls-auto-label"> — detectado automaticamente</span>}</h4>
             <div className="game-summary-wlsv-row">
               <label>
                 W
