@@ -64,7 +64,7 @@ function generateTextReport(game, rows) {
     lines.push('PITCHING')
     lines.push(sep)
     lines.push(
-      `${pad('Pitcher', 18, true)}${pad('IP', 6)}${pad('ER', 4)}${pad('ERA', 6)}${pad('H', 4)}${pad('SO', 4)}${pad('BB', 4)}${pad('PC', 5)}`
+      `${pad('Pitcher', 18, true)}${pad('IP', 6)}${pad('ER', 4)}${pad('ERA', 6)}${pad('H', 4)}${pad('SO', 4)}${pad('BB', 4)}${pad('PC', 5)}${pad('STR', 5)}${pad('BAL', 5)}${pad('W', 4)}${pad('L', 4)}${pad('SV', 4)}`
     )
     lines.push(sep)
     for (const row of pitchers) {
@@ -73,9 +73,23 @@ function generateTextReport(game, rows) {
       const ip = formatIpFromOuts(outs)
       const era = outs ? ((safeNumber(p.earnedRuns) * 27) / outs).toFixed(2) : '0.00'
       lines.push(
-        `${pad(row.player.name, 18, true)}${pad(ip, 6)}${pad(safeNumber(p.earnedRuns), 4)}${pad(era, 6)}${pad(safeNumber(p.hitsAllowed), 4)}${pad(safeNumber(p.strikeouts), 4)}${pad(safeNumber(p.walks), 4)}${pad(safeNumber(p.pitchCount), 5)}`
+        `${pad(row.player.name, 18, true)}${pad(ip, 6)}${pad(safeNumber(p.earnedRuns), 4)}${pad(era, 6)}${pad(safeNumber(p.hitsAllowed), 4)}${pad(safeNumber(p.strikeouts), 4)}${pad(safeNumber(p.walks), 4)}${pad(safeNumber(p.pitchCount), 5)}${pad(safeNumber(p.strikes), 5)}${pad(safeNumber(p.balls), 5)}${pad(safeNumber(p.wins), 4)}${pad(safeNumber(p.losses), 4)}${pad(safeNumber(p.saves), 4)}`
       )
     }
+  }
+
+  lines.push('')
+  lines.push('DEFESA')
+  lines.push(sep)
+  lines.push(
+    `${pad('Jogador', 18, true)}${pad('E', 4)}${pad('DP', 4)}${pad('FO', 4)}${pad('GO', 4)}${pad('LO', 4)}`
+  )
+  lines.push(sep)
+  for (const row of rows) {
+    const d = row.defense
+    lines.push(
+      `${pad(row.player.name, 18, true)}${pad(safeNumber(d.errors), 4)}${pad(safeNumber(d.doublePlays), 4)}${pad(safeNumber(d.flyOuts), 4)}${pad(safeNumber(d.groundOuts), 4)}${pad(safeNumber(d.lineOuts), 4)}`
+    )
   }
 
   const subs = gs.substitutions || []
@@ -130,7 +144,12 @@ function generateHtmlReport(game, rows) {
     const outs = safeNumber(p.outsPitched)
     const ip = formatIpFromOuts(outs)
     const era = outs ? ((safeNumber(p.earnedRuns) * 27) / outs).toFixed(2) : '0.00'
-    return `<tr><td>${row.player.name}</td><td>${ip}</td><td>${safeNumber(p.earnedRuns)}</td><td>${era}</td><td>${safeNumber(p.hitsAllowed)}</td><td>${safeNumber(p.strikeouts)}</td><td>${safeNumber(p.walks)}</td><td>${safeNumber(p.pitchCount)}</td></tr>`
+    return `<tr><td>${row.player.name}</td><td>${ip}</td><td>${safeNumber(p.earnedRuns)}</td><td>${era}</td><td>${safeNumber(p.hitsAllowed)}</td><td>${safeNumber(p.strikeouts)}</td><td>${safeNumber(p.walks)}</td><td>${safeNumber(p.pitchCount)}</td><td>${safeNumber(p.strikes)}</td><td>${safeNumber(p.balls)}</td><td>${safeNumber(p.wins)}</td><td>${safeNumber(p.losses)}</td><td>${safeNumber(p.saves)}</td></tr>`
+  }).join('')
+
+  const defenseRows = rows.map((row) => {
+    const d = row.defense
+    return `<tr><td>${row.player.name}</td><td>#${row.player.number}</td><td>${getMainPosition(row.player)}</td><td>${safeNumber(d.errors)}</td><td>${safeNumber(d.doublePlays)}</td><td>${safeNumber(d.flyOuts)}</td><td>${safeNumber(d.groundOuts)}</td><td>${safeNumber(d.lineOuts)}</td></tr>`
   }).join('')
 
   let linescoreHtml = ''
@@ -202,7 +221,12 @@ ${linescoreHtml}
   <thead><tr><th>Jogador</th><th>N</th><th>Pos</th><th>AB</th><th>H</th><th>2B</th><th>3B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>SO</th><th>SB</th><th>OUT</th><th>AVG</th></tr></thead>
   <tbody>${battingRows}</tbody>
 </table>
-${pitchers.length ? `<h2>Pitching</h2><table><thead><tr><th>Pitcher</th><th>IP</th><th>ER</th><th>ERA</th><th>H</th><th>SO</th><th>BB</th><th>PC</th></tr></thead><tbody>${pitchingRows}</tbody></table>` : ''}
+${pitchers.length ? `<h2>Pitching</h2><table><thead><tr><th>Pitcher</th><th>IP</th><th>ER</th><th>ERA</th><th>H</th><th>SO</th><th>BB</th><th>PC</th><th>STR</th><th>BAL</th><th>W</th><th>L</th><th>SV</th></tr></thead><tbody>${pitchingRows}</tbody></table>` : ''}
+<h2>Defesa</h2>
+<table>
+  <thead><tr><th>Jogador</th><th>N</th><th>Pos</th><th>E</th><th>DP</th><th>FO</th><th>GO</th><th>LO</th></tr></thead>
+  <tbody>${defenseRows}</tbody>
+</table>
 ${subsHtml}
 ${logHtml}
 <p style="font-size:.8em;color:#777;margin-top:1.5em">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
