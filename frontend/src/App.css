@@ -427,7 +427,7 @@ textarea:focus-visible {
 .nav-actions .active {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #fff;
+  color: var(--ink);
 }
 
 .nav-actions .nav-no-game {
@@ -1297,7 +1297,7 @@ textarea:focus-visible {
 .pregame-radio-row label:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #fff;
+  color: var(--ink);
   font-weight: 700;
 }
 .pregame-radio-row label:hover:not(:has(input:checked)) {
@@ -1440,7 +1440,7 @@ textarea:focus-visible {
 .action-btn {
   background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
   border-color: var(--accent-dark);
-  color: #fff;
+  color: var(--ink);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -1753,7 +1753,7 @@ html, body {
 .positions-picker label:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #fff;
+  color: var(--ink);
   font-weight: 700;
 }
 .positions-picker label:hover:not(:has(input:checked)) {
@@ -1794,7 +1794,7 @@ html, body {
 .lineup-picker label:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #fff;
+  color: var(--ink);
   font-weight: 700;
 }
 .lineup-picker label:hover:not(:has(input:checked)) {
@@ -1843,7 +1843,7 @@ html, body {
 .stats-tabs button.active {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #fff;
+  color: var(--ink);
 }
 
 .link-btn {
@@ -2277,7 +2277,7 @@ html, body {
   z-index: 120;
   padding: 8px 10px;
   background: var(--accent);
-  color: #fff;
+  color: var(--ink);
   border: 1px solid var(--accent-dark);
   border-radius: 8px;
   font-weight: 700;
@@ -2636,7 +2636,7 @@ html, body {
 
 .tool-dock button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--ink);
   border-color: var(--accent-dark);
 }
 
@@ -3158,7 +3158,7 @@ html {
 
 .game-subview-bar button.active {
   background: var(--accent, #6366f1);
-  color: #fff;
+  color: var(--ink);
 }
 
 /* ── Ações view ─────────────────────────────────────────────────── */

@@ -756,7 +756,7 @@ function App() {
       )}
       <header className={`top-nav${navCollapsed ? ' nav-hidden' : ''}`}>
         <div className="nav-brand" aria-label="InPlay">
-          <img className="nav-brand-logo" src="/inplay-logo.svg" alt="InPlay logo" />
+          <img className="nav-brand-logo" src="/IP_Square.png" alt="InPlay logo" />
           <div className="nav-brand-text">
             <h1>InPlay</h1>
             <span>Baseball Intelligence</span>

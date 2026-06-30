@@ -98,7 +98,7 @@ export default function LoginPage({ onLogin }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img
-            src="/inplay-logo.svg"
+            src="/IP_Square.png"
             alt="InPlay logo"
             style={{ width: '2.5rem', height: '2.5rem', objectFit: 'contain' }}
           />
@@ -178,7 +178,7 @@ export default function LoginPage({ onLogin }) {
                   borderRadius: '0.5rem',
                   border: 'none',
                   background: loading ? '#3a3a5a' : 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
-                  color: '#fff',
+                  color: '#eeeeff',
                   fontWeight: 700,
                   fontSize: '0.9rem',
                   cursor: loading ? 'not-allowed' : 'pointer',
@@ -227,7 +227,7 @@ export default function LoginPage({ onLogin }) {
                   borderRadius: '0.5rem',
                   border: 'none',
                   background: loading ? '#3a3a5a' : 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
-                  color: '#fff',
+                  color: '#eeeeff',
                   fontWeight: 700,
                   fontSize: '0.9rem',
                   cursor: loading ? 'not-allowed' : 'pointer',
