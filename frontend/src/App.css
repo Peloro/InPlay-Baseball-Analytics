@@ -4746,6 +4746,7 @@ html {
 .gd-players {
   display: grid;
   gap: 12px;
+  align-items: start;
 }
 
 @media (min-width: 640px) {
@@ -4964,4 +4965,67 @@ html {
   .gd-score-num {
     font-size: 1.4rem;
   }
+}
+
+/* ── Box score (linescore) ────────────────────────────────────────── */
+
+.gd-boxscore-wrap {
+  margin-bottom: 16px;
+  background: #181828;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.gd-boxscore-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gd-boxscore {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: max-content;
+  font-size: 0.82rem;
+}
+
+.gd-boxscore th,
+.gd-boxscore td {
+  padding: 7px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.gd-boxscore thead th {
+  background: #202038;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.73rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gd-boxscore tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.gd-bs-team {
+  text-align: left !important;
+  font-weight: 700;
+  color: var(--ink);
+  min-width: 90px;
+  padding-left: 14px !important;
+}
+
+.gd-bs-inn {
+  min-width: 28px;
+  color: var(--muted);
+}
+
+.gd-bs-tot {
+  min-width: 36px;
+  border-left: 1px solid var(--line);
+  font-size: 0.9rem;
+  color: var(--ink);
 }

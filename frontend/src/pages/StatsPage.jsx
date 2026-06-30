@@ -839,17 +839,6 @@ function StatsPage({
         {viewingGame && showGameDetail && (
           <div ref={gameDetailsRef}>
             {gameStatsLoading && <div className="stats-loading">Carregando estatísticas do jogo...</div>}
-            <div className="detail-actions">
-              <Button type="button" variant="primary" onClick={() => handleOpenGame(viewingGame)}>
-                Abrir jogo
-              </Button>
-              <Button type="button" variant="primary" onClick={onGoField}>
-                Ir para campo
-              </Button>
-              <Button type="button" variant="danger" onClick={() => setPendingResetGame(true)}>
-                Resetar stats do jogo
-              </Button>
-            </div>
             <GameDetailPage
               game={viewingGame}
               players={detailRosterPlayers}

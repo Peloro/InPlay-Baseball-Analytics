@@ -5,6 +5,7 @@ import { safeNumber } from '../utils/number'
 import { avgFromValues, formatEraFromOuts, formatIpFromOuts } from '../utils/stats'
 import { getPlayerId, getMainPosition, detectPlayerType } from '../utils/player'
 import { EMPTY_HITTING, EMPTY_PITCHING, EMPTY_DEFENSE } from '../constants/stats'
+import { getAuth } from '../services/api'
 
 // ── Report generation ─────────────────────────────────────────────
 
@@ -21,23 +22,26 @@ function generateTextReport(game, rows) {
   const awayScore = safeNumber(gs.awayScore)
   const inningScores = gs.inningScores || { home: [], away: [] }
   const sep = '─'.repeat(56)
+  const myTeam = getAuth()?.teamName || 'Nós'
+  const opponent = game.opponentName || game.opponent || 'Adversário'
 
   const lines = [
     'RELATÓRIO DE JOGO',
     '═'.repeat(40),
-    `vs ${game.opponentName || game.opponent}`,
+    `${myTeam} vs ${opponent}`,
     `Data: ${date}   Competição: ${game.competition || '—'}`,
-    `Placar final: ${homeScore} x ${awayScore}`,
+    `Placar final: ${myTeam} ${homeScore} × ${awayScore} ${opponent}`,
   ]
 
   const maxInning = Math.max(inningScores.home.length, inningScores.away.length)
   if (maxInning > 0) {
     const innings = Array.from({ length: maxInning }, (_, i) => i + 1)
+    const teamW = Math.max(myTeam.length, opponent.length, 8)
     lines.push('')
-    lines.push('PLACAR POR INNING')
-    lines.push(`${'Inning'.padEnd(8)} ${innings.map((n) => pad(n, 3)).join('')}  | Tot`)
-    lines.push(`${'Nós'.padEnd(8)} ${innings.map((_, i) => pad(inningScores.home[i] ?? 0, 3)).join('')}  | ${homeScore}`)
-    lines.push(`${'Deles'.padEnd(8)} ${innings.map((_, i) => pad(inningScores.away[i] ?? 0, 3)).join('')}  | ${awayScore}`)
+    lines.push('BOX SCORE')
+    lines.push(`${pad('', teamW, true)} ${innings.map((n) => pad(n, 3)).join('')}  | Tot`)
+    lines.push(`${pad(myTeam, teamW, true)} ${innings.map((_, i) => pad(inningScores.home[i] ?? 0, 3)).join('')}  | ${homeScore}`)
+    lines.push(`${pad(opponent, teamW, true)} ${innings.map((_, i) => pad(inningScores.away[i] ?? 0, 3)).join('')}  | ${awayScore}`)
   }
 
   lines.push('')
@@ -129,6 +133,8 @@ function generateHtmlReport(game, rows) {
   const awayScore = safeNumber(gs.awayScore)
   const inningScores = gs.inningScores || { home: [], away: [] }
   const maxInning = Math.max(inningScores.home.length, inningScores.away.length)
+  const myTeam = getAuth()?.teamName || 'Nós'
+  const opponent = game.opponentName || game.opponent || 'Adversário'
 
   const battingRows = rows.map((row) => {
     const h = row.hitting
@@ -159,11 +165,11 @@ function generateHtmlReport(game, rows) {
     const homeCells = innings.map((_, i) => `<td>${inningScores.home[i] ?? 0}</td>`).join('')
     const awayCells = innings.map((_, i) => `<td>${inningScores.away[i] ?? 0}</td>`).join('')
     linescoreHtml = `
-      <h2>Placar por Inning</h2>
-      <table><thead><tr><th>Time</th>${thCells}<th>Total</th></tr></thead>
+      <h2>Box Score</h2>
+      <table><thead><tr><th>Time</th>${thCells}<th>R</th></tr></thead>
       <tbody>
-        <tr><td><strong>Nós</strong></td>${homeCells}<td><strong>${homeScore}</strong></td></tr>
-        <tr><td><strong>Deles</strong></td>${awayCells}<td><strong>${awayScore}</strong></td></tr>
+        <tr><td><strong>${myTeam}</strong></td>${homeCells}<td><strong>${homeScore}</strong></td></tr>
+        <tr><td><strong>${opponent}</strong></td>${awayCells}<td><strong>${awayScore}</strong></td></tr>
       </tbody></table>`
   }
 
@@ -192,7 +198,7 @@ function generateHtmlReport(game, rows) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Relatório — ${game.opponentName || game.opponent} (${date})</title>
+<title>Relatório — ${myTeam} vs ${opponent} (${date})</title>
 <style>
   body{font-family:Arial,sans-serif;margin:2em;color:#111}
   h1{font-size:1.3em;margin-bottom:.2em}
@@ -210,10 +216,10 @@ function generateHtmlReport(game, rows) {
 <button class="print-btn" onclick="window.print()">Imprimir / Salvar como PDF</button>
 <h1>RELATÓRIO DE JOGO</h1>
 <div class="meta">
-  <strong>vs ${game.opponentName || game.opponent}</strong> &nbsp;|&nbsp;
+  <strong>${myTeam} vs ${opponent}</strong> &nbsp;|&nbsp;
   ${date} &nbsp;|&nbsp;
   ${game.competition || ''} &nbsp;|&nbsp;
-  Placar: <strong>${homeScore} x ${awayScore}</strong>
+  Placar: <strong>${myTeam} ${homeScore} × ${awayScore} ${opponent}</strong>
 </div>
 ${linescoreHtml}
 <h2>Batting</h2>
@@ -480,24 +486,28 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
   const awayScore = safeNumber(gs.awayScore)
   const hasScore = gs.homeScore != null || gs.awayScore != null
   const isNative = Boolean(window.Capacitor?.isNativePlatform?.() || window.Capacitor?.isNative)
+  const myTeam = getAuth()?.teamName || 'Nós'
+  const opponent = game.opponentName || game.opponent || 'Adversário'
+  const inningScores = gs.inningScores || { home: [], away: [] }
+  const maxInning = Math.max(inningScores.home.length, inningScores.away.length)
 
   return (
     <div className="game-detail card">
       {/* ── Header ── */}
       <div className="gd-header">
         <div className="gd-header-info">
-          <h3 className="gd-title">vs {game.opponentName || game.opponent}</h3>
+          <h3 className="gd-title">{myTeam} vs {opponent}</h3>
           <p className="gd-meta">
             {new Date(game.date).toLocaleDateString('pt-BR')}
             {game.competition ? ` · ${game.competition}` : ''}
           </p>
           {hasScore && (
             <div className="gd-score">
-              <span className="gd-score-team">Nós</span>
+              <span className="gd-score-team">{myTeam}</span>
               <strong className="gd-score-num">{homeScore}</strong>
               <span className="gd-score-sep">×</span>
               <strong className="gd-score-num">{awayScore}</strong>
-              <span className="gd-score-team">Adversário</span>
+              <span className="gd-score-team">{opponent}</span>
             </div>
           )}
         </div>
@@ -513,6 +523,41 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
           </Button>
         </div>
       </div>
+
+      {/* ── Box score (linescore) ── */}
+      {maxInning > 0 && (
+        <div className="gd-boxscore-wrap">
+          <div className="gd-boxscore-scroll">
+            <table className="gd-boxscore">
+              <thead>
+                <tr>
+                  <th className="gd-bs-team">Time</th>
+                  {Array.from({ length: maxInning }, (_, i) => (
+                    <th key={i + 1} className="gd-bs-inn">{i + 1}</th>
+                  ))}
+                  <th className="gd-bs-tot">R</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="gd-bs-team">{myTeam}</td>
+                  {Array.from({ length: maxInning }, (_, i) => (
+                    <td key={i} className="gd-bs-inn">{inningScores.home[i] ?? 0}</td>
+                  ))}
+                  <td className="gd-bs-tot"><strong>{homeScore}</strong></td>
+                </tr>
+                <tr>
+                  <td className="gd-bs-team">{opponent}</td>
+                  {Array.from({ length: maxInning }, (_, i) => (
+                    <td key={i} className="gd-bs-inn">{inningScores.away[i] ?? 0}</td>
+                  ))}
+                  <td className="gd-bs-tot"><strong>{awayScore}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Player cards ── */}
       <div className="gd-players">
