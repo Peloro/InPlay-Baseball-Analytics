@@ -1,4 +1,4 @@
-package com.caaso.baseball;
+package com.inplay.analytics;
 
 import android.os.Build;
 import android.view.View;

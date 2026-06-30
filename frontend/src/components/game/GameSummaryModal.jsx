@@ -2,11 +2,12 @@ import { useState } from 'react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import Select from '../ui/Select'
-import { gameStatsApi } from '../../services/api'
+import { gameStatsApi, getAuth } from '../../services/api'
 import { safeNumber } from '../../utils/number'
 import { detectPlayerType, getPlayerId } from '../../utils/player'
 
 export default function GameSummaryModal({ snapshot, gameState, players, upsertPlayerStat, onClose }) {
+  const teamName = getAuth()?.teamName || 'Nós'
   const [summaryWP, setSummaryWP] = useState('')
   const [summaryLP, setSummaryLP] = useState('')
   const [summarySV, setSummarySV] = useState('')
@@ -42,7 +43,7 @@ export default function GameSummaryModal({ snapshot, gameState, players, upsertP
       <div className="game-summary">
         <div className="game-summary-result">
           {snapshot.homeScore > snapshot.awayScore
-            ? 'CAASO venceu!'
+            ? `${teamName} venceu!`
             : snapshot.homeScore < snapshot.awayScore
               ? `${snapshot.opponentName} venceu`
               : 'Empate'}
@@ -67,7 +68,7 @@ export default function GameSummaryModal({ snapshot, gameState, players, upsertP
                 <td className="gsb-total">{snapshot.awayScore}</td>
               </tr>
               <tr>
-                <td className="gsb-team gsb-team-label">CAASO</td>
+                <td className="gsb-team gsb-team-label">{teamName}</td>
                 {Array.from({ length: numInnings }, (_, i) => (
                   <td key={i} className="gsb-cell">{(snapshot.inningScores?.home || [])[i] ?? 0}</td>
                 ))}

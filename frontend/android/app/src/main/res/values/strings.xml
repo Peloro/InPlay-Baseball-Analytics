@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Beisebol CAASO</string>
-    <string name="title_activity_main">Beisebol CAASO</string>
-    <string name="package_name">com.caaso.baseball</string>
-    <string name="custom_url_scheme">com.caaso.baseball</string>
+    <string name="app_name">InPlay</string>
+    <string name="title_activity_main">InPlay</string>
+    <string name="package_name">com.inplay.analytics</string>
+    <string name="custom_url_scheme">com.inplay.analytics</string>
 </resources>

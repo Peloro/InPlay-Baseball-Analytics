@@ -1,6 +1,8 @@
 import React from 'react'
+import { getAuth } from '../../../services/api'
 
 export default function Scoreboard({ gameState, opponentName, visible = false }) {
+  const teamName = getAuth()?.teamName || 'Nós'
   const inningScores = gameState.inningScores || { home: [], away: [] }
   const totalInnings = Math.max(
     9,
@@ -13,7 +15,7 @@ export default function Scoreboard({ gameState, opponentName, visible = false })
   return (
     <div className={`game-scoreboard ${visible ? 'visible' : 'hidden'}`} role="region" aria-label="Placar do jogo">
       <div className="game-score-main">
-        <strong className="team-name">CAASO</strong>
+        <strong className="team-name">{teamName}</strong>
         <span key={`score-home-${gameState.homeScore || 0}`} className="score-value score-pulse">{gameState.homeScore || 0}</span>
         <span className="score-separator">x</span>
         <span key={`score-away-${gameState.awayScore || 0}`} className="score-value score-pulse">{gameState.awayScore || 0}</span>

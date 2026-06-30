@@ -8,7 +8,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import CountDots from '../components/CountDots'
-import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
+import { gameStatsApi, gamesApi, seasonStatsApi, getAuth } from '../services/api'
 import { getDefaultFieldPosition } from '../data/defaultFieldPositions'
 import { VALID_POSITIONS } from '../data/positions'
 import Scoreboard from '../components/game/Scoreboard/Scoreboard'
@@ -49,6 +49,7 @@ function FieldPage({
   statsRefreshKey = 0,
   onStatsUpdated = null,
 }) {
+  const teamName = getAuth()?.teamName || 'Nós'
   const layoutRef = useRef(null)
   const fieldStageRef = useRef(null)
   const fieldImageRef = useRef(null)
@@ -251,7 +252,7 @@ function FieldPage({
       gameState.homeScore > gameState.awayScore
     ) {
       kind = 'walkoff'
-      message = 'Walk-off! CAASO venceu. Encerrar o jogo?'
+      message = `Walk-off! ${teamName} venceu! Encerrar o jogo?`
     }
 
     if (kind && message) {
@@ -1274,7 +1275,7 @@ function FieldPage({
           aria-live="polite"
           aria-atomic="true"
         >
-          {`Inning ${gameState.inning || 1} ${gameState.inningHalf === 'top' ? 'topo' : 'parte baixa'}, ${gameState.outs || 0} out${(gameState.outs || 0) !== 1 ? 's' : ''}, CAASO ${gameState.homeScore || 0} x ${gameState.awayScore || 0} ${opponentName || 'Adversário'}`}
+          {`Inning ${gameState.inning || 1} ${gameState.inningHalf === 'top' ? 'topo' : 'parte baixa'}, ${gameState.outs || 0} out${(gameState.outs || 0) !== 1 ? 's' : ''}, ${teamName} ${gameState.homeScore || 0} x ${gameState.awayScore || 0} ${opponentName || 'Adversário'}`}
         </div>
         <Scoreboard gameState={gameState} opponentName={opponentName} visible={gameSubView === 'campo' && showScoreboard} />
         {sideSwitchBanner && (
@@ -1363,7 +1364,7 @@ function FieldPage({
         <div className="acoes-view">
           <div className="acoes-left">
             <div className="acoes-score-row">
-              <span className="acoes-score-team">CAASO</span>
+              <span className="acoes-score-team">{teamName}</span>
               <span className="acoes-score-num">{gameState.homeScore || 0}</span>
               <span className="acoes-score-sep">×</span>
               <span className="acoes-score-num">{gameState.awayScore || 0}</span>
@@ -1944,7 +1945,7 @@ function FieldPage({
           <span className={`score-chip-mode ${gameState.isAttacking ? 'score-chip-mode--atk' : 'score-chip-mode--def'}`}>
             {gameState.isAttacking ? 'ATK' : 'DEF'}
           </span>
-          <span className="score-chip-score">CAASO {gameState.homeScore||0} × {gameState.awayScore||0} {opponentName||'Adv'}</span>
+          <span className="score-chip-score">{teamName} {gameState.homeScore||0} × {gameState.awayScore||0} {opponentName||'Adv'}</span>
           <span className="score-chip-dot">·</span>
           <span className="score-chip-inning">{gameState.inningHalf==='top'?'▲':'▼'} {gameState.inning||1}ª</span>
           <span className="score-chip-dot">·</span>
