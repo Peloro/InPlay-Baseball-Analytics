@@ -419,9 +419,19 @@ function PlayerDetailCard({ row, onQuickEvent, onOpenPlayer }) {
   )
 }
 
+// ── Trash icon ────────────────────────────────────────────────────
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2 3.5h10M5.5 3.5V2.5h3v1M4 3.5l.667 8h4.666L10 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────
 
-function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpenPlayer }) {
+function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onDelete, onOpenPlayer }) {
   const [showExport, setShowExport] = useState(false)
 
   const rows = useMemo(() => {
@@ -512,15 +522,23 @@ function GameDetailPage({ game, players, gameStats, onQuickEvent, onClose, onOpe
           )}
         </div>
         <div className="gd-head-actions">
-          <Button type="button" variant="primary" onClick={() => setShowExport(true)}>
-            Resumo
-          </Button>
-          <Button type="button" variant="secondary" onClick={handlePrintReport}>
-            {isNative ? 'Compartilhar' : 'PDF'}
-          </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            ✕
-          </Button>
+          {onDelete && (
+            <button type="button" className="gd-delete-btn" onClick={onDelete} title="Excluir jogo">
+              <TrashIcon />
+              Excluir
+            </button>
+          )}
+          <div className="gd-head-actions-right">
+            <Button type="button" variant="primary" onClick={() => setShowExport(true)}>
+              Resumo
+            </Button>
+            <Button type="button" variant="secondary" onClick={handlePrintReport}>
+              {isNative ? 'Compartilhar' : 'PDF'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              ✕ Fechar
+            </Button>
+          </div>
         </div>
       </div>
 

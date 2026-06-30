@@ -1958,6 +1958,10 @@ html, body {
   gap: 8px;
 }
 
+.game-detail-inline {
+  list-style: none;
+}
+
 .game-list-row,
 .game-card {
   display: grid;
@@ -4681,11 +4685,8 @@ html {
 
 /* Header */
 .gd-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 10px;
   margin-bottom: 16px;
 }
 
@@ -4736,10 +4737,44 @@ html {
 
 .gd-head-actions {
   display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-shrink: 0;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.gd-head-actions-right {
+  display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: flex-start;
+}
+
+.gd-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #c0392b;
+  border-radius: 8px;
+  background: transparent;
+  color: #e05555;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 34px;
+  transition: background 120ms, color 120ms;
+  -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
+}
+
+.gd-delete-btn:hover {
+  background: rgba(224, 85, 85, 0.12);
+}
+
+.gd-delete-btn:active {
+  background: rgba(224, 85, 85, 0.25);
 }
 
 /* Player grid */
@@ -4955,11 +4990,6 @@ html {
 
   .gd-stats-grid {
     gap: 5px;
-  }
-
-  .gd-head-actions {
-    width: 100%;
-    justify-content: flex-end;
   }
 
   .gd-score-num {

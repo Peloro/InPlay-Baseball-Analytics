@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, Fragment, useMemo, useState } from 'react'
 import StatLabel from '../components/ui/StatLabel'
 import GameDetailPage from './GameDetailPage'
 import { gameStatsApi, gamesApi, seasonStatsApi } from '../services/api'
@@ -61,8 +61,6 @@ function StatsPage({
   // Completely independent from gameState.currentGameId (the active/live game).
   const [viewingGameId, setViewingGameId] = useState(() => gameState.currentGameId)
   const [showGameDetail, setShowGameDetail] = useState(() => Boolean(gameState.currentGameId))
-
-  const gameDetailsRef = useRef(null)
 
   const loadGames = useCallback(async () => {
     setGamesLoading(true)
@@ -399,20 +397,12 @@ function StatsPage({
   }
 
   const handleSelectGameCard = (game) => {
-    setViewingGameId(game._id)
-    setShowGameDetail(true)
-  }
-
-  const handleOpenGame = (game) => {
-    onOpenGame?.(game)
-  }
-
-  const handleViewGameStats = (game) => {
-    setViewingGameId(game._id)
-    setShowGameDetail(true)
-    window.setTimeout(() => {
-      gameDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 20)
+    if (viewingGameId === game._id && showGameDetail) {
+      setShowGameDetail(false)
+    } else {
+      setViewingGameId(game._id)
+      setShowGameDetail(true)
+    }
   }
 
   const handleRefresh = async () => {
@@ -774,104 +764,74 @@ function StatsPage({
         <ul className="game-list">
           {sortedGames.map((game) => {
             const isLive = game._id === gameState.currentGameId
-            // For the active game show live score; for historical games show stored score
             const score = isLive
               ? `${Number(gameState.homeScore || 0)} x ${Number(gameState.awayScore || 0)}`
               : game?.gameState
                 ? `${Number(game.gameState.homeScore || 0)} x ${Number(game.gameState.awayScore || 0)}`
                 : '-- x --'
+            const isSelected = viewingGameId === game._id && showGameDetail
 
             return (
-              <li key={game._id}>
-                <article
-                  className={`game-card ${viewingGameId === game._id ? 'selected' : ''}`}
-                  onClick={() => handleSelectGameCard(game)}
-                >
-                  <div className="game-card-head">
-                    <strong>{game.opponentName || game.opponent}</strong>
-                    <div className="game-card-head-right">
-                      {isLive && <span className="live-badge">AO VIVO</span>}
-                      <span>{new Date(game.date).toLocaleDateString('pt-BR')}</span>
+              <Fragment key={game._id}>
+                <li>
+                  <article
+                    className={`game-card ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSelectGameCard(game)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="game-card-head">
+                      <strong>{game.opponentName || game.opponent}</strong>
+                      <div className="game-card-head-right">
+                        {isLive && <span className="live-badge">AO VIVO</span>}
+                        <span>{new Date(game.date).toLocaleDateString('pt-BR')}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="game-card-meta">
-                    <span>{game.competition}</span>
-                    <span>Placar: {score}</span>
-                  </div>
-                    <div className="game-card-actions">
-                      <Button
-                        type="button"
-                        variant="primary"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          handleOpenGame(game)
-                        }}
-                      >
-                        Abrir jogo
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          handleViewGameStats(game)
-                        }}
-                      >
-                        Ver estatisticas
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          handleDeleteGameItem(game)
-                        }}
-                      >
-                        Excluir
-                      </Button>
+                    <div className="game-card-meta">
+                      <span>{game.competition}</span>
+                      <span>Placar: {score}</span>
                     </div>
-                </article>
-              </li>
+                  </article>
+                </li>
+                {isSelected && (
+                  <li className="game-detail-inline">
+                    {gameStatsLoading && <div className="stats-loading">Carregando estatísticas do jogo...</div>}
+                    <GameDetailPage
+                      game={game}
+                      players={detailRosterPlayers}
+                      gameStats={gameStats}
+                      onClose={() => setShowGameDetail(false)}
+                      onDelete={() => handleDeleteGameItem(game)}
+                      onOpenPlayer={openPlayerDetails}
+                      onQuickEvent={(playerId, category, fieldKey, delta) => {
+                        const freshStats = gameStatsApi.listByGame(viewingGameId).data
+                        const current = freshStats.find((entry) => {
+                          const entryPlayerId = entry.playerId?._id || entry.playerId
+                          return entryPlayerId === playerId
+                        }) || { ...EMPTY_GAME_STAT }
+
+                        const currentCategory = current[category] || EMPTY_GAME_STAT[category]
+                        const currentValue = safeNumber(currentCategory[fieldKey])
+                        const newValue = Math.max(0, currentValue + delta)
+                        const updatedCategory = { ...currentCategory, [fieldKey]: newValue }
+
+                        if (category === 'pitching' && fieldKey === 'outsPitched') {
+                          updatedCategory.inningsPitched = Math.floor(newValue / 3) + ((newValue % 3) / 10)
+                        }
+
+                        upsertGameStat(playerId, {
+                          hitting: current.hitting || EMPTY_GAME_STAT.hitting,
+                          pitching: current.pitching || EMPTY_GAME_STAT.pitching,
+                          defense: current.defense || EMPTY_GAME_STAT.defense,
+                          [category]: updatedCategory,
+                        })
+                      }}
+                    />
+                  </li>
+                )}
+              </Fragment>
             )
           })}
         </ul>
-
-        {viewingGame && showGameDetail && (
-          <div ref={gameDetailsRef}>
-            {gameStatsLoading && <div className="stats-loading">Carregando estatísticas do jogo...</div>}
-            <GameDetailPage
-              game={viewingGame}
-              players={detailRosterPlayers}
-              gameStats={gameStats}
-              onClose={() => setShowGameDetail(false)}
-              onOpenPlayer={openPlayerDetails}
-              onQuickEvent={(playerId, category, fieldKey, delta) => {
-                // Read FRESH from localStorage — avoids stale React state after background server sync
-                const freshStats = gameStatsApi.listByGame(viewingGameId).data
-                const current = freshStats.find((entry) => {
-                  const entryPlayerId = entry.playerId?._id || entry.playerId
-                  return entryPlayerId === playerId
-                }) || { ...EMPTY_GAME_STAT }
-
-                const currentCategory = current[category] || EMPTY_GAME_STAT[category]
-                const currentValue = safeNumber(currentCategory[fieldKey])
-                const newValue = Math.max(0, currentValue + delta)
-                const updatedCategory = { ...currentCategory, [fieldKey]: newValue }
-
-                if (category === 'pitching' && fieldKey === 'outsPitched') {
-                  updatedCategory.inningsPitched = Math.floor(newValue / 3) + ((newValue % 3) / 10)
-                }
-
-                upsertGameStat(playerId, {
-                  hitting: current.hitting || EMPTY_GAME_STAT.hitting,
-                  pitching: current.pitching || EMPTY_GAME_STAT.pitching,
-                  defense: current.defense || EMPTY_GAME_STAT.defense,
-                  [category]: updatedCategory,
-                })
-              }}
-            />
-          </div>
-        )}
       </div>
       </div>{/* /stats-main */}
 
