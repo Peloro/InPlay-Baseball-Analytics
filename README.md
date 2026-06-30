@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="frontend/public/Ativo%201Cporcotransparente.png" alt="CAASO Baseball Tracker" width="200"/>
+  <img src="frontend/public/IP_Square.png" alt="CAASO Baseball Tracker" width="200"/>
 
-  # CAASO Baseball Tracker
+  # InPlay Baseball Analytics
 
-  **Live game tracking and season statistics for the CAASO  baseball team**
+  **Live game tracking and season statistics**
 
   [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://reactjs.org/)
   [![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -20,7 +20,7 @@
 
 ## About
 
-CAASO Baseball Tracker is a mobile-first app for live game tracking and statistics management for the **CAASO** university baseball team. The app runs fully offline — all data is stored locally in `localStorage` and synced with the backend in the background whenever a connection is available.
+CAASO Baseball Tracker is a mobile-first app for live game tracking and statistics management. The app runs fully offline — all data is stored locally in `localStorage` and synced with the backend in the background whenever a connection is available.
 
 It is distributed as an **Android APK** via Capacitor and can also be used directly in the browser.
 
@@ -54,8 +54,8 @@ It is distributed as an **Android APK** via Capacitor and can also be used direc
 
 ```bash
 # Clone the repository
-git clone https://github.com/Peloro/CAASO-Baseball-Tracker.git
-cd CAASO-Baseball-Tracker
+git clone https://github.com/Peloro/InPlay-Baseball-Analytics.git
+cd InPlay-Baseball-Analytics
 
 # Frontend
 cd frontend
@@ -150,7 +150,7 @@ Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
 
 <div align="center">
 
-  Made with ♥ for Brazilian university baseball
+  Made with ♥ for Brazilian Baseball
 
   [![GitHub](https://img.shields.io/badge/GitHub-Peloro-181717?logo=github)](https://github.com/Peloro)
 
