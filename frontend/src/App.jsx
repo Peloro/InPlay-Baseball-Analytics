@@ -759,7 +759,7 @@ function App() {
           <img className="nav-brand-logo" src="/IP_Square.png" alt="InPlay logo" />
           <div className="nav-brand-text">
             <h1>InPlay</h1>
-            <span>Baseball Intelligence</span>
+            <span>Baseball Analytics</span>
           </div>
           {syncStatus !== 'no-backend' && (
             <span

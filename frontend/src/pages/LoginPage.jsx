@@ -104,7 +104,7 @@ export default function LoginPage({ onLogin }) {
           />
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#eeeeff', lineHeight: 1.2, letterSpacing: '0.02em' }}>InPlay</div>
-            <div style={{ fontSize: '0.68rem', color: '#6366f1', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>Baseball Intelligence</div>
+            <div style={{ fontSize: '0.68rem', color: '#6366f1', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>Baseball Analytics</div>
           </div>
         </div>
 

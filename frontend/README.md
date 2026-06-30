@@ -1,4 +1,4 @@
-# InPlay — Baseball Intelligence
+# InPlay — Baseball Analytics
 
 A mobile-first baseball game management platform. Track live games, manage rosters, record pitch-by-pitch stats, and analyze season performance — all offline-first with optional cloud sync.
 
