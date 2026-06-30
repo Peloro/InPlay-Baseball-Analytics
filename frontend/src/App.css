@@ -1,22 +1,22 @@
 :root {
-  --ink: #f2eedb;
-  --muted: #9a9080;
-  --panel: #171717;
-  --accent: #f5d400;
-  --accent-dark: #bc9900;
-  --line: #4c4427;
+  --ink: #eeeeff;
+  --muted: #6b6b7e;
+  --panel: #131320;
+  --accent: #6366f1;
+  --accent-dark: #4f46e5;
+  --line: #26263a;
   --top-nav-height: calc(64px + env(safe-area-inset-top, 0px));
   /* Control sizing */
   --ctrl-radius: 8px;
-  --ctrl-bg: #1e1e1e;
-  --ctrl-border: #3a3327;
+  --ctrl-bg: #1e1e2a;
+  --ctrl-border: #26263a;
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3a3222; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #5c4e2e; }
+::-webkit-scrollbar-thumb { background: #26263a; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a5a; }
 
 * {
   box-sizing: border-box;
@@ -118,7 +118,7 @@ select {
   border-radius: 8px;
   padding: 8px 28px 8px 10px;
   background-color: var(--ctrl-bg);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23bc9900' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%234f46e5' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   color: var(--ink);
@@ -198,7 +198,7 @@ textarea:focus-visible {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   color: var(--ink);
-  background: linear-gradient(145deg, #0f0f0f 0%, #121212 100%);
+  background: linear-gradient(145deg, #09090f 0%, #0d0d1a 100%);
   transition: opacity 260ms ease, padding-top 220ms ease;
 }
 
@@ -228,8 +228,8 @@ textarea:focus-visible {
   z-index: 9999;
   min-height: var(--top-nav-height);
   padding: calc(10px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
-  background: rgba(14, 14, 14, 0.96);
-  border-bottom: 1px solid rgba(0,0,0,0.2);
+  background: rgba(9, 9, 15, 0.96);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.12);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -304,7 +304,7 @@ textarea:focus-visible {
   font-size: 1.05rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #f5d400;
+  color: var(--accent);
 }
 
 .nav-brand {
@@ -328,7 +328,7 @@ textarea:focus-visible {
 }
 
 .nav-brand-text span {
-  color: rgba(255, 245, 183, 0.9);
+  color: rgba(160, 160, 255, 0.75);
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -343,7 +343,7 @@ textarea:focus-visible {
 
 .nav-actions button {
   border: 1px solid var(--line);
-  background: #222014;
+  background: #1a1a28;
   color: var(--ink);
   border-radius: 999px;
   padding: 8px 14px;
@@ -416,10 +416,10 @@ textarea:focus-visible {
 .game-access-warning {
   margin: 8px 16px 0;
   padding: 8px 10px;
-  border: 1px solid #8a6d2d;
+  border: 1px solid #4a4a9a;
   border-radius: 10px;
-  background: rgba(56, 44, 12, 0.9);
-  color: #f8dc8d;
+  background: rgba(30, 30, 70, 0.9);
+  color: #c4c4ff;
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -427,7 +427,7 @@ textarea:focus-visible {
 .nav-actions .active {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #1b1b1b;
+  color: #fff;
 }
 
 .nav-actions .nav-no-game {
@@ -436,8 +436,8 @@ textarea:focus-visible {
 }
 
 .nav-actions .nav-no-game.active {
-  background: #2d4a2d;
-  border-color: #4a7a4a;
+  background: #1e1e40;
+  border-color: #4a4a9a;
   color: var(--ink);
   border-style: solid;
   opacity: 1;
@@ -464,9 +464,9 @@ textarea:focus-visible {
   z-index: 27;
   min-width: 340px;
   max-width: min(92vw, 680px);
-  border: 1px solid #5a4e22;
+  border: 1px solid #26263a;
   border-radius: 14px;
-  background: rgba(24, 24, 24, 0.96);
+  background: rgba(19, 19, 32, 0.96);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
   padding: 8px 10px;
   display: grid;
@@ -767,7 +767,7 @@ textarea:focus-visible {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  background: rgba(7, 18, 13, 0.9);
+  background: rgba(9, 9, 20, 0.9);
   color: #fff;
   font-size: calc(0.8rem * var(--field-scale));
   padding: 6px 8px;
@@ -826,9 +826,9 @@ textarea:focus-visible {
   right: 12px;
   bottom: 12px;
   width: 300px;
-  border: 1px solid #4f4727;
+  border: 1px solid #26263a;
   border-radius: 14px;
-  background: rgba(26, 26, 26, 0.95);
+  background: rgba(19, 19, 32, 0.95);
   padding: 14px;
   overflow-y: auto;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34);
@@ -876,7 +876,7 @@ textarea:focus-visible {
 }
 
 .bench-card:hover {
-  border-color: #5a4e30;
+  border-color: #3a3a60;
 }
 
 .bench-card.selected {
@@ -972,7 +972,7 @@ textarea:focus-visible {
 
   .hud-sub {
     margin: 6px 0 8px 0;
-    color: #bdb5a6;
+    color: #9090c8;
   }
 
   .hud-actions {
@@ -1059,8 +1059,8 @@ textarea:focus-visible {
   bottom: 12px !important;
   width: 320px !important;
   max-width: 320px !important;
-  background: rgba(26, 26, 26, 0.95) !important;
-  border: 1px solid #4f4727 !important;
+  background: rgba(19, 19, 32, 0.95) !important;
+  border: 1px solid #26263a !important;
   border-radius: 14px !important;
   padding: 14px !important;
   box-shadow: 0 8px 22px rgba(0,0,0,0.34) !important;
@@ -1297,11 +1297,11 @@ textarea:focus-visible {
 .pregame-radio-row label:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #111;
+  color: #fff;
   font-weight: 700;
 }
 .pregame-radio-row label:hover:not(:has(input:checked)) {
-  border-color: #685a2a;
+  border-color: #4a4a8a;
   color: var(--ink);
 }
 
@@ -1391,7 +1391,7 @@ textarea:focus-visible {
   transition: border-color 130ms ease, background-color 130ms ease;
 }
 .pregame-order-item:hover {
-  border-color: #5a4e30;
+  border-color: #3a3a60;
   background: #222;
 }
 .pregame-order-handle {
@@ -1438,9 +1438,9 @@ textarea:focus-visible {
 .player-form button,
 .link-btn,
 .action-btn {
-  background: linear-gradient(180deg, var(--accent) 0%, #d9ba00 100%);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
   border-color: var(--accent-dark);
-  color: #111;
+  color: #fff;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -1538,10 +1538,10 @@ textarea:focus-visible {
 
 @keyframes statPulse {
   0% {
-    background: rgba(198, 87, 47, 0.16);
+    background: rgba(99, 102, 241, 0.16);
   }
   100% {
-    background: rgba(246, 245, 238, 0.92);
+    background: rgba(238, 238, 255, 0.92);
   }
 }
 
@@ -1706,7 +1706,7 @@ html, body {
 
 .card {
   background: var(--panel);
-  border: 1px solid #4f4523;
+  border: 1px solid #26263a;
   border-radius: 14px;
   padding: 18px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
@@ -1753,11 +1753,11 @@ html, body {
 .positions-picker label:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #111;
+  color: #fff;
   font-weight: 700;
 }
 .positions-picker label:hover:not(:has(input:checked)) {
-  border-color: #685a2a;
+  border-color: #4a4a8a;
   color: var(--ink);
 }
 .positions-picker label:has(input:disabled) {
@@ -1794,11 +1794,11 @@ html, body {
 .lineup-picker label:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #111;
+  color: #fff;
   font-weight: 700;
 }
 .lineup-picker label:hover:not(:has(input:checked)) {
-  border-color: #685a2a;
+  border-color: #4a4a8a;
   color: var(--ink);
 }
 .lineup-picker label:has(input:disabled) {
@@ -1843,7 +1843,7 @@ html, body {
 .stats-tabs button.active {
   background: var(--accent);
   border-color: var(--accent-dark);
-  color: #1a1a1a;
+  color: #fff;
 }
 
 .link-btn {
@@ -1932,7 +1932,7 @@ html, body {
 }
 
 .season-leader-row {
-  background: rgba(198, 87, 47, 0.08);
+  background: rgba(99, 102, 241, 0.08);
 }
 
 .stats-table .sortable-th {
@@ -1979,8 +1979,8 @@ html, body {
 
 .game-card.selected {
   border-color: var(--accent-dark);
-  background: #2d2816;
-  box-shadow: 0 0 0 2px rgba(198, 87, 47, 0.18);
+  background: #16162a;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.18);
 }
 
 .game-card-head,
@@ -2030,7 +2030,7 @@ html, body {
 }
 
 .game-card-meta {
-  color: #c2b98f;
+  color: #9090c8;
   font-size: 0.9rem;
 }
 
@@ -2051,7 +2051,7 @@ html, body {
   transition: border-color 130ms ease, background-color 130ms ease, filter 120ms ease, opacity 120ms ease;
 }
 .game-list button:hover {
-  border-color: #5a4e30;
+  border-color: #3a3a60;
   background: #222;
 }
 
@@ -2105,7 +2105,7 @@ html, body {
   transition: border-color 130ms ease, background-color 130ms ease;
 }
 .managed-list-item:hover {
-  border-color: #5a4e30;
+  border-color: #3a3a60;
   background: #212121;
 }
 
@@ -2261,7 +2261,7 @@ html, body {
 }
 
 .player-row-head {
-  background: #2a2617;
+  background: #16162a;
 }
 
 /* Hidden mode utility used to collapse entire containers */
@@ -2277,7 +2277,7 @@ html, body {
   z-index: 120;
   padding: 8px 10px;
   background: var(--accent);
-  color: #111;
+  color: #fff;
   border: 1px solid var(--accent-dark);
   border-radius: 8px;
   font-weight: 700;
@@ -2521,7 +2521,7 @@ html, body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(17, 25, 20, 0.6);
+  background: rgba(9, 9, 20, 0.6);
   z-index: 10001;
   display: grid;
   place-items: center;
@@ -2617,10 +2617,10 @@ html, body {
   gap: 8px;
   padding: 10px;
   border-radius: 14px;
-  border: 1px solid rgba(88, 76, 28, 0.5);
-  background: rgba(25, 25, 25, 0.92);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(19, 19, 32, 0.92);
   backdrop-filter: blur(8px);
-  box-shadow: 0 8px 22px rgba(16, 35, 26, 0.24);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
 }
 
 .tool-dock button {
@@ -2636,7 +2636,7 @@ html, body {
 
 .tool-dock button.active {
   background: var(--accent);
-  color: #1a1a1a;
+  color: #fff;
   border-color: var(--accent-dark);
 }
 
@@ -2867,7 +2867,7 @@ html, body {
   }
 
   .stat-card-sub {
-    color: #bfb591;
+    color: #9090c8;
     font-size: 0.86rem;
     margin-top: 4px;
   }
@@ -3028,8 +3028,8 @@ html {
 }
 
 .hud-mode-attack {
-  background: rgba(245, 212, 0, 0.14);
-  border: 1px solid rgba(245, 212, 0, 0.45);
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(99, 102, 241, 0.45);
   color: var(--accent);
 }
 
@@ -3058,9 +3058,9 @@ html {
 }
 
 .hud-mode-toggle-pending {
-  background: #5a3a00;
-  border-color: #d2a100;
-  color: #f5d400;
+  background: #1e1e50;
+  border-color: #6366f1;
+  color: #a5b4fc;
   animation: pulse-warn 0.4s ease;
 }
 
@@ -3117,7 +3117,7 @@ html {
 
 .bench-field-count {
   font-size: 0.8rem;
-  color: #c2b98f;
+  color: #9090c8;
   font-weight: 600;
   white-space: nowrap;
   padding: 3px 8px;
@@ -3157,8 +3157,8 @@ html {
 }
 
 .game-subview-bar button.active {
-  background: var(--accent, #f5d400);
-  color: #1b1b1b;
+  background: var(--accent, #6366f1);
+  color: #fff;
 }
 
 /* ── Ações view ─────────────────────────────────────────────────── */
@@ -3169,7 +3169,7 @@ html {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #0f0f0f;
+  background: #09090f;
   z-index: 150;
   display: flex;
   gap: 0;

@@ -755,11 +755,11 @@ function App() {
         <button type="button" className="nav-restore-btn" onClick={() => setNavCollapsed(false)} aria-label="Mostrar navegação">▼</button>
       )}
       <header className={`top-nav${navCollapsed ? ' nav-hidden' : ''}`}>
-        <div className="nav-brand" aria-label="Beisebol CAASO">
-          <img className="nav-brand-logo" src="/Ativo 1Cporcotransparente.png" alt="Logo C com porco" />
+        <div className="nav-brand" aria-label="InPlay">
+          <img className="nav-brand-logo" src="/inplay-logo.svg" alt="InPlay logo" />
           <div className="nav-brand-text">
-            <h1>Beisebol CAASO</h1>
-            <span>RAÇA CAASO</span>
+            <h1>InPlay</h1>
+            <span>Baseball Intelligence</span>
           </div>
           {syncStatus !== 'no-backend' && (
             <span

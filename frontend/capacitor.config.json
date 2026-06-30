@@ -1,6 +1,6 @@
 {
   "appId": "com.caaso.baseball",
-  "appName": "Beisebol CAASO",
+  "appName": "InPlay",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"
@@ -13,7 +13,7 @@
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true,
-      "backgroundColor": "#0f0f0f",
+      "backgroundColor": "#09090f",
       "showSpinner": false
     }
   }

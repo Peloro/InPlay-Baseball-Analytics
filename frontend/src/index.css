@@ -20,8 +20,8 @@ body,
 
 body {
   min-width: 320px;
-  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
-  color: #10231a;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: #eeeeff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
